@@ -331,8 +331,8 @@
       "default_branch": "main",
       "pinned_url": "https://github.com/mksglu/context-mode/tree/2aed57aeb12401600fbe9323ab9de74bff65e899",
       "coverage_status": "native-partial",
-      "coverage_evidence": "tests/store.test.mjs; tests/output-fragments.test.mjs",
-      "remaining_gap": "Local FTS5 and RRF excerpts exist; context-execute sandbox, batching, external tool-call routing and embeddings are absent."
+      "coverage_evidence": "extensions/envelope/store.mjs; extensions/envelope/output-fragments.mjs; tests/output-chunk-index.test.mjs",
+      "remaining_gap": "v0.15.0 adds locally indexed bounded chunk FTS5/BM25 plus lexical RRF, verified recall, and incremental migration. Sandbox execution, embeddings and comprehensive Context Mode parity are not ported."
     },
     {
       "repo": "ttttmr/pi-context",

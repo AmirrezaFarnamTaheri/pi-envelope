@@ -6,16 +6,37 @@ import {
   rmSync, writeFileSync
 } from 'node:fs';
 import { join } from 'node:path';
-import { rankFragments, splitOutputSections } from './output-fragments.mjs';
+import { splitIndexedChunks } from './output-fragments.mjs';
 
 const ID = /^[0-9a-f]{64}$/;
 const SEARCH_TERM = /[\p{L}\p{N}_]+/gu;
 const DEFAULT_MAX_CAPTURE = 2_000_000;
+const BACKFILL_BATCH = 8;
+const MAX_SEARCH_CANDIDATES = 200;
+const MAX_VERIFIED_OUTPUTS = 40;
+const MAX_VERIFIED_BYTES = 8_000_000;
+const PREVIEW_CHARS = 320;
 
 /** @param {string} query */
 function matchExpression(query) {
   const words = String(query ?? '').match(SEARCH_TERM)?.slice(0, 8) || [];
   return words.map((word) => `"${word.replaceAll('"', '""')}"`).join(' AND ');
+}
+
+/** Show the matching span, not a possibly irrelevant prefix; preserve Unicode. */
+function chunkPreview(text,words){
+  const chars=Array.from(text);
+  const haystack=text.toLowerCase();
+  let first=text.length;
+  for(const word of words){
+    const offset=haystack.indexOf(word);
+    if(offset>=0 && offset<first)first=offset;
+  }
+  const codepointStart=first<text.length?Array.from(text.slice(0,first)).length:0;
+  const start=Math.max(0,codepointStart-70);
+  const end=Math.min(chars.length,start+PREVIEW_CHARS);
+  const preview=(start?'…':'')+chars.slice(start,end).join('')+(end<chars.length?'…':'');
+  return {preview,previewTruncated:start>0||end<chars.length};
 }
 
 /** Refuse symlinks and any body whose bytes differ from its project-scoped ID.
@@ -66,6 +87,16 @@ export class OutputStore {
         id UNINDEXED, project UNINDEXED, tool UNINDEXED, command, text,
         tokenize='unicode61'
       );
+      CREATE TABLE IF NOT EXISTS output_chunks_state (
+        id TEXT PRIMARY KEY REFERENCES outputs(id) ON DELETE CASCADE,
+        project TEXT NOT NULL,
+        chunk_count INTEGER NOT NULL
+      );
+      CREATE VIRTUAL TABLE IF NOT EXISTS output_chunks_fts USING fts5(
+        id UNINDEXED, project UNINDEXED, ordinal UNINDEXED,
+        line_start UNINDEXED, line_end UNINDEXED, text,
+        tokenize='unicode61'
+      );
     `);
     this.lookup = this.db.prepare('SELECT id, project, tool, command, bytes, created_at FROM outputs WHERE id = ?');
     this.insertMeta = this.db.prepare(
@@ -80,6 +111,29 @@ export class OutputStore {
       FROM outputs_fts JOIN outputs o ON outputs_fts.id = o.id
       WHERE outputs_fts MATCH ? AND outputs_fts.project = ?
       ORDER BY bm25(outputs_fts) LIMIT ?
+    `);
+    this.chunkState = this.db.prepare('SELECT chunk_count FROM output_chunks_state WHERE id = ?');
+    this.chunkMark = this.db.prepare('INSERT INTO output_chunks_state (id, project, chunk_count) VALUES (?, ?, ?)');
+    this.chunkInsert = this.db.prepare('INSERT INTO output_chunks_fts (id, project, ordinal, line_start, line_end, text) VALUES (?, ?, ?, ?, ?, ?)');
+    this.chunkDelete = this.db.prepare('DELETE FROM output_chunks_fts WHERE id = ? AND project = ?');
+    this.chunkStateDelete = this.db.prepare('DELETE FROM output_chunks_state WHERE id = ? AND project = ?');
+    this.chunkCandidates = this.db.prepare(`
+      SELECT id, project, ordinal, line_start AS lineStart, line_end AS lineEnd,
+        text, bm25(output_chunks_fts) AS bm25score
+      FROM output_chunks_fts
+      WHERE output_chunks_fts MATCH ? AND project = ?
+      ORDER BY bm25score, id, ordinal LIMIT ?
+    `);
+    this.chunkPending = this.db.prepare(`
+      SELECT o.id FROM outputs o LEFT JOIN output_chunks_state s ON s.id=o.id
+      WHERE o.project=? AND s.id IS NULL ORDER BY o.created_at,o.id LIMIT ?
+    `);
+    this.chunkCount = this.db.prepare(`
+      SELECT COUNT(*) AS total,
+        COALESCE(SUM(CASE WHEN s.id IS NULL THEN 1 ELSE 0 END),0) AS pending,
+        COALESCE(SUM(s.chunk_count),0) AS chunks
+      FROM outputs o LEFT JOIN output_chunks_state s ON o.id=s.id
+      WHERE o.project=?
     `);
     this.statsStmt = this.db.prepare('SELECT COUNT(*) AS items, COALESCE(SUM(bytes), 0) AS capturedBytes FROM outputs');
     this.statsProjectStmt = this.db.prepare('SELECT COUNT(*) AS items, COALESCE(SUM(bytes), 0) AS capturedBytes FROM outputs WHERE project = ?');
@@ -129,6 +183,9 @@ export class OutputStore {
       this.db.exec('ROLLBACK');
       throw error;
     }
+    // Chunk indexing is additive. Never lose a recoverable raw capture if the
+    // optional search index is full, corrupt, or temporarily unavailable.
+    try {this.indexOutputChunks({id,project,text:data.text});}catch{/* Retry on search. */}
     return { id, bytes };
   }
 
@@ -164,6 +221,8 @@ export class OutputStore {
         if (!ID.test(id)) throw new TypeError('invalid output identifier');
         const row = this.lookup.get(id);
         if (!row || row.project !== project) continue;
+        this.chunkDelete.run(id, project);
+        this.chunkStateDelete.run(id, project);
         this.deleteIndex.run(id, project);
         if (this.deleteMeta.run(id, project).changes) removed.push(id);
       }
@@ -195,22 +254,98 @@ export class OutputStore {
     return {deleted, hasMore:rows.length > limit};
   }
 
-  /** Return bounded, section-aware line snippets; raw bytes remain in exact recall. */
-  searchFragments(query,{project,limit=10}={}) {
+  /** Index one verified raw output, in one transaction, without duplicating rows. */
+  indexOutputChunks({id,project,text}) {
+    if(this.closed)throw new Error('store is closed');
+    if(this.chunkState.get(id))return false;
+    const chunks=splitIndexedChunks(text);
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      if(this.chunkState.get(id)) {this.db.exec('COMMIT');return false;}
+      for(let ordinal=0;ordinal<chunks.length;ordinal++){
+        const part=chunks[ordinal];
+        this.chunkInsert.run(id,project,ordinal,part.lineStart,part.lineEnd,part.text);
+      }
+      this.chunkMark.run(id,project,chunks.length);
+      this.db.exec('COMMIT');
+      return true;
+    }catch(err){this.db.exec('ROLLBACK');throw err;}
+  }
+
+  /** Only existing, integrity-checked output objects can be lazily migrated. */
+  backfillOutputChunks(project){
+    let indexed=0;
+    for(const {id} of this.chunkPending.all(project,BACKFILL_BATCH)){
+      try {
+        const row=this.retrieve(id); // SHA-256 verified, owner-scoped body
+        if(row?.project===project && this.indexOutputChunks({id,project,text:row.text}))indexed++;
+      }catch{/* Broken/missing raw objects stay pending; never index unverified data. */}
+    }
+    return indexed;
+  }
+
+  /** Project-only counts; no command bodies, filenames, previews or raw text. */
+  chunkIndexStatus(project){
+    if(this.closed)throw new Error('store is closed');
+    if(typeof project!=='string'||!project)throw new TypeError('project scope required');
+    const {total,pending,chunks}=this.chunkCount.get(project);
+    return {indexed:total-pending,pending,chunks,partial:pending>0};
+  }
+
+  /** Bounded FTS5/BM25 plus lexical reciprocal-rank fusion on verified chunks. */
+  searchFragmentsReport(query,{project,limit=10}={}){
     if(this.closed)throw new Error('store is closed');
     if(typeof project!=='string'||!project)throw new TypeError('project scope required');
     if(!Number.isInteger(limit)||limit<1||limit>25)throw new RangeError('limit must be 1..25');
-    const outputs=this.search(query,{project,limit:25});
-    const fragments=[];
-    for(const entry of outputs){
-      const row=this.retrieve(entry.id);
-      if(!row || row.project!==project)continue;
-      for(const hit of rankFragments(splitOutputSections(row.text),query,{limit:2})){
-        fragments.push({id:row.id,tool:row.tool,...hit});
-        if(fragments.length>=limit)return fragments;
+    const expression=matchExpression(query);
+    if(!expression)return {hits:[],index:this.chunkIndexStatus(project)};
+    this.backfillOutputChunks(project);
+    const rows=this.chunkCandidates.all(expression,project,MAX_SEARCH_CANDIDATES);
+    const verified=new Map(),candidates=[];
+    let verifiedBytes=0,verificationLimited=false;
+    const words=String(query).toLowerCase().match(SEARCH_TERM)?.slice(0,8)||[];
+    for(const row of rows){
+      if(!verified.has(row.id)){
+        if(verified.size>=MAX_VERIFIED_OUTPUTS || verifiedBytes>=MAX_VERIFIED_BYTES){
+          verificationLimited=true;
+          continue;
+        }
+        try {
+          const output=this.retrieve(row.id);
+          if(output?.project===project){
+            verifiedBytes+=output.bytes;
+            verified.set(row.id,{output,chunks:splitIndexedChunks(output.text)});
+          }else verified.set(row.id,null);
+        }catch{verified.set(row.id,null);}
       }
+      const match=verified.get(row.id);
+      const expected=match?.chunks[Number(row.ordinal)];
+      if(!expected || expected.text!==row.text || expected.lineStart!==Number(row.lineStart)
+        || expected.lineEnd!==Number(row.lineEnd))continue;
+      const lower=expected.text.toLowerCase();
+      const lexical=words.reduce((score,word)=>score+lower.split(word).length-1,0);
+      candidates.push({...row,tool:match.output.tool,lexical});
     }
-    return fragments;
+    const byLexical=[...candidates].sort((a,b)=>b.lexical-a.lexical || a.bm25score-b.bm25score || a.id.localeCompare(b.id) || Number(a.ordinal)-Number(b.ordinal));
+    const lexRank=new Map(byLexical.map((part,i)=>[`${part.id}:${part.ordinal}`,i+1]));
+    const fused=candidates.map((part,i)=>({...part,rank:1/(60+i+1)+1/(60+lexRank.get(`${part.id}:${part.ordinal}`))}));
+    fused.sort((a,b)=>b.rank-a.rank || a.bm25score-b.bm25score || a.id.localeCompare(b.id) || Number(a.ordinal)-Number(b.ordinal));
+    const perOutput=new Map(),hits=[];
+    const candidateLimited=rows.length===MAX_SEARCH_CANDIDATES;
+    for(const row of fused){
+      if((perOutput.get(row.id)||0)>=2)continue;
+      perOutput.set(row.id,(perOutput.get(row.id)||0)+1);
+      hits.push({id:row.id,tool:row.tool,lineStart:Number(row.lineStart),lineEnd:Number(row.lineEnd),
+        ...chunkPreview(row.text,words)});
+      if(hits.length>=limit)break;
+    }
+    const index=this.chunkIndexStatus(project);
+    return {hits,index:{...index,candidateLimited,verificationLimited,partial:index.partial||candidateLimited||verificationLimited}};
+  }
+
+  /** Preserve the original public return shape for existing Pi callers. */
+  searchFragments(query,options={}){
+    return this.searchFragmentsReport(query,options).hits;
   }
 
   stats(options = {}) {

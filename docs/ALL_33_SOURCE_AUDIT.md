@@ -91,3 +91,7 @@ The host now offers `npm run smoke:runtime` to check pinned Tersio resources and
 - Parent `context` hook ownership remains unchanged. For test evidence, see `tests/context-frontier.test.mjs` and `tests/context-replay-integration.test.mjs`. The corresponding machine-readable records are updated in `integrations/extraction-audit.json`.
 
 The original 33 pinned source commits are unchanged. The new code is an independently authored adaptation; it does not vendor upstream ACP or pruning engines.
+
+## v0.15.0 Context Mode retrieval adaptation
+
+`mksglu/context-mode` (#22) now contributes a bounded, local chunk-FTS5/BM25 and lexical reciprocal-rank-fusion path through the existing `OutputStore` and `envelope_search_fragments`. Captures are indexed incrementally, old captures lazily backfilled in bounded groups, and every returned chunk is verified against its original content-hashed raw object. Project filtering, privacy, deletion and incomplete-index status are covered by `tests/output-chunk-index.test.mjs`. This is an **independent partial adaptation**, not a vendored Context Mode engine; sandbox execution, embeddings, external resources and provider quality measurements remain out of scope. The original pinned commit remains unchanged.
