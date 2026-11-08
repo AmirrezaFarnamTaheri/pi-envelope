@@ -4,7 +4,7 @@
   "baseCommit": "0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64",
   "candidateVersion": "0.22.0",
   "licenseAssumption": "User assumes compatibility; independent legal review not performed",
-  "implementationScope": "Native graph projection plus bounded local external Graphify/NetworkX node-link artifact reader and opt-in invalidation-only watcher; opt-in project notes, bounded Claude JSONL fact import, Git co-change/churn, source context cards; opt-in pinned Graphify Python CLI read-only query/path/explain plus human-only AST code build/update; optional graph orientation in existing Pi hook; revocable session-only code-change watcher for offline Graphify update (no provider, no persistent daemon)",
+  "implementationScope": "Native graph projection plus bounded local external Graphify/NetworkX node-link artifact reader and opt-in invalidation-only watcher; opt-in project notes, bounded Claude JSONL fact import, Git co-change/churn, source context cards; opt-in pinned Graphify Python CLI read-only query/path/explain plus human-only AST code build/update; optional graph orientation in existing Pi hook; revocable session-only code-change watcher for offline Graphify update (no provider, no persistent daemon); explicit bounded session-local symbol-delta baselines, source-verified declaration hashes, conservative static importer hints",
   "upstreams": [
     {
       "repo": "lucasrosati/claude-code-memory-setup",
@@ -80,7 +80,7 @@
       "repo": "colbymchenry/codegraph",
       "commit": "f72c9d2efb14454ff4f9fd7b8460abd82f19a287",
       "capabilities": "Rust/TS codegraph kernel, typed traversal, auto-sync, impact and agent tools",
-      "adoption": "Native typed CodeIndex graph and bounded Git co-change/churn. No preindexed multi-agent graph daemon or full language matrix.",
+      "adoption": "Native typed CodeIndex graph and bounded Git co-change/churn. No preindexed multi-agent graph daemon or full language matrix. Stacked delta candidate reuses single CodeIndex for static importer candidates around changed declarations; no Rust indexing kernel or continuously synchronized multi-agent graph.",
       "completePort": false
     },
     {
@@ -94,7 +94,7 @@
       "repo": "GlitterKill/sdl-mcp",
       "commit": "2a20acbd283a5edf8290fb217eee0ecff86b31f5",
       "capabilities": "Symbol delta ledger, compact context cards, graph slices, memory and policies",
-      "adoption": "Native graph/replay/FTS with v0.19 hash-verified symbol context cards and opt-in notes. No standalone SDL symbol delta engine.",
+      "adoption": "Native graph/replay/FTS with v0.19 hash-verified symbol context cards and opt-in notes. No standalone SDL symbol delta engine. Stacked delta candidate: explicit project-local, in-memory verified symbol baselines; JS/TS AST node body SHA-256, conservative Python/Go, stable comparison-version cursor, strict byte budget, static importer hints. No persistence, SCIP/provider facts, graph beam search, memory bridge or MCP parity.",
       "completePort": false
     },
     {
@@ -115,7 +115,7 @@
       "repo": "artk0de/TeaRAGs-MCP",
       "commit": "5ba0ac24a02d1b4daf3b4ca1027b13974a66b184",
       "capabilities": "Semantic retrieval, call graph, Git trajectory, architecture and naming lexicon",
-      "adoption": "v0.20 local hash-verified AST symbol/path rank fusion and bounded graph navigation; no embedding engine or provider calls",
+      "adoption": "v0.20 local hash-verified AST symbol/path rank fusion and bounded graph navigation; no embedding engine or provider calls Stacked delta candidate adds source-verified changed-declaration metadata for code review; no semantic embeddings, vector index, owner inference or evidence of automatic test coverage.",
       "completePort": false
     }
   ],
