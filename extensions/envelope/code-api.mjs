@@ -2,6 +2,7 @@
 import { CodeIndex } from './code-index.mjs';
 import { analyzeChangeImpact } from './change-evidence.mjs';
 import { inspectCodeGraph } from './graph-intelligence.mjs';
+import { ExternalGraphReader } from './graphify-adapter.mjs';
 import { TreeSitterBroker, treeCaptureGroups } from './tree-sitter-broker.mjs';
 
 const result = (value,isError=false) => ({
@@ -10,9 +11,14 @@ const result = (value,isError=false) => ({
 const intProp = (description,min,max) => ({type:'integer',minimum:min,maximum:max,description});
 function schema(properties,required=[]) {return {type:'object',properties,required,additionalProperties:false};}
 
-export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>import('typescript'),observe,loadTreeRuntime,getTreeGrammarPath}={}) {
+export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>import('typescript'),observe,loadTreeRuntime,getTreeGrammarPath,watchGraphFactory}={}) {
   const indices=new Map();
   const treeBrokers=new Map();
+  const graphReaders=new Map();
+  function graphReader(index) {
+    if(!graphReaders.has(index.root))graphReaders.set(index.root,new ExternalGraphReader(index.root,{...(watchGraphFactory?{watchFactory:watchGraphFactory}:{})}));
+    return graphReaders.get(index.root);
+  }
   function treeBroker(index) {
     if(!treeBrokers.has(index.root)) treeBrokers.set(index.root,new TreeSitterBroker({
       ...(loadTreeRuntime?{loadRuntime:loadTreeRuntime}:{}),
@@ -68,6 +74,19 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
       format:{type:'string',enum:['json','mermaid']},
       rules:{type:'array',maxItems:12,items:{type:'object',properties:{from:{type:'string'},forbid:{type:'array',minItems:1,maxItems:12,items:{type:'string'}}},required:['from','forbid'],additionalProperties:false}}
     }), (index,params)=>inspectCodeGraph(index,params));
+  tool('envelope_code_external_graph','Envelope: External Graphify Artifact',
+    'Explicitly inspect a local graphify-out/graph.json node-link graph as untrusted external assertions. Check hash-attested source freshness, bounded nodes/paths/edges, and opt-in debounce watcher. Never merges edges with native AST, runs Graphify or makes model calls.',
+    schema({action:{type:'string',enum:['status','nodes','neighbors','path','watch']},
+      source:{type:'string',description:'External node ID for neighbors or path'},
+      target:{type:'string',description:'External destination node ID for path'},
+      query:{type:'string',description:'Optional node name/ID/type substring filter'},
+      direction:{type:'string',enum:['outgoing','incoming','both']},
+      limit:intProp('Maximum nodes or adjacent edges (1-25)',1,25),
+      maxDepth:intProp('Path search bound (1-8)',1,8),
+      allowStale:{type:'boolean',description:'Explicitly acknowledge that a known-stale graph may be used'},
+      enabled:{type:'boolean',description:'Explicit watch enable or disable (action: watch)'},
+      debounceMs:intProp('Debounce invalidations between 100 and 5000 ms (action: watch)',100,5000)}),
+    (index,params)=>graphReader(index).query(index,params));
   tool('envelope_code_languages','Envelope: Structural Parser Status',
     'Display available indexed languages, skipped parser reasons, and whether optional local Python/Go AST parsing is enabled.',
     schema({}), (index)=>index.languageStatus());
@@ -123,5 +142,5 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
       const report=index.verify(params.path,{content:params.content});
       return {...report,diagnostics:report.diagnostics.slice(0,20).map(d=>({...d,message:d.message.slice(0,400)}))};
     });
-  return {loaded:()=>indices.size,indexOf};
+  return {loaded:()=>indices.size,indexOf,close:()=>{for(const reader of graphReaders.values())reader.close();graphReaders.clear();}};
 }

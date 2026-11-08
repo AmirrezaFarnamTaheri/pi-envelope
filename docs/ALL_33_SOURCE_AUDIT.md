@@ -103,3 +103,7 @@ The existing `gzy987/RepoPilot` and `kuangxiaoc/code-graph-pilot` partial adapta
 ## v0.17.0 independent 16-source graph cohort
 
 The 16 Graphify/CodeGraph/knowledge/memory/workflow sources are audited separately in `docs/GRAPH_SOURCE_AUDIT.md` and `integrations/graph-source-audit.json`, without changing the original pinned 33-source ledger. The new native graph projection from CodeIndex provides traceable static imports and conservative call edges plus bounded path/hub/component/boundary/export queries. Deferred backends, memory, watchers, semantic systems and UI are not claimed as delivered.
+
+## v0.18.0 addendum: additional Graphify cohort
+
+An opt-in Graphify/NetworkX node-link artifact reader, SHA-256 source-byte status and invalidation-only watch are independently adapted and recorded in `docs/GRAPH_SOURCE_AUDIT.md`. The native AST graph remains authoritative for code evidence. This does **not** add or imply full Graphify AI semantic extraction, background indexing or other 16-source feature parity.

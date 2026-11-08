@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "auditDate": "2026-11-08",
   "baseCommit": "0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64",
-  "candidateVersion": "0.17.0",
+  "candidateVersion": "0.18.0",
   "licenseAssumption": "User assumes compatibility; independent legal review not performed",
-  "implementationScope": "Native graph projection only",
+  "implementationScope": "Native graph projection plus bounded local external Graphify/NetworkX node-link artifact reader and opt-in invalidation-only watcher",
   "upstreams": [
     {
       "repo": "lucasrosati/claude-code-memory-setup",
@@ -24,7 +24,7 @@
       "repo": "juhas96/graphify-pi",
       "commit": "dd54ac9ae22bc48195fafd5b25ffe0c7ef09c4a9",
       "capabilities": "Pi graphify CLI wrapper, freshness prompts and wiki-first guidance",
-      "adoption": "Single native graph-query tool; future external artifact health adapter",
+      "adoption": "Single native graph-query tool; future external artifact health adapter v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded.",
       "completePort": false
     },
     {
@@ -38,14 +38,14 @@
       "repo": "gaodes/pi-graphify",
       "commit": "4826f5eb351b72f49f44dc5ede24f3a886552b2d",
       "capabilities": "Pi graphify CLI query, paths, hubs, reports, watchers and exports",
-      "adoption": "Native path/neighbor/hub/export; no automatic CLI/LLM backend",
+      "adoption": "Native path/neighbor/hub/export; no automatic CLI/LLM backend v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded.",
       "completePort": false
     },
     {
       "repo": "QuantumKuba/dsh-graphify-plugin",
       "commit": "74a2c72b31abef95adf7afa53ec45d7dcb0ba47e",
       "capabilities": "DSH graph adapter, project-root fencing, freshness/status and MCP lifecycle",
-      "adoption": "Reuse CodeIndex project isolation and refresh; optional external adapter later",
+      "adoption": "Reuse CodeIndex project isolation and refresh; optional external adapter later v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded.",
       "completePort": false
     },
     {
@@ -59,7 +59,7 @@
       "repo": "yetanotheraryan/graphify-chokidar",
       "commit": "9c584df9ab087425fec3d030e3ef7d1a29431707",
       "capabilities": "Debounced file watcher, code vs media classification, user-confirmed LLM rebuild",
-      "adoption": "Existing incremental refresh; explicit opt-in watcher later",
+      "adoption": "Existing incremental refresh; explicit opt-in watcher later v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded.",
       "completePort": false
     },
     {
@@ -118,5 +118,11 @@
       "adoption": "Existing FTS/calls plus graph navigation; history/vector layers later",
       "completePort": false
     }
-  ]
+  ],
+  "graphifyEngineReference": {
+    "repo": "Graphify-Labs/graphify",
+    "commit": "6c8002eca4acad58db6160eabcb466e61fc35afb",
+    "basis": "graphify-out/graph.json NetworkX node_link_data, docs/how-it-works.md, tests/fixtures/extraction.json",
+    "importPolicy": "untrusted external assertions; no model/backend execution"
+  }
 }

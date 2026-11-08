@@ -2,7 +2,7 @@
 
 This document is the current, user-facing release assessment. It replaces the historic execution plans and avoids retaining obsolete command and package examples.
 
-## v0.17.0 candidate: implemented locally
+## v0.18.0 unmerged candidate: implemented locally
 
 - Namespaced `pi-envelope` package, `envelope` command and `envelope_*` tools, `extensions/envelope` and `skills/envelope`. No `upper` command or extension is shipped.
 - Default-safe bash output compactor with exact recall, byte checks, durable FTS5 chunk search and bounded lexical/BM25 reciprocal-rank fusion, and optional retention/erasure, all project scoped. Raw output can contain secrets and no filesystem erasure claim covers backups/snapshots.
@@ -41,3 +41,7 @@ This candidate extends the existing optional Python stdlib `ast` call scanner an
 ## v0.17.0 native graph integration gate
 
 The user-supplied 16-source Graphify/CodeGraph/SDL/TeaRAGs cohort is pinned and decomposed in `docs/GRAPH_SOURCE_AUDIT.md` and `integrations/graph-source-audit.json`. This candidate implements deterministic read-only static import/call graph queries (status, shortest paths, neighbors, incoming-degree hubs, weak components, advisory boundaries and bounded JSON/Mermaid) through **one additional tool** and the existing CodeIndex. No new session/context hook, daemon, model call or generated file. Regression tests cover direction, budgets, provenance, project root and symlink refusal, no project-code execution and Pi tool registration; see `tests/graph-intelligence.test.mjs` and `docs/GRAPH_NATIVE.md`. Additional source features are phased candidates, not full port or token-savings claims.
+
+## v0.18.0 Graphify artifact interoperability gate
+
+The v0.18.0 candidate adds `envelope_code_external_graph` under the existing CodeIndex. It reads fixed project-local `graphify-out/graph.json` (including NetworkX root metadata, `nodes` and `links`) and optional self-declared `envelope-sources.json` SHA-256 source/graph manifest. Each returned edge retains external provenance and upstream confidence, never joining native AST evidence. Missing, stale, invalid and partially attested input statuses are distinct; the `needs_update` marker blocks traversal until explicit acknowledgement. Query budgets and path-only status do not imply semantic completeness. The watcher is opt-in, bounded, invalidation-only and disposed on extension shutdown; no Graphify or model invocation is made. Tests: `tests/graphify-adapter.test.mjs` and `docs/GRAPHIFY_ARTIFACTS.md`. PR #6 and this PR remain unmerged unless explicitly approved.

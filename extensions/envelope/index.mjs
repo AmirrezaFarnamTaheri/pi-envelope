@@ -146,7 +146,7 @@ export function registerEnvelope(pi, options = {}) {
     ledger, frontier, getStore:()=>store, getConfig:()=>config, project, metrics, observe
   });
 
-  const codeApi = registerCodeFeature(pi, {project, getConfig:()=>config, loadCompiler:options.loadCompiler, loadTreeRuntime:options.loadTreeRuntime, getTreeGrammarPath:options.getTreeGrammarPath, observe});
+  const codeApi = registerCodeFeature(pi, {project, getConfig:()=>config, loadCompiler:options.loadCompiler, loadTreeRuntime:options.loadTreeRuntime, getTreeGrammarPath:options.getTreeGrammarPath, watchGraphFactory:options.watchGraphFactory, observe});
   registerLspFeature(pi,{indexOf:codeApi.indexOf,getConfig:()=>config,home,observe});
 
   // One read-only preflight stage for write/edit; Tersio only rewrites bash.
@@ -172,7 +172,7 @@ export function registerEnvelope(pi, options = {}) {
   });
 
   pi.on('before_agent_start', (event) => composePolicy(event?.systemPrompt, config.policy.enabled) || undefined);
-  pi.on('session_shutdown', () => { store?.close(); store = null; frontier?.close(); frontier=null; workflowLedger?.close(); metricLedger?.close(); metricLedger=null; });
+  pi.on('session_shutdown', () => { codeApi.close?.(); store?.close(); store = null; frontier?.close(); frontier=null; workflowLedger?.close(); metricLedger?.close(); metricLedger=null; });
 
   pi.registerTool?.({
     name: 'envelope_recall_output',
@@ -360,6 +360,7 @@ export function registerEnvelope(pi, options = {}) {
         }
         try {
           config = saveConfig(settingsPath, { ...config, code:{...config.code,enabled:value === 'on'} });
+          if(value==='off')codeApi.close?.(); // An explicitly disabled code feature must not retain opt-in graph watches.
           notify(ctx, `Envelope code ${value}`);
         } catch(err) {notify(ctx, `Envelope code settings failed: ${err.message}`, 'warning');}
         return;
@@ -428,7 +429,7 @@ export function registerEnvelope(pi, options = {}) {
     }
   });
 
-  return { metrics, getConfig: () => config, close: () => {store?.close(); frontier?.close(); workflowLedger?.close(); metricLedger?.close();} };
+  return { metrics, getConfig: () => config, close: () => {codeApi.close?.(); store?.close(); frontier?.close(); workflowLedger?.close(); metricLedger?.close();} };
 }
 
 export default registerEnvelope;
