@@ -1,6 +1,6 @@
 # Envelope
 
-**Envelope v0.19.0 (unmerged candidate)** is one Pi coding-agent package that combines pinned Tersio modes with native, project-scoped output recovery, context checkpoints, code intelligence, reviewed worktree tasks, and local numeric observability. It is a source distribution: **no installed Pi, Tersio, or Tree-sitter WASM runtime is included**.
+**Envelope v0.22.0 (unmerged review candidate)** is one Pi coding-agent package that combines pinned Tersio modes with native, project-scoped output recovery, context checkpoints, code intelligence, reviewed worktree tasks, and local numeric observability. It is a source distribution: **no installed Pi, Tersio, or Tree-sitter WASM runtime is included**.
 
 The [16-source graph adoption audit](docs/GRAPH_SOURCE_AUDIT.md) and [33-source, commit-pinned audit](docs/ALL_33_SOURCE_AUDIT.md), with their [graph ledger](integrations/graph-source-audit.json) and [original-source ledger](integrations/extraction-audit.json), distinguish delivered adaptations from external or deferred capabilities. These are **not** claims of full upstream parity.
 
@@ -34,6 +34,7 @@ pi install .
 | Context cards | `envelope_code_context_card` | Bounded source-hash-verified symbol, import and syntactic call evidence; no source bodies unless explicitly requested |
 | Git history | `envelope_code_history` | Bounded read-only co-change/churn evidence; never causal dependency or author identity |
 | Graphify | `envelope_code_external_graph` | Opt-in local NetworkX/Graphify node-link artifact inspection: source hash freshness, typed external assertions, bounded paths/neighbors, explicit read-only watcher; no external program or model calls |
+| Graphify CLI (opt-in) | `/envelope graphify status/on/off/binary/timeout/orientation/build/update`, `envelope_graphify_cli` | User-pinned external Graphify executable: status, read-only query/path/explain, explicit human-only AST code build/update, no LLM keys or auto-build; bounded and stale-aware |
 | Changes | `envelope_code_change_impact` | Commit-pinned clean-checkout diff with changed-line evidence, static dependents, and candidate tests; not a complete semantic blast radius |
 | Other languages | `/envelope code languages on\|off`, `envelope_code_languages` | Opt-in Python/Go stdlib AST through bounded subprocess parsing |
 | Tree-sitter | `/envelope code tree on\|off\|status`, `envelope_code_tree_status`, `envelope_code_tree_query`, `envelope_code_tree_capture` | Optional real WASM S-expression queries and capture groups; unavailable grammar is reported, not simulated |
@@ -77,3 +78,7 @@ Envelope's native modules are independently authored adaptations; the 33 origina
 ## Capability discovery and read-only visual interoperability (v0.21.0 candidate)
 
 `envelope_capabilities` shows actual Envelope mode toggles, detected-but-unverified external CLI presence and manual orientation/review/resume tool sequences. `envelope_code_graph` can export a bounded static SVG or Obsidian-compatible Mermaid Markdown note with safely encoded labels. `envelope_code_external_graph` can inspect Graphify/Graphify.NET exporter-declared communities, never as native inferred graph proof. None of these changes install new host adapters, execute external CLI tools, modify a vault or publish a service. See [capability cockpit](docs/CAPABILITY_COCKPIT.md) and [visual exports](docs/GRAPH_VIEW_EXPORT.md).
+
+## v0.22.0 opt-in Graphify CLI review candidate
+
+The existing read-only `graphify-out/graph.json` adapter can optionally be complemented by `envelope_graphify_cli` to run a pinned, trusted Graphify Python executable. Disabled until explicitly configured; agent tool operations are read-only and project-scoped, while local AST-only build/update require user slash commands. Optional graph orientation reuses the existing prompt hook; no auto-watcher or LLM call. See [CLI contracts, safety and validation](docs/GRAPHIFY_CLI.md). Live upstream CLI compatibility is unverified until an actual installed Graphify smoke passes.
