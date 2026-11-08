@@ -431,6 +431,18 @@ export function registerEnvelope(pi, options = {}) {
         return;
       }
       if (verb === 'code') {
+        if(value==='vectors'){
+          const mode=extra[0]||'status';
+          if(mode==='status'&&extra.length<=1){
+            notify(ctx,`Envelope local vectors ${config.code.vectorEnabled?'on':'off'}; expects user-supplied .envelope/embeddings.json; no model or network`);return;
+          }
+          if(!['on','off'].includes(mode)||extra.length!==1){notify(ctx,'Usage: /envelope code vectors [status|on|off]','warning');return;}
+          try{config=saveConfig(settingsPath,{...config,code:{...config.code,vectorEnabled:mode==='on'}});
+            notify(ctx,`Envelope user-supplied local vector retrieval ${mode}; no model loaded or downloaded`);}
+          catch(err){notify(ctx,`Envelope vector preference not saved: ${err.message}`,'warning');}
+          return;
+        }
+
         if(value==='versions') {
           const mode=extra[0]||'status';
           try {
@@ -492,7 +504,7 @@ export function registerEnvelope(pi, options = {}) {
           return;
         }
         if (!['on', 'off'].includes(value) || extra.length) {
-          notify(ctx, 'Usage: /envelope code [status|on|off|versions status|versions capture|versions prune <n>|languages on|languages off|tree on|tree off|tree status|guard on|guard off|rename on|rename off|lsp status]', 'warning');
+          notify(ctx, 'Usage: /envelope code [status|on|off|vectors on|vectors off|versions status|versions capture|versions prune <n>|languages on|languages off|tree on|tree off|tree status|guard on|guard off|rename on|rename off|lsp status]', 'warning');
           return;
         }
         try {
