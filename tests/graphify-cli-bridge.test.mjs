@@ -6,6 +6,7 @@ import {join} from 'node:path';
 import {GraphifyCliBridge,composeGraphifyOrientation} from '../extensions/envelope/graphify-cli.mjs';
 import registerEnvelope from '../extensions/envelope/index.mjs';
 import {MetricsLedger} from '../extensions/envelope/metrics-ledger.mjs';
+import {inspectCapabilityCockpit} from '../extensions/envelope/capability-cockpit.mjs';
 
 function fixture(t, {scriptBody, graph=true, stale=false, binaryName='graphify-test'}={}) {
   const home=mkdtempSync(join(tmpdir(),'envelope-cli-integration-'));
@@ -175,4 +176,17 @@ test('session close cancels a running Graphify command and leaves no background 
   const operation=active.run(f.root,{...f.config,timeoutMs:5000},{action:'query',question:'x'});
   setTimeout(()=>active.close(),70);
   await assert.rejects(operation,/cancel|abort/i);
+});
+
+test('capability cockpit routes the optional Graphify CLI only when explicitly configured',t=>{
+  const f=fixture(t);
+  const config={code:{enabled:true},graphify:{enabled:true,executable:f.executable}};
+  const active=inspectCapabilityCockpit(config,{intent:'graph',pathEnv:''});
+  assert.equal(active.capabilities.graphifyCli,'configured-unverified');
+  assert.equal(active.plan[1].tool,'envelope_graphify_cli');
+  assert.equal(active.plan[1].state,'suggested');
+  assert.equal(active.toolExecution,false);
+  const off=inspectCapabilityCockpit({...config,graphify:{...config.graphify,enabled:false}},{intent:'graph',pathEnv:''});
+  assert.equal(off.capabilities.graphifyCli,'disabled');
+  assert.ok(!off.plan.some(x=>x.tool==='envelope_graphify_cli'));
 });
