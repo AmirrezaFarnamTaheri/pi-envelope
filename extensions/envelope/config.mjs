@@ -8,7 +8,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   output: Object.freeze({ enabled: true, minBytes: 1200, maxChars: 12000, minSavingsRatio: 0.2, retentionDays: 0 }),
   policy: Object.freeze({ enabled: false }),
   context: Object.freeze({ enabled: false, minBytes: 2400, maxPreviewChars: 650, recentMessages: 8, minSavingsRatio: 0.4 }),
-  code: Object.freeze({ enabled: true, languagesEnabled: false, treeEnabled: false, guardEnabled: false, renameEnabled: false, vectorEnabled: false, lspCommand: null, lspTimeoutMs: 3500 }),
+  code: Object.freeze({ enabled: true, languagesEnabled: false, treeEnabled: false, guardEnabled: false, renameEnabled: false, vectorEnabled: false, vectorExecutable: null, lspCommand: null, lspTimeoutMs: 3500 }),
   workflow: Object.freeze({ enabled: true, runEnabled: false }),
   memory: Object.freeze({ enabled: false }),
   graphify: Object.freeze({ enabled: false, executable: null, timeoutMs: 30000, orientationEnabled: false }),
@@ -61,6 +61,7 @@ export function normalizeConfig(raw = {}) {
       guardEnabled: safeBoolean(code.guardEnabled, DEFAULT_CONFIG.code.guardEnabled),
       renameEnabled: safeBoolean(code.renameEnabled, DEFAULT_CONFIG.code.renameEnabled),
       vectorEnabled: safeBoolean(code.vectorEnabled, DEFAULT_CONFIG.code.vectorEnabled),
+      vectorExecutable: typeof code.vectorExecutable === 'string' && code.vectorExecutable.length > 1 && code.vectorExecutable.length <= 1024 && isAbsolute(code.vectorExecutable) && !/[\u0000-\u001f\u007f]/.test(code.vectorExecutable) ? code.vectorExecutable : null,
       lspCommand: Array.isArray(code.lspCommand) && code.lspCommand.length>=1 && code.lspCommand.length<=16 && code.lspCommand.every(x=>typeof x==='string'&&x.length>=1&&x.length<=512&&!x.includes('\0')) ? [...code.lspCommand] : null,
       lspTimeoutMs: safeInteger(code.lspTimeoutMs, DEFAULT_CONFIG.code.lspTimeoutMs, 100, 10000)
     },
