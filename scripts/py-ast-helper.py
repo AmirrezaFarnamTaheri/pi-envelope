@@ -4,6 +4,7 @@ import json
 import sys
 
 MAX_CALLS = 200
+MAX_MODULE_BINDINGS = 1000
 
 
 def parse(record):
@@ -62,21 +63,68 @@ def parse(record):
     for item in root.body:
         if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
             report['declarations'].append({'name': item.name[:128], 'line': item.lineno, 'exported': True})
+        elif isinstance(item, ast.Import):
+            for alias in item.names:
+                # "import pkg.mod" binds "pkg", whereas "as m" binds the full module.
+                # Deep attribute chains (pkg.mod.fn) remain explicitly unresolved.
+                local = alias.asname or alias.name.split('.')[0]
+                module = alias.name if alias.asname else local
+                report['bindings'].append({'kind': 'namespace', 'local': local[:128], 'spec': module})
         elif isinstance(item, ast.ImportFrom):
             base = '.' * item.level + (item.module or '')
             for alias in item.names:
-                if alias.name != '*' and base:
+                if alias.name == '*' or not base:
+                    continue  # Star imports and import-all bindings are deliberately opaque.
+                if item.level and not item.module:
+                    # "from . import mod as x" binds the module, not a function in __init__.
+                    # The linker checks for a conflicting initializer declaration.
+                    report['bindings'].append({'kind': 'namespace', 'local': (alias.asname or alias.name)[:128],
+                                               'imported': alias.name[:128], 'spec': base + alias.name,
+                                               'fromPackage': base})
+                else:
                     report['bindings'].append({'kind': 'named', 'local': (alias.asname or alias.name)[:128],
                                                'imported': alias.name[:128], 'spec': base})
 
-    # Even a direct call can be shadowed by a parameter, assignment or nested definition.
-    # Any uncertain rebinding produces *unresolved* evidence, not a false positive.
+    # Any top-level assignment/rebinding can invalidate a module alias, even if
+    # hidden in an if/for/with/try branch. Never scan the body of a nested scope.
     module_assignments = set()
+
+    class TopLevelBinder(ast.NodeVisitor):
+        def visit_FunctionDef(self, node):
+            return
+        visit_AsyncFunctionDef = visit_FunctionDef
+        def visit_ClassDef(self, node):
+            module_assignments.add(node.name)
+        def visit_Lambda(self, node):
+            return
+        def visit_Import(self, node):
+            return  # Expected imports are checked for ambiguity by the linker.
+        visit_ImportFrom = visit_Import
+        def visit_Name(self, node):
+            if isinstance(node.ctx, (ast.Store, ast.Del)):
+                module_assignments.add(node.id)
+        def visit_ExceptHandler(self, node):
+            if node.name:
+                module_assignments.add(node.name)
+            self.generic_visit(node)
+        def visit_MatchAs(self, node):
+            if node.name:
+                module_assignments.add(node.name)
+            self.generic_visit(node)
+        def visit_MatchStar(self, node):
+            if node.name:
+                module_assignments.add(node.name)
+        def visit_MatchMapping(self, node):
+            if node.rest:
+                module_assignments.add(node.rest)
+            self.generic_visit(node)
+
+    binder = TopLevelBinder()
     for item in root.body:
-        if isinstance(item, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
-            for sub in ast.walk(item):
-                if isinstance(sub, ast.Name) and isinstance(sub.ctx, ast.Store):
-                    module_assignments.add(sub.id)
+        binder.visit(item)
+    ordered = sorted(module_assignments)
+    report['moduleAssigned'] = [name[:128] for name in ordered[:MAX_MODULE_BINDINGS]]
+    report['moduleBindingsTruncated'] = len(ordered) > MAX_MODULE_BINDINGS
 
     def function_calls(fn, name):
         local = set(module_assignments)

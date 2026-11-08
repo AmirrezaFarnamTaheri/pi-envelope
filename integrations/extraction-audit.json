@@ -91,8 +91,8 @@
       "default_branch": "main",
       "pinned_url": "https://github.com/kuangxiaoc/code-graph-pilot/tree/ad284dc5ed346ab7aa82e33a525434e95f27fe67",
       "coverage_status": "native-partial",
-      "coverage_evidence": "tests/multilanguage-index.test.mjs; tests/code-call-graph.test.mjs",
-      "remaining_gap": "Python class hierarchy, Neo4j, LangGraph reviewer and evidence-based critic loop are not included."
+      "coverage_evidence": "tests/multilanguage-index.test.mjs; tests/code-call-graph.test.mjs; tests/python-module-calls.test.mjs; extensions/envelope/code-call-evidence.mjs",
+      "remaining_gap": "Python class hierarchy, Neo4j, LangGraph reviewer and evidence-based critic loop are not included. v0.16.0 adds uniquely indexed Python module-alias call links with conservative shadow/initializer ambiguity checks; receiver type inference, Python MRO and full runtime call resolution remain absent."
     },
     {
       "repo": "gzy987/RepoPilot",
@@ -106,8 +106,8 @@
       "default_branch": "main",
       "pinned_url": "https://github.com/gzy987/RepoPilot/tree/e922b761ff59d5b0db293a5573d6363afeeaca73",
       "coverage_status": "native-partial",
-      "coverage_evidence": "tests/multilanguage-index.test.mjs; tests/code-call-graph.test.mjs",
-      "remaining_gap": "Python MRO, receiver-type inference, builtin/stdlib/external classification and GitHub agent remain absent."
+      "coverage_evidence": "tests/multilanguage-index.test.mjs; tests/code-call-graph.test.mjs; tests/python-module-calls.test.mjs; extensions/envelope/code-call-evidence.mjs",
+      "remaining_gap": "Python MRO, receiver-type inference, builtin/stdlib/external classification and GitHub agent remain absent. v0.16.0 adds uniquely indexed Python module-alias call links with conservative shadow/initializer ambiguity checks; receiver type inference, Python MRO and full runtime call resolution remain absent."
     },
     {
       "repo": "markokocic/pi-tree-sitter",

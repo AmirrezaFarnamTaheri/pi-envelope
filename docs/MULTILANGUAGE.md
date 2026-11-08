@@ -65,4 +65,4 @@ An opt-in Tree-sitter WASM S-expression/capture interface was added in Phase 11 
 
 Phase 11 adds an independent Tree-sitter WASM **query** adapter under the same CodeIndex paths, not a replacement for Python/Go stdlib symbol/diagnostic extraction. It requires optional locally installed WASM dependencies and an explicit `/envelope code tree on`. See [TREE_SITTER.md](TREE_SITTER.md).
 
-Phase 12 adds **bounded direct-call evidence**, including selected imported symbol links, without executing project code. For exact syntax, uncertainty and shadowing limitations see [CALL_EVIDENCE.md](CALL_EVIDENCE.md).
+Phase 12 adds **bounded direct-call evidence**, including selected imported symbol links, without executing project code. Phase 16 extends that evidence to unshadowed, uniquely indexed Python module aliases (`import pkg.mod as m`, `from . import mod as m`) and conservative package-initializer ambiguity checks. Plain dotted attribute chains, runtime importlib, module monkey-patching and Python receiver types remain outside the static evidence boundary. For exact syntax, uncertainty and shadowing limitations see [CALL_EVIDENCE.md](CALL_EVIDENCE.md).

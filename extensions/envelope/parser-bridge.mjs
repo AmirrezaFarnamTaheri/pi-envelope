@@ -21,12 +21,17 @@ export function validateCallFacts(record){
   if(record.bindings!==undefined&&(!Array.isArray(record.bindings)||record.bindings.length>1000||
     record.bindings.some(b=>!b||!['named','package','namespace'].includes(b.kind)||!nameField(b.local)||
       typeof b.spec!=='string'||b.spec.length>512||b.spec.includes('\0')||b.spec.startsWith('../')||
-      b.kind==='named'&&!nameField(b.imported)||b.explicit!==undefined&&typeof b.explicit!=='boolean')))return false;
+      b.kind==='named'&&!nameField(b.imported)||b.explicit!==undefined&&typeof b.explicit!=='boolean'||
+      b.fromPackage!==undefined&&(typeof b.fromPackage!=='string'||!b.fromPackage||b.fromPackage.length>512)||
+      b.fromPackage!==undefined&&b.kind!=='namespace')))return false;
   if(record.calls!==undefined&&(!Array.isArray(record.calls)||record.calls.length>200||
     record.calls.some(c=>!c||!nameField(c.name)||!['direct','member'].includes(c.form)||
       typeof c.receiver!=='string'||c.receiver.length>128||!c.caller||!nameField(c.caller.name)||
       !position(c.caller.line)||!position(c.line)||!position(c.column)||typeof c.shadowed!=='boolean')))return false;
   if(record.omittedCalls!==undefined&&(!Number.isSafeInteger(record.omittedCalls)||record.omittedCalls<0||record.omittedCalls>10_000_000))return false;
+  if(record.moduleAssigned!==undefined && (!Array.isArray(record.moduleAssigned)||record.moduleAssigned.length>1000||
+    record.moduleAssigned.some(name=>!nameField(name))))return false;
+  if(record.moduleBindingsTruncated!==undefined && typeof record.moduleBindingsTruncated!=='boolean')return false;
   if(record.package!==undefined&&record.package!==null&&record.package!==''&&!nameField(record.package))return false;
   return true;
 }
