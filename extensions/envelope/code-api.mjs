@@ -6,6 +6,7 @@ import { ExternalGraphReader } from './graphify-adapter.mjs';
 import {inspectCodeHistory} from './code-history.mjs';
 import {inspectCochangeCoupling} from './cochange-review.mjs';
 import {GraphVersionStore} from './graph-versions.mjs';
+import {searchLocalVectors} from './local-vectors.mjs';
 import {homedir} from 'node:os';
 import {join} from 'node:path';
 import {projectContextCard} from './context-card.mjs';
@@ -106,6 +107,24 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
       maxCommits:intProp('Maximum Git commits examined, 1-100',1,100),
       limit:intProp('Maximum reported related/churn files, 1-20',1,20)}),
     (index,params)=>inspectCodeHistory(index,params));
+  tool('envelope_code_vector','Envelope: Opt-In Local Vector and Lexical Retrieval',
+    'Offline cosine/hybrid ranking of user-supplied embeddings, matched to current source SHA-256. No automatic model download or provider call; explicit /envelope code vectors on required.',
+    schema({action:{type:'string',enum:['status','search']},
+      queryVector:{type:'array',minItems:8,maxItems:1024,items:{type:'number'}},
+      query:{type:'string',description:'Optional lexical query, 1-160 chars'},
+      limit:intProp('Maximum returned files 1-15',1,15),
+      offset:intProp('Zero-based result offset 0-256',0,256),
+      ifVersion:{type:'string',description:'Exact previous vector search version'},
+      maxChars:intProp('Maximum JSON output bytes 900-16000',900,16000)}),
+    (index,params)=>{
+      const action=params.action||'status';
+      if(action==='status')return {enabled:getConfig().code.vectorEnabled===true,
+        artifact:'.envelope/embeddings.json',modelExecution:false,automaticNetwork:false,
+        note:'Manifest supplies external numeric vectors, not verified semantic quality.'};
+      if(action!=='search')throw new TypeError('unsupported vector action');
+      if(getConfig().code.vectorEnabled!==true)throw new Error('Local vector retrieval disabled; use /envelope code vectors on');
+      return searchLocalVectors(index,params);
+    });
   tool('envelope_code_versions','Envelope: Persistent Verified Graph Versions',
     'Read-only metadata snapshots with exact file hashes, static import edges and bounded diff. Capture/prune are human-only /envelope code versions commands. Never stores raw source.',
     schema({action:{type:'string',enum:['status','list','compare']},
