@@ -4,9 +4,10 @@ import { chmodSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-const KINDS=new Set(['output_compaction','context_projection','model_usage','code_query','workflow_action']);
+const KINDS=new Set(['output_compaction','context_projection','model_usage','code_query','workflow_action','graphify_cli']);
 const ACTIONS={
   code_query:new Set(['envelope_code_overview','envelope_code_languages','envelope_code_tree_status','envelope_code_tree_query','envelope_code_tree_capture','envelope_code_lookup','envelope_code_calls','envelope_code_impact','envelope_code_change_impact','envelope_code_verify']),
+  graphify_cli:new Set(['status','query','path','explain','build','update']),
   workflow_action:new Set(['envelope_workflow_create','envelope_workflow_status','envelope_workflow_claim','envelope_workflow_finish','envelope_workflow_review','envelope_workflow_retry','envelope_workflow_events','envelope_workflow_handoff','envelope_workflow_run'])
 };
 const OUTCOMES=new Set(['ok','error','review','completed','failed']);
@@ -31,7 +32,7 @@ function clean(kind,data){
   if(!data||typeof data!=='object'||Array.isArray(data)) throw new TypeError('metrics fields must be an object');
   for(const key of Object.keys(data)) if(!FIELDS.has(key)) throw new TypeError(`unexpected metrics field: ${key}`);
   const action=data.action??'';
-  if(typeof action!=='string'||(action&&!ACTIONS[kind]?.has(action))||((kind==='code_query'||kind==='workflow_action')&&!action)) throw new TypeError('unrecognized metrics action');
+  if(typeof action!=='string'||(action&&!ACTIONS[kind]?.has(action))||((kind==='code_query'||kind==='workflow_action'||kind==='graphify_cli')&&!action)) throw new TypeError('unrecognized metrics action');
   const outcome=data.outcome??'ok';
   if(!OUTCOMES.has(outcome)) throw new TypeError('invalid outcome');
   if(data.providerBilled!==undefined&&typeof data.providerBilled!=='boolean') throw new TypeError('providerBilled must be boolean');
