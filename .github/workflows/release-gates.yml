@@ -71,6 +71,20 @@ jobs:
           mkdir -p "$RUNNER_TEMP/envelope-ci-home/.tersio"
           printf '{"comboSetupComplete":true,"comboDefault":"off"}\n' > "$RUNNER_TEMP/envelope-ci-home/.tersio/settings.json"
           HOME="$RUNNER_TEMP/envelope-ci-home" npm run smoke:runtime
+      - name: Install isolated pinned Graphify CLI
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/envelope-graphify-runtime"
+          "$RUNNER_TEMP/envelope-graphify-runtime/bin/python" -m pip install --disable-pip-version-check --no-input --progress-bar off "graphifyy==0.9.100"
+          "$RUNNER_TEMP/envelope-graphify-runtime/bin/graphify" --version
+      - name: Prove real Graphify CLI code-only compatibility
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          GRAPHIFY_BACKEND=none node scripts/smoke-graphify-real.mjs "$RUNNER_TEMP/envelope-graphify-runtime/bin/graphify"
       - name: Prove real Tree-sitter WASM grammars
         if: ${{ !cancelled() }}
         run: npm run smoke:tree
