@@ -102,3 +102,5 @@ For explicit durable static graph history, see [persistent graph version command
 **Read-only external MCP:** a manually launched [MCP stdio bridge](docs/MCP_STDIO_BRIDGE.md) exposes only operator-captured private file-graph versions (list, snapshot and compare). It does not start automatically or open a network port.
 
 [TypeScript compiler evidence](docs/TYPESCRIPT_COMPILER_EVIDENCE.md) documents checked JS/TS types, bounded diagnostic provenance, and explicit multi-language gaps.
+
+**Optional local GraphQL:** an operator-started [GraphQL.js history bridge](docs/GRAPHQL_HISTORY_BRIDGE.md) offers authenticated **loopback-only, read-only** queries over previously captured graph metadata. It does not start a public server, scan code, or install GraphQL.js automatically.
