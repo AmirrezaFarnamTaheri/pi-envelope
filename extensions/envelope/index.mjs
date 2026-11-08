@@ -6,7 +6,7 @@
  * owns conservative bash-result compaction and exact local retrieval.
  */
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, isAbsolute } from 'node:path';
 import { compactOutput } from './compactor.mjs';
 import { OutputStore } from './store.mjs';
 import { readConfig, saveConfig } from './config.mjs';
@@ -25,6 +25,7 @@ import {registerCapabilityCockpit} from './capability-cockpit.mjs';
 import { registerGraphifyCliFeature, normalizeGraphifyExecutable, composeGraphifyOrientation } from './graphify-cli.mjs';
 import { registerGraphifyDotnetFeature, normalizeGraphifyDotnetExecutable } from './graphify-dotnet-runtime.mjs';
 import { registerMetricsFeature } from './metrics-api.mjs';
+import {LocalEmbeddingRuntime} from './local-embedding-runtime.mjs';
 
 function homePath() {
   if (process.env.ENVELOPE_HOME) return process.env.ENVELOPE_HOME;
@@ -162,6 +163,7 @@ export function registerEnvelope(pi, options = {}) {
     ledger, frontier, getStore:()=>store, getConfig:()=>config, project, metrics, observe
   });
 
+  const localEmbeddingRuntime = options.localEmbeddingRuntime || new LocalEmbeddingRuntime();
   const codeApi = registerCodeFeature(pi, {project, getConfig:()=>config, loadCompiler:options.loadCompiler, loadTreeRuntime:options.loadTreeRuntime, getTreeGrammarPath:options.getTreeGrammarPath, watchGraphFactory:options.watchGraphFactory, home, observe});
   registerLspFeature(pi,{indexOf:codeApi.indexOf,getConfig:()=>config,home,observe});
   const graphifyCli = registerGraphifyCliFeature(pi,{project,getConfig:()=>config,observe,cli:options.graphifyCliBridge,watcher:options.graphifyWatcher});
@@ -193,7 +195,7 @@ export function registerEnvelope(pi, options = {}) {
     const policy=composePolicy(event?.systemPrompt,config.policy.enabled);
     return composeGraphifyOrientation(policy?.systemPrompt??event?.systemPrompt,project(ctx),config.graphify.orientationEnabled) || policy || undefined;
   });
-  pi.on('session_shutdown', () => { graphifyDotnet.close?.(); graphifyCli.close?.(); codeApi.close?.(); store?.close(); store = null; frontier?.close(); frontier=null; workflowLedger?.close(); metricLedger?.close(); metricLedger=null; });
+  pi.on('session_shutdown', () => { localEmbeddingRuntime.close?.(); graphifyDotnet.close?.(); graphifyCli.close?.(); codeApi.close?.(); store?.close(); store = null; frontier?.close(); frontier=null; workflowLedger?.close(); metricLedger?.close(); metricLedger=null; });
 
   pi.registerTool?.({
     name: 'envelope_recall_output',
@@ -470,11 +472,44 @@ export function registerEnvelope(pi, options = {}) {
         if(value==='vectors'){
           const mode=extra[0]||'status';
           if(mode==='status'&&extra.length<=1){
-            notify(ctx,`Envelope local vectors ${config.code.vectorEnabled?'on':'off'}; expects user-supplied .envelope/embeddings.json; no model or network`);return;
+            notify(ctx,`Envelope vectors ${config.code.vectorEnabled?'on':'off'}; encoder ${config.code.vectorExecutable?'pinned':'not configured'}; manual build/find only, no automatic models`);return;
           }
-          if(!['on','off'].includes(mode)||extra.length!==1){notify(ctx,'Usage: /envelope code vectors [status|on|off]','warning');return;}
+          if(mode==='encoder'){
+            const selected=rawArgs.replace(/^code\s+vectors\s+encoder\s*/i,'').trim();
+            try {
+              if(!selected)throw new Error('absolute encoder executable path required');
+              const executable=selected.toLowerCase()==='none'?null:selected;
+              if(executable&&(!isAbsolute(executable)||executable.length>1024||/[\u0000-\u001f\u007f]/.test(executable)))throw new Error('absolute encoder executable required');
+              config=saveConfig(settingsPath,{...config,code:{...config.code,vectorExecutable:executable}});
+              localEmbeddingRuntime.close?.();
+              notify(ctx,`Envelope local embedding encoder ${config.code.vectorExecutable?'pinned':'cleared'}; no model installed or started`);
+            }catch(err){notify(ctx,`Envelope encoder path rejected: ${err.message}`,'warning');}
+            return;
+          }
+          if(mode==='build'||mode==='replace'){
+            if(extra.length!==1){notify(ctx,'Usage: /envelope code vectors [build|replace]','warning');return;}
+            try {
+              if(!config.code.enabled||!config.code.vectorEnabled)throw new Error('code vectors disabled; enable explicitly');
+              const index=await codeApi.indexOf(ctx);
+              const result=await localEmbeddingRuntime.build(index,{executable:config.code.vectorExecutable,replace:mode==='replace'});
+              notify(ctx,`Envelope local vector ${mode}: ${result.files} verified files, model ${result.model}, ${result.dimensions} dimensions; text windows truncated in ${result.truncatedTexts} files. No semantic-quality claim.`);
+            }catch(err){notify(ctx,`Envelope local embedding ${mode} failed: ${err.message}`,'warning');}
+            return;
+          }
+          if(mode==='find'){
+            const query=rawArgs.replace(/^code\s+vectors\s+find\s*/i,'').trim();
+            try {
+              if(!config.code.enabled||!config.code.vectorEnabled)throw new Error('code vectors disabled; enable explicitly');
+              const results=await localEmbeddingRuntime.find(await codeApi.indexOf(ctx),{executable:config.code.vectorExecutable,query});
+              const top=results.results.slice(0,5).map(x=>`${x.path}: ${x.score}`).join(', ');
+              notify(ctx,`Envelope local vector search (${results.model}): ${top||'no current verified matches'}; stale ${results.skippedStale}. Scores are heuristics.`);
+            }catch(err){notify(ctx,`Envelope local vector search failed: ${err.message}`,'warning');}
+            return;
+          }
+          if(!['on','off'].includes(mode)||extra.length!==1){notify(ctx,'Usage: /envelope code vectors [status|on|off|encoder <absolute path>|encoder none|build|replace|find <text>]','warning');return;}
           try{config=saveConfig(settingsPath,{...config,code:{...config.code,vectorEnabled:mode==='on'}});
-            notify(ctx,`Envelope user-supplied local vector retrieval ${mode}; no model loaded or downloaded`);}
+            if(mode==='off')localEmbeddingRuntime.close?.();
+            notify(ctx,`Envelope local vector retrieval ${mode}; encoder use requires an explicit human build/find command`);}
           catch(err){notify(ctx,`Envelope vector preference not saved: ${err.message}`,'warning');}
           return;
         }
@@ -540,12 +575,12 @@ export function registerEnvelope(pi, options = {}) {
           return;
         }
         if (!['on', 'off'].includes(value) || extra.length) {
-          notify(ctx, 'Usage: /envelope code [status|on|off|vectors on|vectors off|versions status|versions capture|versions prune <n>|languages on|languages off|tree on|tree off|tree status|guard on|guard off|rename on|rename off|lsp status]', 'warning');
+          notify(ctx, 'Usage: /envelope code [status|on|off|vectors on|vectors off|vectors encoder <path>|vectors build|vectors replace|vectors find <text>|versions status|versions capture|versions prune <n>|languages on|languages off|tree on|tree off|tree status|guard on|guard off|rename on|rename off|lsp status]', 'warning');
           return;
         }
         try {
           config = saveConfig(settingsPath, { ...config, code:{...config.code,enabled:value === 'on'} });
-          if(value==='off'){codeApi.close?.();graphifyCli.close?.();graphifyDotnet.close?.();} // Stop opt-in readers and CLI work on disable.
+          if(value==='off'){localEmbeddingRuntime.close?.();codeApi.close?.();graphifyCli.close?.();graphifyDotnet.close?.();} // Stop opt-in readers and CLI work on disable.
           notify(ctx, `Envelope code ${value}`);
         } catch(err) {notify(ctx, `Envelope code settings failed: ${err.message}`, 'warning');}
         return;
@@ -614,7 +649,7 @@ export function registerEnvelope(pi, options = {}) {
     }
   });
 
-  return { metrics, getConfig: () => config, close: () => {graphifyDotnet.close?.();graphifyCli.close?.();codeApi.close?.(); store?.close(); frontier?.close(); projectMemory?.close(); workflowLedger?.close(); metricLedger?.close();} };
+  return { metrics, getConfig: () => config, close: () => {localEmbeddingRuntime.close?.();graphifyDotnet.close?.();graphifyCli.close?.();codeApi.close?.(); store?.close(); frontier?.close(); projectMemory?.close(); workflowLedger?.close(); metricLedger?.close();} };
 }
 
 export default registerEnvelope;
