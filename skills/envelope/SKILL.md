@@ -102,3 +102,7 @@ The user may enable `/envelope graphify watch on 1200` after pinning an external
 ### Explicit persistent graph versions
 
 Only a human may run `/envelope code versions capture` or `prune 8`; the agent's `envelope_code_versions` tool can only `status`, `list` and `compare` private persisted **file-hash/static-import** snapshots. Do not auto-capture a repository as a side effect of asking a question. These snapshots do not prove typed dependency, runtime behavior, formal correctness or semantic similarity. Historical diff pages use exact version IDs and `ifVersion`. Source bodies are not persisted but file paths and declaration names are private metadata. See `docs/PERSISTENT_GRAPH_VERSIONS.md`.
+
+### User-supplied local embeddings
+
+Only use `envelope_code_vector({action:"search",queryVector:[...],query:"optional lexical task"})` when the human explicitly enabled `/envelope code vectors on` and supplied a trusted `.envelope/embeddings.json`. The tool does not produce embeddings: the query vector must come from the same model as the indexed vectors. Check `skippedStale`, `complete`, `version`, source hashes and numeric score provenance. Do not claim semantic relevance, correctness, precision/recall or cost savings from a high cosine score. Never auto-download a model, start a provider or disclose source bodies. See `docs/LOCAL_VECTOR_RETRIEVAL.md`.
