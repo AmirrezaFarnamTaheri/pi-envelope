@@ -40,6 +40,7 @@ pi install .
 | Persistent graph versions (explicit) | `envelope_code_versions` | Private, content-addressed file-hash + static-import snapshots; human-only capture/prune, metadata-only historical diffs |
 | Local vectors (explicit opt-in) | `envelope_code_vector` | Source-hash verified cosine/hybrid ranking over user-provided numeric embeddings, no encoder or provider calls |
 | Static graph invariant checks | `envelope_code_invariant` | Verified import cycles, reachability and no-path closures with checkable witnesses; no program-correctness proof |
+| Graphify.NET CLI (explicit) | `envelope_graphify_dotnet` status; `/envelope graphify-dotnet ...` | Separate .NET 10 AST-only runtime, pinned executable, no credential inheritance, separate unverified graph output |
 | Graphify CLI (opt-in) | `/envelope graphify status/on/off/binary/timeout/orientation/build/update/watch`, `envelope_graphify_cli` | User-pinned external Graphify executable: status, read-only query/path/explain, explicit human build/update or consent-only session code watch, no LLM provider keys; bounded and stale-aware |
 | Changes | `envelope_code_change_impact` | Commit-pinned clean-checkout diff with changed-line evidence, static dependents, and candidate tests; not a complete semantic blast radius |
 | Other languages | `/envelope code languages on\|off`, `envelope_code_languages` | Opt-in Python/Go stdlib AST through bounded subprocess parsing |
@@ -94,3 +95,5 @@ For explicit durable static graph history, see [persistent graph version command
 [Local vector retrieval guide](docs/LOCAL_VECTOR_RETRIEVAL.md) documents the operator-supplied embedding manifest and strict source-staleness controls.
 
 [Static graph invariant guide](docs/STATIC_GRAPH_INVARIANTS.md) explains the limited proof boundary and `unknown` verdicts for incomplete index evidence.
+
+[Graphify.NET runtime guide](docs/GRAPHIFY_DOTNET_RUNTIME.md) documents explicit build, provider-free process environment and real-version smoke requirements.
