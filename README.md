@@ -1,6 +1,6 @@
 # Envelope
 
-**Envelope v0.15.0 (candidate)** is one Pi coding-agent package that combines pinned Tersio modes with native, project-scoped output recovery, context checkpoints, code intelligence, reviewed worktree tasks, and local numeric observability. It is a source distribution: **no installed Pi, Tersio, or Tree-sitter WASM runtime is included**.
+**Envelope v0.16.0 (candidate)** is one Pi coding-agent package that combines pinned Tersio modes with native, project-scoped output recovery, context checkpoints, code intelligence, reviewed worktree tasks, and local numeric observability. It is a source distribution: **no installed Pi, Tersio, or Tree-sitter WASM runtime is included**.
 
 The [33-source, commit-pinned audit](docs/ALL_33_SOURCE_AUDIT.md) and its [machine-readable coverage ledger](integrations/extraction-audit.json) distinguish partial native adaptations from external, unavailable, or intentionally excluded upstream features. This is **not** a claim that all 33 independent projects were fully ported.
 
@@ -28,7 +28,7 @@ pi install .
 | Output | `/envelope output on|off`, `envelope_recall_output`, `envelope_search_output`, `envelope_search_fragments` | Conservative completed-bash compaction; exact project-scoped recovery or incrementally indexed chunk FTS5 + bounded BM25/lexical RRF search |
 | Retention | `/envelope output retention <0..365>`, `/envelope output prune <days>`, `/envelope output erase <64-hex-id>`, `envelope_output_retention` | Explicit user-controlled deletion and bounded opportunistic expiry; 0 disables automatic expiry |
 | Context | `/envelope context on|off|status|restore`, `envelope_context_checkpoint`, `envelope_context_timeline`, `envelope_context_prune`, `envelope_context_restore`, `envelope_context_footprint` | Session-aware checkpointed projection with versioned crash-recoverable replay blocks; original Pi session transcript remains intact |
-| Code | `/envelope code on|off|status`, `envelope_code_overview`, `envelope_code_lookup`, `envelope_code_impact`, `envelope_code_calls`, `envelope_code_verify` | Shared JS/TS AST index, static import graph and conservatively grounded call sites |
+| Code | `/envelope code on|off|status`, `envelope_code_overview`, `envelope_code_lookup`, `envelope_code_impact`, `envelope_code_calls`, `envelope_code_verify` | Shared JS/TS AST index and static call evidence, with opt-in conservatively linked Python module aliases and Go packages |
 | Changes | `envelope_code_change_impact` | Commit-pinned clean-checkout diff with changed-line evidence, static dependents, and candidate tests; not a complete semantic blast radius |
 | Other languages | `/envelope code languages on|off`, `envelope_code_languages` | Opt-in Python/Go stdlib AST through bounded subprocess parsing |
 | Tree-sitter | `/envelope code tree on|off|status`, `envelope_code_tree_status`, `envelope_code_tree_query`, `envelope_code_tree_capture` | Optional real WASM S-expression queries and capture groups; unavailable grammar is reported, not simulated |
@@ -59,7 +59,7 @@ npm run smoke:runtime         # Real installed Pi/Tersio RPC, or BLOCKED
 npm run smoke:tree            # Real installed WASM grammar, or BLOCKED
 ```
 
-The offline suite includes mocked Pi/Tree-sitter protocol and workflow integration, actual local Git worktrees, real Python/Go AST runs when installed, and real clangd LSP when available. **Passing those tests does not establish complete Pi/Tersio live compatibility.** The v0.14.0 predecessor passed [hosted real-runtime validation](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42477506854); this v0.15.0 candidate must pass its own hosted gates. This source archive alone does not prove a new bundled release.
+The offline suite includes mocked Pi/Tree-sitter protocol and workflow integration, actual local Git worktrees, real Python/Go AST runs when installed, and real clangd LSP when available. **Passing those tests does not establish complete Pi/Tersio live compatibility.** The v0.15.0 predecessor passed [hosted real-runtime validation](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42478614461); this v0.16.0 candidate must pass its own hosted gates. This source archive alone does not prove a new bundled release.
 
 ## Scope and provenance
 

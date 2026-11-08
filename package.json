@@ -1,6 +1,6 @@
 {
   "name": "pi-envelope",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "private": true,
   "description": "Envelope: one Pi coding-agent package with Tersio modes, reversible local output/context, code intelligence, worktree workflows and private metrics",
   "type": "module",
