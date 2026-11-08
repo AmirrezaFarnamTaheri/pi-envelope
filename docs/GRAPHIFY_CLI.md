@@ -34,7 +34,7 @@ Only **direct user slash commands** request graph-writing operations:
 /envelope graphify update
 ```
 
-Build invokes a fixed `graphify extract . --code-only --no-cluster --out graphify-out` argument vector. Update invokes `graphify update . --no-cluster`. Both run from the current canonical project root, without a shell. `GRAPHIFY_BACKEND=none` is forced, provider API credentials and arbitrary environment keys are not forwarded, and Graphify query logging is disabled. As a consequence, *docs, images, and other semantic/LLM content are not imported by this bridge*. Use a separately reviewed/manual upstream Graphify workflow for that. The adapter never runs Graphify for you just because a file changes.
+Build invokes a fixed `graphify extract . --code-only --no-cluster` argument vector. Graphify itself creates `graphify-out/` in the working project; adding `--out graphify-out` would incorrectly nest that directory and is forbidden by the adapter. Update invokes `graphify update . --no-cluster`. Both run from the current canonical project root, without a shell. `GRAPHIFY_BACKEND=none` is forced, provider API credentials and arbitrary environment keys are not forwarded, and Graphify query logging is disabled. As a consequence, *docs, images, and other semantic/LLM content are not imported by this bridge*. Use a separately reviewed/manual upstream Graphify workflow for that. The adapter never runs Graphify for you just because a file changes.
 
 ## Budgets, safety and lifecycle
 
