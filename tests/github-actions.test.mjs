@@ -72,3 +72,17 @@ test('real Pi RPC smoke disables only Tersio first-run wizard inside isolated CI
   assert.match(yaml,/\.tersio\/settings\.json/);
   assert.match(yaml,/"off"/);
 });
+
+test('hosted CI exercises real pinned Graphify Python CLI separately from fake process tests',()=>{
+  const yaml=read('.github/workflows/release-gates.yml');
+  for(const required of [
+    'graphifyy==0.9.100','python3 -m venv',
+    'scripts/smoke-graphify-real.mjs',
+    'Prove real Graphify CLI code-only compatibility',
+    'GRAPHIFY_BACKEND=none',
+  ])assert.ok(yaml.includes(required),required);
+  assert.doesNotMatch(yaml,/continue-on-error:\\s*true/);
+  const smoke=read('scripts/smoke-graphify-real.mjs');
+  for(const required of ['GraphifyCliBridge','action:\'build\'','action:\'update\'','action:\'query\'','action:\'path\'','action:\'explain\''])
+    assert.ok(smoke.includes(required),required);
+});
