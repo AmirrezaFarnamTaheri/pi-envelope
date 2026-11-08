@@ -1,6 +1,7 @@
 /** Pi-native code intelligence over one shared lazy TypeScript AST index per root. */
 import { CodeIndex } from './code-index.mjs';
 import { analyzeChangeImpact } from './change-evidence.mjs';
+import { inspectCodeGraph } from './graph-intelligence.mjs';
 import { TreeSitterBroker, treeCaptureGroups } from './tree-sitter-broker.mjs';
 
 const result = (value,isError=false) => ({
@@ -54,6 +55,19 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
     'Inspect a small ranked repository map using AST symbols and relative import centrality; no embeddings or full runtime call graph.',
     schema({limit:intProp('Maximum ranked files, defaults to 12',1,15)}),
     (index,params)=>index.overview({limit:Math.min(params.limit||12,15)}));
+  tool('envelope_code_graph','Envelope: Native Graph Exploration',
+    'Read-only, deterministic file graph over the current indexed project. Supports status, imports/calls neighbors, shortest paths, hubs, weak components, architecture boundary auditing, and bounded JSON/Mermaid exports. Does not infer semantic/runtime relationships.',
+    schema({
+      action:{type:'string',enum:['status','neighbors','path','hubs','components','boundaries','export']},
+      source:{type:'string',description:'Indexed source file, required for neighbors or path'},
+      target:{type:'string',description:'Indexed destination file, required for path'},
+      relation:{type:'string',enum:['imports','calls','both']},
+      direction:{type:'string',enum:['incoming','outgoing','both']},
+      maxDepth:intProp('Shortest-path depth bound, 1-8',1,8),
+      limit:intProp('Maximum results or exported nodes, 1-100; action-specific smaller limits apply',1,100),
+      format:{type:'string',enum:['json','mermaid']},
+      rules:{type:'array',maxItems:12,items:{type:'object',properties:{from:{type:'string'},forbid:{type:'array',minItems:1,maxItems:12,items:{type:'string'}}},required:['from','forbid'],additionalProperties:false}}
+    }), (index,params)=>inspectCodeGraph(index,params));
   tool('envelope_code_languages','Envelope: Structural Parser Status',
     'Display available indexed languages, skipped parser reasons, and whether optional local Python/Go AST parsing is enabled.',
     schema({}), (index)=>index.languageStatus());
