@@ -97,3 +97,7 @@ A new `envelope_code_invariant` read-only tool verifies bounded SHA-attested sta
 ## Read-only MCP stdio graph-version bridge (stacked draft)
 
 A manually launched newline-delimited JSON-RPC MCP 2025-11-25 stdio process can list, snapshot and compare **explicitly captured** private static file-graph metadata, without source rescanning, network listeners, automatic model calls, mutation tools, or extra Pi hooks. Requests/responses and metadata are bounded; invalid snapshots and protocol handshakes fail closed. Real subprocess fixture tests in `tests/mcp-stdio-interop.test.mjs` check the contract. No authenticated remote HTTP MCP, OAuth, subscriptions, provider routing or GraphQL server is implied. See `docs/MCP_STDIO_BRIDGE.md`.
+
+## Bounded TypeScript compiler facts (stacked draft)
+
+`envelope_code_typecheck` uses the actual TypeScript 5.8.3 TypeChecker over bounded SHA-verified JS/TS source from the shared CodeIndex. It provides type errors, exact indexed declaration positions and aliases across modules; it does not run/emit project code, compile Python/Go/C#, resolve arbitrary npm packages or certify program correctness. Unresolved modules and coverage gaps are explicit. Seven TypeScript compiler tests cover real type resolution, mismatch diagnostics, staleness, unsafe paths and one native Pi tool. See `docs/TYPESCRIPT_COMPILER_EVIDENCE.md`; hosted CI must pass on this head before claiming review readiness.
