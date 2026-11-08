@@ -9,6 +9,7 @@ import {GraphVersionStore} from './graph-versions.mjs';
 import {searchLocalVectors} from './local-vectors.mjs';
 import {verifyGraphInvariant} from './graph-invariants.mjs';
 import {inspectTypedSource} from './typechecker-evidence.mjs';
+import {inspectGoTypes} from './go-typechecker-evidence.mjs';
 import {homedir} from 'node:os';
 import {join} from 'node:path';
 import {projectContextCard} from './context-card.mjs';
@@ -109,6 +110,18 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
       maxCommits:intProp('Maximum Git commits examined, 1-100',1,100),
       limit:intProp('Maximum reported related/churn files, 1-20',1,20)}),
     (index,params)=>inspectCodeHistory(index,params));
+  tool('envelope_code_go_types','Envelope: Go go/types Compiler Evidence',
+    'Read-only, offline standard-library Go type checker for current source-hash verified indexed Go files within one package. No project execution or external dependency fetching.',
+    schema({action:{type:'string',enum:['diagnostics','symbol']},
+      path:{type:'string',description:'Exact indexed project-local Go source path'},
+      line:intProp('One-based Go identifier cursor line',1,100000),
+      column:intProp('One-based UTF-16 cursor column',1,100000),
+      limit:intProp('Maximum reported diagnostics 1-30',1,30),
+      maxChars:intProp('Maximum serialized JSON bytes 900-16000',900,16000)},['path']),
+    (index,params)=>{
+      if(getConfig().code.languagesEnabled!==true)throw new Error('Go AST indexing disabled; use /envelope code languages on');
+      return inspectGoTypes(index,params);
+    });
   tool('envelope_code_typecheck','Envelope: TypeScript Compiler Facts',
     'Read-only TypeScript/JavaScript TypeChecker diagnostics or a typed symbol/declaration from verified indexed sources. No project emit, runtime execution, external language proof or source-body output.',
     schema({action:{type:'string',enum:['diagnostics','symbol']},
