@@ -163,7 +163,7 @@ export function registerEnvelope(pi, options = {}) {
 
   const codeApi = registerCodeFeature(pi, {project, getConfig:()=>config, loadCompiler:options.loadCompiler, loadTreeRuntime:options.loadTreeRuntime, getTreeGrammarPath:options.getTreeGrammarPath, watchGraphFactory:options.watchGraphFactory, observe});
   registerLspFeature(pi,{indexOf:codeApi.indexOf,getConfig:()=>config,home,observe});
-  const graphifyCli = registerGraphifyCliFeature(pi,{project,getConfig:()=>config,observe});
+  const graphifyCli = registerGraphifyCliFeature(pi,{project,getConfig:()=>config,observe,cli:options.graphifyCliBridge,watcher:options.graphifyWatcher});
 
   // One read-only preflight stage for write/edit; Tersio only rewrites bash.
   // Deliberately disabled until the user opts in, and never writes to disk.
@@ -317,7 +317,8 @@ export function registerEnvelope(pi, options = {}) {
       }
       if (verb === 'graphify') {
         if ((!value || value==='status') && !extra.length) {
-          notify(ctx,`Envelope Graphify CLI ${config.graphify.enabled?'on':'off'}; binary ${config.graphify.executable?'pinned':'unconfigured'}; timeout ${config.graphify.timeoutMs} ms; orientation ${config.graphify.orientationEnabled?'on':'off'}; offline-only, AST code builds by explicit command`);
+          const watch=graphifyCli.watchStatus(ctx);
+          notify(ctx,`Envelope Graphify CLI ${config.graphify.enabled?'on':'off'}; binary ${config.graphify.executable?'pinned':'unconfigured'}; timeout ${config.graphify.timeoutMs} ms; orientation ${config.graphify.orientationEnabled?'on':'off'}; code-only watcher ${watch.active?'on':'off'} (${watch.watchedDirectories} directories, ${watch.pendingCodeFiles} pending, ${watch.batches} batches, manual rebuild ${watch.manualRebuildRequired?'required':'not flagged'}); no automatic LLM calls`);
           return;
         }
         if (value==='binary') {
@@ -326,7 +327,9 @@ export function registerEnvelope(pi, options = {}) {
           try {
             if (!selected)throw new Error('absolute executable path required');
             const executable=selected.toLowerCase()==='none'?null:normalizeGraphifyExecutable(selected);
+            const changed=executable!==config.graphify.executable;
             config=saveConfig(settingsPath,{...config,graphify:{...config.graphify,executable}});
+            if(changed)graphifyCli.close?.(); // changing the executable revokes active consent
             notify(ctx,`Envelope Graphify executable ${executable?'pinned':'cleared'}; never auto-installed`);
           } catch(err) {notify(ctx,`Envelope Graphify binary not changed: ${err.message}`,'warning');}
           return;
@@ -338,6 +341,36 @@ export function registerEnvelope(pi, options = {}) {
           try{config=saveConfig(settingsPath,{...config,graphify:{...config.graphify,orientationEnabled:extra[0]==='on'}});
             notify(ctx,`Envelope Graphify graph orientation ${extra[0]} (one bounded existing prompt hook)`);}
           catch(err){notify(ctx,`Envelope Graphify orientation not changed: ${err.message}`,'warning');}
+          return;
+        }
+        if (value==='watch') {
+          const mode=extra[0]??'status';
+          if(mode==='status'&&extra.length<=1) {
+            const status=graphifyCli.watchStatus(ctx);
+            notify(ctx,'Envelope Graphify watch '+(status.active?'on':'off')+
+              '; directories '+status.watchedDirectories+
+              '; pending code '+status.pendingCodeFiles+
+              '; updating '+(status.updating?'yes':'no')+
+              '; batches '+status.batches+
+              '; manual rebuild '+(status.manualRebuildRequired?'required':'not flagged')+
+              '; last '+status.lastOutcome+'; LLM never automatic');
+            return;
+          }
+          if(mode==='off'&&extra.length===1) {
+            try{await graphifyCli.watch(ctx,{enabled:false});notify(ctx,'Envelope Graphify watch stopped; no background rebuilds');}
+            catch(err){notify(ctx,'Envelope Graphify watch stop failed: '+err.message,'warning');}
+            return;
+          }
+          if(mode==='on'&&(extra.length===1||extra.length===2)) {
+            const debounceMs=extra.length===2?Number(extra[1]):undefined;
+            try{
+              const status=await graphifyCli.watch(ctx,{enabled:true,debounceMs});
+              notify(ctx,'Envelope Graphify code-only watch active in this session: '+
+                status.watchedDirectories+' project directories, no LLM; docs/media require manual build');
+            }catch(err){notify(ctx,'Envelope Graphify watch not enabled: '+err.message,'warning');}
+            return;
+          }
+          notify(ctx,'Usage: /envelope graphify watch [status|on [250..10000 ms]|off]','warning');
           return;
         }
         if (value==='timeout') {
@@ -352,8 +385,10 @@ export function registerEnvelope(pi, options = {}) {
         }
         if ((value==='build'||value==='update') && !extra.length) {
           try {
+            const watching=graphifyCli.watchStatus(ctx).active;
+            if(watching)await graphifyCli.watch(ctx,{enabled:false}); // serialize manual writes with the watcher
             const report=await graphifyCli.run(ctx,{action:value},undefined,{humanCommand:true});
-            notify(ctx,`Envelope Graphify ${value}: CLI exited successfully; artifact ${report.artifactState}; changed ${report.artifactChanged?'yes':'no'}. ${report.output.slice(0,300)}`);
+            notify(ctx,`Envelope Graphify ${value}: CLI exited successfully; artifact ${report.artifactState}; changed ${report.artifactChanged?'yes':'no'}; watcher stopped for manual rebuild. ${report.output.slice(0,300)}`);
           } catch(err){notify(ctx,`Envelope Graphify ${value} failed: ${err.message}`,'warning');}
           return;
         }
@@ -364,7 +399,7 @@ export function registerEnvelope(pi, options = {}) {
           catch(err){notify(ctx,`Envelope Graphify settings not saved: ${err.message}`,'warning');}
           return;
         }
-        notify(ctx,'Usage: /envelope graphify [status|on|off|binary <absolute path>|binary none|timeout <ms>|orientation on|off|build|update]','warning');
+        notify(ctx,'Usage: /envelope graphify [status|on|off|binary <absolute path>|binary none|timeout <ms>|orientation on|off|watch status|watch on [ms]|watch off|build|update]','warning');
         return;
       }
       if (verb === 'context') {
