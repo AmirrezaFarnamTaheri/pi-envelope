@@ -16,6 +16,26 @@ const MAX_SEARCH_CANDIDATES = 200;
 const MAX_VERIFIED_OUTPUTS = 40;
 const MAX_VERIFIED_BYTES = 8_000_000;
 const PREVIEW_CHARS = 320;
+const METADATA_SEARCH_CANDIDATES = 100;
+const METADATA_SEARCH_VERIFY_BYTES = 8_000_000;
+
+/** FTS is candidate discovery, not a trusted source for output text. */
+function normalizedTerms(text) {
+  return String(text).normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().match(SEARCH_TERM) || [];
+}
+function verifiedSearchExcerpt(text, words) {
+  const codepoints=Array.from(text);
+  const lower=text.toLowerCase();
+  let first=Infinity;
+  for(const word of words){
+    const at=lower.indexOf(word);
+    if(at>=0 && at<first)first=at;
+  }
+  const matchStart=Number.isFinite(first)?Array.from(text.slice(0,first)).length:0;
+  const start=Math.max(0,matchStart-60);
+  const end=Math.min(codepoints.length,start+PREVIEW_CHARS);
+  return (start?'…':'')+codepoints.slice(start,end).join('')+(end<codepoints.length?'…':'');
+}
 
 /** @param {string} query */
 function matchExpression(query) {
@@ -106,11 +126,10 @@ export class OutputStore {
       'INSERT INTO outputs_fts (id, project, tool, command, text) VALUES (?, ?, ?, ?, ?)'
     );
     this.searchStmt = this.db.prepare(`
-      SELECT o.id, o.project, o.tool, o.command, o.bytes, o.created_at,
-        snippet(outputs_fts, 4, '[', ']', '...', 12) AS excerpt
+      SELECT o.id, o.project, o.tool, o.command, o.bytes, o.created_at
       FROM outputs_fts JOIN outputs o ON outputs_fts.id = o.id
-      WHERE outputs_fts MATCH ? AND outputs_fts.project = ?
-      ORDER BY bm25(outputs_fts) LIMIT ?
+      WHERE outputs_fts MATCH ? AND outputs_fts.project = ? AND o.project = ?
+      ORDER BY bm25(outputs_fts), o.id LIMIT ?
     `);
     this.chunkState = this.db.prepare('SELECT chunk_count FROM output_chunks_state WHERE id = ?');
     this.chunkMark = this.db.prepare('INSERT INTO output_chunks_state (id, project, chunk_count) VALUES (?, ?, ?)');
@@ -200,13 +219,41 @@ export class OutputStore {
     };
   }
 
-  search(query, options = {}) {
+  /** Search indexes only for candidate IDs; display snippets from verified raw objects.
+   * Indexes can be stale, modified, or point to an erased object. Fail closed. */
+  searchReport(query, options = {}) {
     if (this.closed) throw new Error('store is closed');
-    const expression = matchExpression(query);
-    if (!expression) return [];
     const project = String(options.project ?? 'unknown-project');
     const limit = Math.min(Math.max(Number.isInteger(options.limit) ? options.limit : 10, 1), 25);
-    return this.searchStmt.all(expression, project, limit);
+    const expression = matchExpression(query);
+    const blank={hits:[],coverage:{partial:false,integritySkipped:0,candidateLimited:false,verificationLimited:false}};
+    if (!expression) return blank;
+    const words=normalizedTerms(query).slice(0,8);
+    if (!words.length) return blank;
+    const maxCandidates=Math.min(METADATA_SEARCH_CANDIDATES,limit*8);
+    const candidates=this.searchStmt.all(expression,project,project,maxCandidates);
+    const hits=[];
+    let integritySkipped=0,verifiedBytes=0,verificationLimited=false;
+    for(const row of candidates){
+      if(verifiedBytes+row.bytes>METADATA_SEARCH_VERIFY_BYTES){verificationLimited=true;continue;}
+      verifiedBytes+=row.bytes;
+      let original;
+      try {original=this.retrieve(row.id);}catch{integritySkipped++;continue;}
+      if(original?.project!==project){integritySkipped++;continue;}
+      const sourceWords=new Set(normalizedTerms(original.text));
+      if(!words.every(w=>sourceWords.has(w))){integritySkipped++;continue;}
+      const excerpt=verifiedSearchExcerpt(original.text,words);
+      hits.push({...row,excerpt});
+      if(hits.length>=limit)break;
+    }
+    const candidateLimited=candidates.length===maxCandidates;
+    return {hits,coverage:{partial:Boolean(integritySkipped||candidateLimited||verificationLimited),
+      integritySkipped,candidateLimited,verificationLimited}};
+  }
+
+  /** Backwards-compatible hit array; use searchReport for bounded coverage. */
+  search(query, options = {}) {
+    return this.searchReport(query, options).hits;
   }
 
   /** Deletes metadata and FTS rows as one SQLite transaction. The object file is

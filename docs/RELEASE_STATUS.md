@@ -28,7 +28,7 @@ No full parity is claimed across the 33 source repositories. Among the unimpleme
 
 The v0.14.0 candidate adds a hash-only, checkpoint-scoped SQLite frontier with atomic batch commits. An archived block is replayed only when source bytes, tool-call fingerprint and stored SHA-256 output agree. A missing or explicitly erased object is not recreated by context projection; the Pi transcript is shown instead. Failures to commit a batch leave outgoing context unchanged. See `docs/CONTEXT_COORDINATOR.md` and `tests/context-frontier.test.mjs`.
 
-Previous [v0.16.0 hosted CI](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42479440053) passed real Pi/Tersio/WASM/clangd gates; v0.17.0 requires an independent CI run before release.
+The original v0.17.0 graph candidate passed [hosted CI](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42481113031) with real Pi/Tersio/WASM/clangd gates; integrity corrections and consolidation require a new hosted run before merge.
 
 ## v0.15.0 chunk retrieval gate
 

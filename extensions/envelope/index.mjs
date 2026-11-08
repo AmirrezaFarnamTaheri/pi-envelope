@@ -240,8 +240,11 @@ export function registerEnvelope(pi, options = {}) {
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       if (!store) return textReply('Local output store unavailable.', true);
       try {
-        const hits = store.search(params?.query, {project: project(ctx), limit: params?.limit});
-        return textReply(hits.length ? JSON.stringify(hits, null, 2) : 'No captured output matched this query.');
+        const {hits,coverage} = store.searchReport(params?.query, {project: project(ctx), limit: params?.limit});
+        const message=hits.length?JSON.stringify(hits,null,2)
+          : coverage.partial?'No verified captured output matched this query (search incomplete; see searchCoverage).'
+            :'No captured output matched this query.';
+        return textReply(message,false,{searchCoverage:coverage});
       } catch (err) { return textReply(`Could not search output: ${err.message}`, true); }
     }
   });
