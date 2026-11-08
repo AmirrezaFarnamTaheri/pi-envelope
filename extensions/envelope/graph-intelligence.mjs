@@ -55,6 +55,7 @@ function nativeGraph(index,relation){
   if(index.lastRefresh?.unavailable?.length)reasons.push('parser-unavailable');
   if(index.lastRefresh?.files>=index.maxFiles)reasons.push('index-file-limit-may-be-reached');
   if(relation!=='imports'&&index.callGraph?.omittedCalls)reasons.push('call-fact-limit');
+  if(relation!=='imports'&&index.callGraph?.unresolvedCalls)reasons.push('unresolved-call-sites');
   return {nodes,edges,edgeOmitted:omitted,reasons};
 }
 function compareEdges(a,b){

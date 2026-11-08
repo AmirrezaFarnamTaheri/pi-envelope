@@ -150,3 +150,20 @@ test('Pi registers a single graph query tool with no new hooks and bounded outpu
  assert.deepEqual(JSON.parse(result.content[0].text).nodes,['src/alpha.ts','src/beta.ts','src/gamma.ts']);
  assert.equal(feature.loaded(),1);
 });
+
+test('unresolved dynamic calls prevent claims of exhaustive call connectivity',t=>{
+ const {index}=fixture(t,{
+  'src/a.ts':'import {run} from "./b"; export function start() { unknown.run(); }\n',
+  'src/b.ts':'export function run() { return 10; }\n'
+ });
+ const status=inspectCodeGraph(index,{action:'status',relation:'calls'});
+ assert.ok(status.callEvidence.unresolvedCalls>=1);
+ assert.equal(status.complete,false);
+ assert.ok(status.reasons.includes('unresolved-call-sites'));
+ const path=inspectCodeGraph(index,{action:'path',source:'src/a.ts',target:'src/b.ts',relation:'calls'});
+ assert.equal(path.found,false);
+ assert.equal(path.complete,false);
+ assert.ok(path.reasons.includes('unresolved-call-sites'));
+ // Unresolved calls do not affect the separate static import relation.
+ assert.equal(inspectCodeGraph(index,{action:'status',relation:'imports'}).complete,true);
+});
