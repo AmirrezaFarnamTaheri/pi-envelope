@@ -196,11 +196,14 @@ export function registerEnvelope(pi, options = {}) {
   pi.registerTool?.({
     name: 'envelope_search_fragments',
     label: 'Envelope: Search Output Fragments',
-    description: 'Read-only project-scoped search of stored output sections, bounded line numbers and excerpts; exact original remains available by ID.',
+    description: 'Project-scoped search of bounded, verified output chunks. May incrementally index up to eight older local captures per call; raw outputs remain unchanged and recoverable by ID.',
     parameters:{type:'object',properties:{query:{type:'string',description:'Terms in historical output'},limit:{type:'integer',minimum:1,maximum:25}},required:['query'],additionalProperties:false},
     async execute(_id,p,_signal,_update,ctx){
       if(!store)return textReply('Local output store unavailable.',true);
-      try{return textReply(JSON.stringify(store.searchFragments(p?.query,{project:project(ctx),limit:p?.limit??10}),null,2));}
+      try {
+        const report=store.searchFragmentsReport(p?.query,{project:project(ctx),limit:p?.limit??10});
+        return textReply(JSON.stringify(report.hits,null,2),false,{chunkIndex:report.index});
+      }
       catch(err){return textReply(`Could not search fragments: ${err.message}`,true);}
     }
   });

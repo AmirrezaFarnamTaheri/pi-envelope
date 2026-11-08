@@ -2,10 +2,10 @@
 
 This document is the current, user-facing release assessment. It replaces the historic execution plans and avoids retaining obsolete command and package examples.
 
-## v0.14.0 candidate: implemented locally
+## v0.15.0 candidate: implemented locally
 
 - Namespaced `pi-envelope` package, `envelope` command and `envelope_*` tools, `extensions/envelope` and `skills/envelope`. No `upper` command or extension is shipped.
-- Default-safe bash output compactor with exact recall, byte checks, bounded section search and optional retention/erasure, all project scoped. Raw output can contain secrets and no filesystem erasure claim covers backups/snapshots.
+- Default-safe bash output compactor with exact recall, byte checks, durable FTS5 chunk search and bounded lexical/BM25 reciprocal-rank fusion, and optional retention/erasure, all project scoped. Raw output can contain secrets and no filesystem erasure claim covers backups/snapshots.
 - Manual checkpoints, reversible context projections and versioned, transactional replay blocks, conservative JS/TS/Python/Go code intelligence, optional Tree-sitter and LSP tools, preview-first rename.
 - Fingerprint-reviewed detached Git worktree child runner (opt-in); `isolated:false` rejected; git worktrees are not OS sandboxes.
 - Project-scoped numeric observability, offline benchmarks and commit-pinned static impact reports.
@@ -28,4 +28,8 @@ No full parity is claimed across the 33 source repositories. Among the unimpleme
 
 The v0.14.0 candidate adds a hash-only, checkpoint-scoped SQLite frontier with atomic batch commits. An archived block is replayed only when source bytes, tool-call fingerprint and stored SHA-256 output agree. A missing or explicitly erased object is not recreated by context projection; the Pi transcript is shown instead. Failures to commit a batch leave outgoing context unchanged. See `docs/CONTEXT_COORDINATOR.md` and `tests/context-frontier.test.mjs`.
 
-Previous [v0.13.0 hosted CI](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42476557073) passed real Pi/Tersio/WASM/clangd gates; new code requires an independent CI run before release.
+Previous [v0.14.0 hosted CI](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42477506854) passed real Pi/Tersio/WASM/clangd gates; v0.15.0 requires an independent CI run before release.
+
+## v0.15.0 chunk retrieval gate
+
+The prior whole-document 25-output prefilter could miss the most relevant section. v0.15.0 adds persistent, bounded local chunk FTS5, verified exact-object search, lexical/BM25 reciprocal rank fusion and batch migration of legacy captures. The existing `envelope_search_fragments` text response remains an array; its Pi result details include index coverage and explicit partial status when a backfill or candidate limit is incomplete. The raw objects are still the source of truth. See `docs/CHUNK_RETRIEVAL.md` and `tests/output-chunk-index.test.mjs`. This is not embedding/vector retrieval or an execution sandbox.

@@ -14,6 +14,7 @@ A compacted result includes an `envelope_recall_output id=<64-hex-hash>` marker.
 - Read the compact result first. If it has everything needed, do not retrieve the original merely because it exists.
 - When an omitted detail matters, call `envelope_recall_output` with the exact ID. The returned text is the original output, not a reconstructed summary.
 - If you know an error phrase but not the ID, prefer `envelope_search_fragments` for bounded, line-numbered excerpts; use `envelope_search_output` for candidate IDs and recall the exact original only when needed.
+- Fragment search uses a local chunk index; after an upgrade it may index at most eight legacy captures per query. Check `details.chunkIndex.partial` and repeat as needed before treating a result as exhaustive. A `partial` result may also indicate a retrieval safety budget. It never runs embeddings or external searches.
 - Both tools default to the current project. The original data never leaves the local machine by these tools.
 
 ## Behavioral rules
