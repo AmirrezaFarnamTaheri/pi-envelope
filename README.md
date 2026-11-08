@@ -97,3 +97,5 @@ For explicit durable static graph history, see [persistent graph version command
 [Static graph invariant guide](docs/STATIC_GRAPH_INVARIANTS.md) explains the limited proof boundary and `unknown` verdicts for incomplete index evidence.
 
 [Graphify.NET runtime guide](docs/GRAPHIFY_DOTNET_RUNTIME.md) documents explicit build, provider-free process environment and real-version smoke requirements.
+
+**Read-only external MCP:** a manually launched [MCP stdio bridge](docs/MCP_STDIO_BRIDGE.md) exposes only operator-captured private file-graph versions (list, snapshot and compare). It does not start automatically or open a network port.
