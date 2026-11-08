@@ -6,6 +6,9 @@ import {mkdtempSync,mkdirSync,readdirSync,readFileSync,rmSync,writeFileSync,exis
 import {tmpdir} from 'node:os';
 import {join,isAbsolute,relative} from 'node:path';
 import {GraphifyCliBridge} from '../extensions/envelope/graphify-cli.mjs';
+import {GraphifyWatchCoordinator} from '../extensions/envelope/graphify-watch.mjs';
+import {setTimeout as delay} from 'node:timers/promises';
+import {createHash} from 'node:crypto';
 
 export async function smokeRealGraphify(executable,{fixture=null}={}){
   if(typeof executable!=='string'||!isAbsolute(executable))throw new Error('absolute Graphify executable required');
@@ -15,6 +18,7 @@ export async function smokeRealGraphify(executable,{fixture=null}={}){
   mkdirSync(project);mkdirSync(privateHome);
   const previousHome=process.env.HOME;
   const cli=new GraphifyCliBridge();
+  const watcher=new GraphifyWatchCoordinator();
   try {
     process.env.HOME=privateHome;
     writeFileSync(join(project,'a.js'),"export function greet(name) { return 'hello ' + name; }\n");
@@ -53,8 +57,35 @@ export async function smokeRealGraphify(executable,{fixture=null}={}){
     const updated=await cli.run(project,config,{action:'update'},undefined,{humanCommand:true});
     assert.equal(updated.action,'update');
     assert.ok(!['missing','invalid'].includes(updated.artifactState),'update broke graph schema');
-    return {ok:true,builtNodes:graph.nodes.length,builtEdges:links.length,readActions:['status','path','explain','query'],writeActions:['build','update'],externalProof:false};
+    // Integration gate: real fs.watch event on a disposable project -> bounded
+    // session-only watcher -> real pinned Graphify offline incremental update.
+    // Generated graphify-out changes are excluded, avoiding recursive loops.
+    const priorHash=createHash('sha256').update(readFileSync(graphPath)).digest('hex');
+    let watchState;
+    try{
+      watcher.start(project,{debounceMs:250,
+        runUpdate:async(root,signal)=>{
+          const refreshed=await cli.run(root,config,{action:'update'},signal,{humanCommand:true});
+          assert.ok(!['missing','stale','invalid'].includes(refreshed.artifactState),'watcher produced stale/invalid graph');
+          return refreshed;
+        }});
+      writeFileSync(join(project,'c.js'),"import {greet} from './a.js';\nexport const label = greet('watcher');\n");
+      for(let attempt=0;attempt<150;attempt++){
+        await delay(200);
+        watchState=watcher.status(project);
+        if(watchState.lastOutcome==='failed')throw new Error('real code watcher update failed');
+        if(watchState.batches>=1&&!watchState.updating&&!watchState.pendingCodeFiles)break;
+      }
+      assert.ok(watchState?.batches>=1,'real fs.watch did not trigger a Graphify update');
+      assert.equal(watchState.manualRebuildRequired,false,'code-only change incorrectly needs a manual LLM rebuild');
+      const nextHash=createHash('sha256').update(readFileSync(graphPath)).digest('hex');
+      assert.notEqual(nextHash,priorHash,'watcher did not refresh actual graph content');
+      const watchedGraph=JSON.parse(readFileSync(graphPath,'utf8'));
+      assert.ok(watchedGraph.nodes.length>graph.nodes.length,'new source not indexed by automatic update');
+    }finally{await watcher.stopAndWait(project);}
+    return {ok:true,builtNodes:graph.nodes.length,builtEdges:links.length,watcherBatches:watchState?.batches??0,realFsWatch:true,readActions:['status','path','explain','query'],writeActions:['build','update','opt-in-watch-update'],externalProof:false};
   }finally{
+    watcher.close();
     cli.close();
     if(previousHome===undefined)delete process.env.HOME;else process.env.HOME=previousHome;
     rmSync(tmp,{recursive:true,force:true});
