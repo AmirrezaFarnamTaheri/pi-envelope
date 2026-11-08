@@ -38,3 +38,15 @@ The same run found the Pi subprocess emitted startup JSON without a command-disc
 Run 42465842215 confirmed that Pi emitted `extension_ui_request` before its `get_commands` reply. For **only the model-free release smoke**, the RPC client now sends `{cancelled:true}` to recognized `confirm`, `select`, `input` and `editor` dialogs (at most four). It never consents, approves commands or supplies synthetic text. Notifications and status updates are not answered. This follows Pi's documented [RPC extension UI contract](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/rpc-extension-ui.md).
 
 The smoke still rejects missing/duplicate commands or an early exit; it now categorizes UI method names without logging request bodies. Real hosted validation is required to prove that the handshake unblocks Pi's startup.
+
+## Temporary Combo defaults for Pi RPC startup smoke
+
+Tersio 2.25.18 prompts for a Combo preset during session_start until comboSetupComplete is true.
+Pi RPC exposes hasUI, but Pi awaits startup session event handlers before attaching its RPC input reader,
+making that first-run select impossible to answer during command discovery.
+
+The hosted job creates $RUNNER_TEMP/envelope-ci-home/.tersio/settings.json with
+{"comboSetupComplete":true,"comboDefault":"off"}
+only inside the disposable job HOME. It bypasses the first-run *dialog*, not extension loading,
+command registration, or command-count validation. It cannot modify a user's actual settings.
+Both working-tree and packed-runtime smokes use this HOME; missing commands still fail CI.

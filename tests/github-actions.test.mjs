@@ -61,3 +61,12 @@ test('CI docs distinguish real Pi discovery failure from runner allocation',()=>
   assert.match(docs,/no executed steps/i);
   assert.match(docs,/hosted runner/i);
 });
+
+test('real Pi RPC smoke disables only Tersio first-run wizard inside isolated CI home',()=>{
+  const yaml=read('.github/workflows/release-gates.yml');
+  assert.match(yaml,/HOME="\$RUNNER_TEMP\/envelope-ci-home"/);
+  assert.match(yaml,/comboSetupComplete/);
+  assert.match(yaml,/comboDefault/);
+  assert.match(yaml,/\.tersio\/settings\.json/);
+  assert.match(yaml,/"off"/);
+});
