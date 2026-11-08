@@ -1,5 +1,7 @@
 /** Pi-native code intelligence over one shared lazy TypeScript AST index per root. */
 import { CodeIndex } from './code-index.mjs';
+import { SymbolDeltaLedger } from './symbol-delta.mjs';
+import { join } from 'node:path';
 import { analyzeChangeImpact } from './change-evidence.mjs';
 import { inspectCodeGraph } from './graph-intelligence.mjs';
 import { ExternalGraphReader } from './graphify-adapter.mjs';
@@ -15,10 +17,16 @@ const result = (value,isError=false) => ({
 const intProp = (description,min,max) => ({type:'integer',minimum:min,maximum:max,description});
 function schema(properties,required=[]) {return {type:'object',properties,required,additionalProperties:false};}
 
-export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>import('typescript'),observe,loadTreeRuntime,getTreeGrammarPath,watchGraphFactory}={}) {
+export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>import('typescript'),observe,loadTreeRuntime,getTreeGrammarPath,watchGraphFactory,home}={}) {
   const indices=new Map();
   const treeBrokers=new Map();
   const graphReaders=new Map();
+  let symbolDeltaLedger=null;
+  function deltaLedger(){
+    if(!home)throw new Error('symbol snapshot storage home unavailable');
+    symbolDeltaLedger??=new SymbolDeltaLedger(join(home,'envelope-symbol-delta'));
+    return symbolDeltaLedger;
+  }
   function graphReader(index) {
     if(!graphReaders.has(index.root))graphReaders.set(index.root,new ExternalGraphReader(index.root,{...(watchGraphFactory?{watchFactory:watchGraphFactory}:{})}));
     return graphReaders.get(index.root);
@@ -91,6 +99,16 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
       enabled:{type:'boolean',description:'Explicit watch enable or disable (action: watch)'},
       debounceMs:intProp('Debounce invalidations between 100 and 5000 ms (action: watch)',100,5000)}),
     (index,params)=>graphReader(index).query(index,params));
+  tool('envelope_code_symbol_delta','Envelope: Explicit Symbol Delta Snapshots',
+    'Capture and compare versioned, project-scoped source-hash-verified AST symbol snapshots. Capture and erase require explicit actions; no automatic recording or guessed renames, no provider calls.',
+    schema({
+      action:{type:'string',enum:['status','capture','diff','erase']},
+      id:{type:'string',description:'Exact snapshot UUID to erase (action: erase)'},
+      from:{type:'string',description:'Exact source snapshot UUID for diff'},
+      to:{type:'string',description:'Target snapshot UUID or current index for diff (defaults to current)'},
+      limit:intProp('Maximum items per delta category (1-50)',1,50),
+      allowIncomplete:{type:'boolean',description:'Explicit acknowledgement when snapshot coverage is incomplete'}
+    }), (index,params)=>deltaLedger().query(index,params));
   tool('envelope_code_history','Envelope: Bounded Git Co-change Evidence',
     'Read-only bounded Git commit co-occurrence, indexed-source churn and window completeness. Historical co-changes are NOT causal dependencies, authorship ownership or runtime call evidence.',
     schema({action:{type:'string',enum:['status','cochange','churn']},
@@ -172,5 +190,5 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
       const report=index.verify(params.path,{content:params.content});
       return {...report,diagnostics:report.diagnostics.slice(0,20).map(d=>({...d,message:d.message.slice(0,400)}))};
     });
-  return {loaded:()=>indices.size,indexOf,close:()=>{for(const reader of graphReaders.values())reader.close();graphReaders.clear();}};
+  return {loaded:()=>indices.size,indexOf,close:()=>{for(const reader of graphReaders.values())reader.close();graphReaders.clear();symbolDeltaLedger?.close();symbolDeltaLedger=null;}};
 }

@@ -2,7 +2,7 @@
 
 This document is the current, user-facing release assessment. It replaces the historic execution plans and avoids retaining obsolete command and package examples.
 
-## v0.21.0 unmerged candidate: implemented locally
+## v0.22.0 unmerged review candidate: implemented locally
 
 - Namespaced `pi-envelope` package, `envelope` command and `envelope_*` tools, `extensions/envelope` and `skills/envelope`. No `upper` command or extension is shipped.
 - Default-safe bash output compactor with exact recall, byte checks, durable FTS5 chunk search and bounded lexical/BM25 reciprocal-rank fusion, and optional retention/erasure, all project scoped. Raw output can contain secrets and no filesystem erasure claim covers backups/snapshots.
@@ -57,3 +57,7 @@ The actual Graphify.NET exported JSON fields are now consumed in the local exter
 ## v0.21.0 discovery and visual export
 
 The new `envelope_capabilities` tool is a read-only capability status and advisory route planner. Optional `graphify`/`jcodemunch`/`rtk`/`headroom` PATH detections are presence-only, never executed. Native file graphs can export bounded static SVG and Obsidian Mermaid Markdown with security-focused escaping; declared external Graphify community IDs are queryable separately from native graph evidence. This phase does not automatically run tools, invoke models, install viewers, start servers, or write Obsidian files. Tests `tests/capability-cockpit.test.mjs`, `tests/graph-visualization.test.mjs`, and `tests/graphify-dotnet.test.mjs`. The prior v0.20.0 candidate passed hosted run 42492265689 (376 passed, 0 failed, 1 skipped); this candidate requires independent hosted CI.
+
+## v0.22.0 explicit source-hash-verified symbol deltas
+
+`envelope_code_symbol_delta` builds on the single existing CodeIndex and adds a project-scoped, owner-restricted SQLite ledger of **explicit** AST symbol snapshots. `capture` writes a bounded source-verified snapshot after explicit invocation; `status`, `diff` (snapshot-to-current or snapshot-to-snapshot) and `erase` do not generate new snapshots. Diff distinguishes added/removed source files, byte-changed files, added/removed declaration identities and line relocation without fabricating semantic renames. Duplicate identities, parser omissions and caps are labelled incomplete, and capturing incomplete evidence requires `allowIncomplete:true`. The SQLite manifest digest detects accidental/tampered row changes but is not a digital signature. No raw code, model requests, automatic session capture, new Pi hook or external parser are introduced. See `docs/SYMBOL_DELTA.md` and `tests/symbol-delta.test.mjs`. The v0.21.0 predecessor passed hosted [run 42492983913](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42492983913) (required real runtime and packaging gates), while the new v0.22.0 commit requires its own independent hosted verification.

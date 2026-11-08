@@ -7,3 +7,7 @@ It reports the current Envelope settings for code, context, memory, output, work
 `intent` accepts `orient`, `graph`, `review`, `resume` or `evidence`. The output is a bounded list of existing native Envelope tool names with `suggested`/`blocked` states, e.g. `envelope_code_overview` → `envelope_code_retrieve` → `envelope_code_graph` for orientation. The user or agent explicitly selects the next action. No automatic skill enforcement, tool routing, permission bypass, provider billing, or hidden child process is implied.
 
 See `tests/capability-cockpit.test.mjs` for deterministic route selection, disabled-mode handling, executable detection with no execution, and Pi integration with exactly the original context/tool hooks. External services remain optional and unsupported until separately tested.
+
+## v0.22.0 evidence route
+
+The `evidence` route also suggests `envelope_code_symbol_delta` for a manual snapshot comparison. This suggestion is **non-executing**: it never records a snapshot, opens a ledger automatically, or captures a session. The user must explicitly invoke `action:"capture"` and review the returned coverage before diffing.

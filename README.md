@@ -1,6 +1,6 @@
 # Envelope
 
-**Envelope v0.19.0 (unmerged candidate)** is one Pi coding-agent package that combines pinned Tersio modes with native, project-scoped output recovery, context checkpoints, code intelligence, reviewed worktree tasks, and local numeric observability. It is a source distribution: **no installed Pi, Tersio, or Tree-sitter WASM runtime is included**.
+**Envelope v0.22.0 (unmerged review candidate)** is one Pi coding-agent package that combines pinned Tersio modes with native, project-scoped output recovery, context checkpoints, code intelligence, reviewed worktree tasks, and local numeric observability. It is a source distribution: **no installed Pi, Tersio, or Tree-sitter WASM runtime is included**.
 
 The [16-source graph adoption audit](docs/GRAPH_SOURCE_AUDIT.md) and [33-source, commit-pinned audit](docs/ALL_33_SOURCE_AUDIT.md), with their [graph ledger](integrations/graph-source-audit.json) and [original-source ledger](integrations/extraction-audit.json), distinguish delivered adaptations from external or deferred capabilities. These are **not** claims of full upstream parity.
 
@@ -29,11 +29,15 @@ pi install .
 | Retention | `/envelope output retention <0..365>`, `/envelope output prune <days>`, `/envelope output erase <64-hex-id>`, `envelope_output_retention` | Explicit user-controlled deletion and bounded opportunistic expiry; 0 disables automatic expiry |
 | Context | `/envelope context on\|off\|status\|restore`, `envelope_context_checkpoint`, `envelope_context_timeline`, `envelope_context_prune`, `envelope_context_restore`, `envelope_context_footprint` | Session-aware checkpointed projection with versioned crash-recoverable replay blocks; original Pi session transcript remains intact |
 | Code | `/envelope code on\|off\|status`, `envelope_code_overview`, `envelope_code_lookup`, `envelope_code_impact`, `envelope_code_calls`, `envelope_code_verify` | Shared JS/TS AST index and static call evidence, with opt-in conservatively linked Python module aliases and Go packages |
-| Graph | `envelope_code_graph` | Read-only typed static import/call paths, neighbors, inbound-degree hubs, weak components, boundary audits, JSON/Mermaid; bounded with explicit incompleteness |
+| Graph | `envelope_code_graph` | Read-only typed static import/call paths, neighbors, inbound-degree hubs, weak components, boundary audits, bounded JSON/Mermaid/Obsidian/SVG exports and explicit incompleteness |
 | Memory | `envelope_memory` | Off-by-default, explicit project notes and Markdown/Claude JSONL imports, SHA freshness, lexical search, deletion; no automatic transcript capture |
 | Context cards | `envelope_code_context_card` | Bounded source-hash-verified symbol, import and syntactic call evidence; no source bodies unless explicitly requested |
 | Git history | `envelope_code_history` | Bounded read-only co-change/churn evidence; never causal dependency or author identity |
+| Symbol history | `envelope_code_symbol_delta` | Explicit source-hash-verified snapshots, scoped symbol/file deltas and durable erase; no background recording, inferred renames or source bodies |
 | Graphify | `envelope_code_external_graph` | Opt-in local NetworkX/Graphify node-link artifact inspection: source hash freshness, typed external assertions, bounded paths/neighbors, explicit read-only watcher; no external program or model calls |
+| Retrieval | `envelope_code_retrieve` | Verified local AST symbol/path rank fusion with optional bounded snippets; no embeddings or external search |
+| Architecture | `envelope_code_policy`; opt-in `npm run architecture:gate` | Advisory source-evidence directory rules and fan-in limits; CI gate runs only when explicitly invoked |
+| Cockpit | `envelope_capabilities` | Non-executing local capability detection and manual workflow suggestions; external CLIs are never launched |
 | Changes | `envelope_code_change_impact` | Commit-pinned clean-checkout diff with changed-line evidence, static dependents, and candidate tests; not a complete semantic blast radius |
 | Other languages | `/envelope code languages on\|off`, `envelope_code_languages` | Opt-in Python/Go stdlib AST through bounded subprocess parsing |
 | Tree-sitter | `/envelope code tree on\|off\|status`, `envelope_code_tree_status`, `envelope_code_tree_query`, `envelope_code_tree_capture` | Optional real WASM S-expression queries and capture groups; unavailable grammar is reported, not simulated |
@@ -49,7 +53,9 @@ pi install .
 
 ## Local storage and settings
 
-Settings live under `envelope` in Tersio's `~/.tersio/settings.json`. `ENVELOPE_HOME` overrides the home directory for development or isolated profiles; `TERSIO_HOME` is respected otherwise. Numeric measurements, exact output objects, context checkpoint sidecars and hash-only replay metadata, and workflow logs live in separate `envelope-*` directories inside that home. See [project memory](docs/PROJECT_MEMORY.md), [source context cards](docs/CONTEXT_CARDS.md), [Git history evidence](docs/CODE_HISTORY.md), [Graphify artifact integration](docs/GRAPHIFY_ARTIFACTS.md), [native graph evidence](docs/GRAPH_NATIVE.md), [16-source audit](docs/GRAPH_SOURCE_AUDIT.md), [chunk retrieval](docs/CHUNK_RETRIEVAL.md), [output safety](docs/OUTPUT_SAFETY.md), [context](docs/CONTEXT_COORDINATOR.md), [workflows](docs/WORKFLOWS.md), and [observability](docs/OBSERVABILITY.md).
+Symbol-delta snapshots are **explicit only** and live in an owner-restricted project-scoped SQLite ledger under the Envelope home. The ledger stores project-relative filenames, identifiers, lines and SHA-256s, not raw code; SQLite deletion cannot securely erase WAL pages or backups. See [symbol deltas](docs/SYMBOL_DELTA.md).
+
+Settings live under `envelope` in Tersio's `~/.tersio/settings.json`. `ENVELOPE_HOME` overrides the home directory for development or isolated profiles; `TERSIO_HOME` is respected otherwise. Numeric measurements, exact output objects, context checkpoint sidecars and hash-only replay metadata, and workflow logs live in separate `envelope-*` directories inside that home. See [symbol deltas](docs/SYMBOL_DELTA.md), [capability cockpit](docs/CAPABILITY_COCKPIT.md), [verified code retrieval](docs/CODE_RETRIEVAL.md), [architecture policies](docs/ARCHITECTURE_POLICY.md), [project memory](docs/PROJECT_MEMORY.md), [source context cards](docs/CONTEXT_CARDS.md), [Git history evidence](docs/CODE_HISTORY.md), [Graphify artifact integration](docs/GRAPHIFY_ARTIFACTS.md), [native graph evidence](docs/GRAPH_NATIVE.md), [16-source audit](docs/GRAPH_SOURCE_AUDIT.md), [chunk retrieval](docs/CHUNK_RETRIEVAL.md), [output safety](docs/OUTPUT_SAFETY.md), [context](docs/CONTEXT_COORDINATOR.md), [workflows](docs/WORKFLOWS.md), and [observability](docs/OBSERVABILITY.md).
 
 ## Development and evidence
 
@@ -64,7 +70,7 @@ npm run smoke:runtime         # Real installed Pi/Tersio RPC, or BLOCKED
 npm run smoke:tree            # Real installed WASM grammar, or BLOCKED
 ```
 
-The offline suite includes mocked Pi/Tree-sitter protocol and workflow integration, actual local Git worktrees, real Python/Go AST runs when installed, and real clangd LSP when available. **Passing those tests does not establish complete Pi/Tersio live compatibility.** The v0.18.0 Graphify candidate passed [hosted real-runtime validation](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42490446378) (339 passing, 1 skipped). The v0.19.0 memory/history/cards extension requires its own hosted suite before any release claim. This source archive alone does not prove a new bundled release.
+The offline suite includes mocked Pi/Tree-sitter protocol and workflow integration, real local Git worktrees, optional Python/Go AST checks, and real clangd LSP when available. **Passing local tests alone does not establish production Pi/Tersio compatibility.** The v0.21.0 predecessor passed [hosted real-runtime CI](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42492983913); this v0.22.0 candidate requires its own hosted checks before being considered validated. No PR is merged or published by this development phase.
 
 ## Scope and provenance
 

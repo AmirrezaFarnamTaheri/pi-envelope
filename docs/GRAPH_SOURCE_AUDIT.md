@@ -1,6 +1,6 @@
 # 16-source graph, memory and workflow integration audit
 
-**Audit date:** 2026-11-08. **Baseline:** Envelope v0.16.0 commit `0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64`. **Candidate:** v0.21.0 on the unmerged review stack.
+**Audit date:** 2026-11-08. **Baseline:** Envelope v0.16.0 commit `0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64`. **Candidate:** v0.22.0 on the unmerged review stack.
 
 The user supplied an assumption that licensing clearance will be resolved separately. It is not a legal opinion. This implementation uses independently written graph code; retain upstream attribution if later copying actual source.
 
@@ -38,9 +38,9 @@ The repositories represent distinct *engines*, *host adapters*, *watchers*, *vie
 
 1. **18 (implemented in candidate):** Read-only Graphify/NetworkX graph artifact adapter with declared SHA-256 source checks and opt-in invalidation-only watch. No automatic CLI/LLM rebuild.
 2. **19 (implemented in candidate):** Project-scoped, explicit typed notes, Markdown import/export, bounded Claude JSONL extraction, source SHA status and deletion; no default chat transcription or vault writes.
-3. **20 (partial in candidate):** Bounded Git co-change/churn with explicit uncertainty; full ownership-risk and architecture CI policies remain future work.
-4. **21 (partial in candidate):** Hash-verified symbol-first context cards plus existing lexical retrieval; embeddings, semantic providers and provider-billed evaluations remain future work.
-5. **22:** Read-only Graphify/Mermaid/Obsidian visual interoperability, optional MCP/GraphQL adapters, no required server or untrusted HTML execution.
+3. **20 (implemented in candidate):** Git co-change/churn, source-verified symbol/path retrieval, and opt-in static architecture CI policy; full language/runtime and ownership attribution are still absent.
+4. **21 (implemented in candidate):** Advisory capability cockpit and bounded static SVG/Obsidian graph exports; no HTML execution or vault write.
+5. **22 (implemented locally, pending hosted CI):** Explicit source-hash-verified symbol snapshots with deterministic AST deltas and manual erasure. External MCP/GraphQL adapters, formal proof, embeddings and provider-billed evaluations remain separate, unimplemented work.
 
 **Boundary:** Listing a source here is not a claim of full or byte-for-byte port. See `docs/GRAPH_NATIVE.md` for the implemented v0.17 API and limits.
 
@@ -59,3 +59,7 @@ The actual Graphify.NET `JsonExporter` was inspected and used to make the extern
 ## v0.21 capability and visualization evidence boundary
 
 `envelope_capabilities` reports local mode state and safely checks names of optional PATH executables without launching them; route sequences are advisory only, not dispatched or enforced. Native graph export adds bounded, XML-escaped static SVG and sanitized Obsidian Markdown with Mermaid; no third-party HTML, server, or vault writes. External Graphify / Graphify.NET artifact reader exposes declared communities as untrusted grouping metadata, not inferred graph structure. See `docs/CAPABILITY_COCKPIT.md` and `docs/GRAPH_VIEW_EXPORT.md`.
+
+## v0.22.0 native symbol-delta adaptation
+
+The missing explicit symbol-delta capability from `GlitterKill/sdl-mcp` is now partly adapted as `extensions/envelope/symbol-delta.mjs` with `tests/symbol-delta.test.mjs`. The same source-hash-verified snapshots extend codegraph and repository-history evidence without adding an index owner, background watcher, autonomous code execution, or LLM calls. The ledger provides deterministic **syntactic identities**, not SDL's policy graph or formal semantic proof. The user assumes upstream licenses are compatible and will resolve legal matters separately; this is not legal verification. No full upstream parity is claimed.

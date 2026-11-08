@@ -111,3 +111,7 @@ An opt-in Graphify/NetworkX node-link artifact reader, SHA-256 source-byte statu
 ## v0.19.0 additional 16-source cohort evolution
 
 The second source cohort (`docs/GRAPH_SOURCE_AUDIT.md`) now includes explicit project notes and session import, bounded Git-history co-change, and hash-verified symbol context cards, without changing original 33 pinned source commits. These are independently written partial adaptations; they do not imply full vendor parity, automatic transcripts, semantic vector RAG, ownership proof or model-token billing savings.
+
+## v0.22.0 independent Graphify/SDL symbol-history extension
+
+The separate 16-source cohort ledger (`integrations/graph-source-audit.json`) records a source-hash-verified, user-triggered AST symbol-delta snapshot implementation. It is not an additional port of one of the original 33 pinned source commits and does not alter their coverage claims.

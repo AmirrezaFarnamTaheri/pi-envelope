@@ -10,7 +10,7 @@ const ROUTES={
  graph:['envelope_code_external_graph','envelope_code_graph','envelope_code_policy'],
  review:['envelope_code_change_impact','envelope_code_policy','envelope_code_verify'],
  resume:['envelope_memory','envelope_workflow_status','envelope_code_context_card'],
- evidence:['envelope_code_context_card','envelope_code_history','envelope_metrics_snapshot'],
+ evidence:['envelope_code_context_card','envelope_code_history','envelope_code_symbol_delta','envelope_metrics_snapshot'],
 };
 function hasExecutable(name,pathEnv){
  if(typeof pathEnv!=='string'||pathEnv.length>4096)return false;

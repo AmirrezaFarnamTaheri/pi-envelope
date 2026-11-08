@@ -160,7 +160,7 @@ export function registerEnvelope(pi, options = {}) {
     ledger, frontier, getStore:()=>store, getConfig:()=>config, project, metrics, observe
   });
 
-  const codeApi = registerCodeFeature(pi, {project, getConfig:()=>config, loadCompiler:options.loadCompiler, loadTreeRuntime:options.loadTreeRuntime, getTreeGrammarPath:options.getTreeGrammarPath, watchGraphFactory:options.watchGraphFactory, observe});
+  const codeApi = registerCodeFeature(pi, {project, getConfig:()=>config, loadCompiler:options.loadCompiler, loadTreeRuntime:options.loadTreeRuntime, getTreeGrammarPath:options.getTreeGrammarPath, watchGraphFactory:options.watchGraphFactory, home, observe});
   registerLspFeature(pi,{indexOf:codeApi.indexOf,getConfig:()=>config,home,observe});
 
   // One read-only preflight stage for write/edit; Tersio only rewrites bash.

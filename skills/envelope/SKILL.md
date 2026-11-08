@@ -62,6 +62,7 @@ The human must explicitly enable `/envelope code tree on` before Tree-sitter que
 ## Opt-in project memory, history and source cards
 
 - Human must enable `/envelope memory on` before `envelope_memory` saves, reads or imports. Do not auto-save chat transcripts, secrets, or output captures. Only `importMarkdown` / `importClaudeTranscript` with a user-directed local project path may import text; manually inspect for sensitivity. Off means no new memory database.
+- For persistent, source-grounded change history across sessions, explicitly call `envelope_code_symbol_delta {"action":"capture"}` and save its returned UUID. Compare later with `{"action":"diff","from":"<UUID>","to":"current"}`. Snapshots are **never** automatic; do not treat byte-changed files, line movements or ambiguous symbols as inferred semantic renames. Check `complete` and `reasons`; `erase` is explicit.
 - Use `envelope_code_context_card` for short, hash-verified AST evidence; raw source snippets require `includeSnippet:true`, not the default. A card cannot prove runtime dispatch or semantic correctness.
 - Use `envelope_code_history` for Git co-change/churn within bounded commits. Historical co-change is **not** a static import/call edge, ownership proof or causal relationship. Check `complete` and `reasons`.
 

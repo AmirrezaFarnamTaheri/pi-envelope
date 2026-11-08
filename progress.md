@@ -1,31 +1,23 @@
-# Envelope — release progress
+# Envelope — cumulative implementation progress
 
-**Current source candidate:** v0.17.0 (unmerged; prior validated release candidate v0.16.0). The initial v0.1–v0.12 development plans and duplicate upstream ledger were interim planning artifacts; they are removed from the deliverable. The 33 pinned source references live only in `integrations/extraction-audit.json` and `docs/ALL_33_SOURCE_AUDIT.md`.
+**Current unmerged review candidate:** v0.22.0. The canonical integrated review stack is PR #6 against `main`; v0.22.0 is a separately proposed change. No merge, package publication, deployment or deletion is authorized by this document. `main` remains at its post-revert state.
 
-## Integrated
+## Implemented and reviewed building blocks
 
-- Single Pi package with Tersio manifest entrypoints and one native `extensions/envelope` extension.
-- Conservative exact-recoverable output compression, anchored-line preservation, incrementally indexed, bounded chunk FTS5/BM25 and lexical-RRF retrieval, project-scoped capture erasure and optional 0–365 day retention.
-- Opt-in reversible context pruning using session checkpoints; v0.14 adds versioned, checkpoint-scoped SQLite replay blocks, atomic batch commits, verified restart reuse and fail-open handling of erased/corrupt originals; no second context owner.
-- v0.16 extends conservative opt-in Python call evidence to uniquely indexed module aliases, with explicit shadowed/ambiguous handling and no runtime/type claims.
-- Shared AST lookup/impact/call evidence (JS/TS, opt-in Python and Go), syntax preflight, optional Tree-sitter query adapter, LSP diagnostics and opt-in hash-bound rename.
-- Commit-pinned clean-checkout change impact; worktree-only child workflow with fingerprinted review and no shared-tree escape hatch.
-- Private numeric metrics, offline benchmark, extensive Node regression tests and real local clangd smoke when installed.
-- Full public namespace `envelope`; stale migration files and duplicate source ledger removed.
+- **Runtime and safety:** one namespaced Pi extension layered after pinned Tersio resources; one output compactor and one context transformer; real-runtime smoke, Wasm/clangd and extracted-package gates. User-approved mutation toggles and detached-worktree handoffs remain explicit.
+- **v0.14–0.17:** content-addressed output retention and verified FTS5/BM25 retrieval, checkpoint-bound SQLite context replay, conservative Python/JS/TS/Go call evidence, typed native file graph traversal and bounded architecture summaries.
+- **v0.18:** local Graphify/NetworkX node-link import, source-hash freshness and opt-in invalidation-only watcher. External confidence labels remain untrusted, not native AST proof.
+- **v0.19:** explicit opt-in project memory, Markdown/Claude JSONL fact imports, Git co-change/churn and source-verified code context cards; no automatic chat transcription.
+- **v0.20:** Graphify.NET export format, source-hash-verified lexical AST retrieval, opt-in architectural boundary/fan-in policy and manually invoked CI gate.
+- **v0.21:** non-executing capability cockpit, static SVG/Obsidian Mermaid export and exporter-declared communities; no required third-party engine or HTML execution.
+- **v0.22 candidate:** manually captured, project-scoped source-verified symbol snapshots; snapshot-to-current and snapshot-to-snapshot deltas, duplicate/coverage uncertainty, explicit deletion and SQLite snapshot integrity checks. No new hook or model call.
 
-## Independent release gates
+All 16 user-supplied graph/memory/workflow sources are pinned and assessed in `integrations/graph-source-audit.json`; the original 33-source ledger remains separate at `integrations/extraction-audit.json`. `completePort:false` is deliberate and must never be equated with full upstream feature parity. Upstream license compatibility is a user-supplied assumption, not independently verified.
 
-- `npm run check` — complete source syntax and unit/integration regressions.
-- `npm run benchmark` — offline deterministic fixtures only, not billed-token or agent quality measurements.
-- `npm run pack:source-check` — source npm dry run only.
-- `npm run doctor:bundle` and `npm run pack:check` — must pass on a machine with the pinned Tersio and TypeScript modules actually installed.
-- `npm run smoke:runtime` and `npm run smoke:tree` — require external Pi/Tersio and WASM assets respectively.
-- `npm run smoke:lsp-real` — actual installed clangd with temporary C fixtures.
+## Evidence and release gates
 
-## Explicitly incomplete
+PR #6 v0.21.0 passed [hosted run 42492983913](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42492983913), including full repository tests, real Pi/Tersio RPC registration, real Tree-sitter WASM, clangd, offline invariants, and extracted npm-package checks. All 21 recorded CodeRabbit inline threads are resolved. The new v0.22.0 candidate passed focused local TDD, syntax, offline benchmark and strict bundle/pack checks, but **requires its own hosted full-suite and real-runtime CI** before being called release-verified.
 
-Hosted v0.16.0 real Pi/Tersio/WASM/clangd gates passed on [run 42479440053](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42479440053). The new v0.17.0 native graph candidate requires its own hosted gates before any release claim. The other partial integration items, rejected duplicates and external adapters remain recorded in the 33-source audit. No live provider-billed savings or complete 33-repository parity is claimed.
+## Open technical gaps
 
-## v0.17.0 native graph source-adoption slice
-
-Sixteen additional repositories are pinned and decomposed in `docs/GRAPH_SOURCE_AUDIT.md`. One read-only CodeIndex-backed graph tool adds status, typed shortest paths, neighbors, degree hubs, weak components, directory-boundary audit, and bounded JSON/Mermaid export. External graph engines, memory, watchers, provider/model work, and UI remain separate follow-on phases.
+Multi-generation ACP summarization, Python MRO/type-checked cross-language runtime resolution, full persistent multi-agent graph backends, embeddings and semantic providers, external MCP/GraphQL server engines, formal method proofs, automatic task approvals, host-enforced OS sandboxing, full upstream application parity and independently verified provider-billed quality/cost improvements are not implemented. These need separate designs, tests, user-controlled runtime permissions and review.

@@ -9,7 +9,7 @@ const read=(path)=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 
 test('current distribution includes optional LSP and transaction modules in the single Envelope extension',()=>{
  const pkg=JSON.parse(read('package.json'));
- assert.equal(pkg.version,'0.21.0');
+ assert.equal(pkg.version,'0.22.0');
  assert.deepEqual(pkg.pi.extensions.filter(s=>s.endsWith('/envelope/index.js')),['./extensions/envelope/index.js']);
  for(const path of ['extensions/envelope/lsp-client.mjs','extensions/envelope/lsp-api.mjs','extensions/envelope/rename-transaction.mjs'])assert.ok(listSyntaxFiles().includes(path),path);
  assert.ok(!pkg.dependencies['vscode-jsonrpc']&&!pkg.dependencies['typescript-language-server']);
