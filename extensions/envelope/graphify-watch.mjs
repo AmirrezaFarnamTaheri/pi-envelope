@@ -48,7 +48,8 @@ function isTemporary(name){
     name.endsWith('.orig');
 }
 function watchSnapshot(session){
-  if(!session||session.closed)return {...EMPTY};
+  if(!session)return {...EMPTY};
+  if(session.closed)return {...EMPTY,manualRebuildRequired:session.manual,queueOverflow:session.overflow,lastOutcome:session.lastOutcome,batches:session.batches};
   return {active:true,watchedDirectories:session.handles.length,
     pendingCodeFiles:session.pending.size,pending:session.timer!==null,
     updating:session.running!==null,manualRebuildRequired:session.manual,
@@ -71,6 +72,7 @@ export class GraphifyWatchCoordinator {
     if(!Number.isInteger(debounceMs)||debounceMs<250||debounceMs>10000)throw new RangeError('Graphify watch debounce must be 250..10000 ms');
     const key=normalizeRoot(root);
     const dirs=sourceDirectories(key); // fail before disrupting an existing watch
+    if(this.sessions.get(key)?.running)throw new Error('Graphify watch update still running; stop and wait before restart');
     this.stop(key);
     const session={root:key,debounceMs,runUpdate,handles:[],pending:new Set(),
       timer:null,running:null,controller:null,manual:false,overflow:false,
@@ -80,6 +82,13 @@ export class GraphifyWatchCoordinator {
         const handle=this.watchFactory(dir,{persistent:false},(_event,filename)=>this.change(session,dir,filename));
         if(!handle||typeof handle.close!=='function')throw new Error('invalid watcher handle');
         session.handles.push(handle);
+        // fs.FSWatcher emits an error event on watch failure. Without a listener
+        // Node would terminate the entire Pi process. Fail closed instead.
+        handle.on?.('error',()=>{
+          if(session.closed)return;
+          session.manual=true;session.lastOutcome='failed';
+          this.halt(session);
+        });
       }
     }catch{
       for(const h of session.handles){try{h.close();}catch{/* closing */}}
@@ -134,7 +143,10 @@ export class GraphifyWatchCoordinator {
         await session.runUpdate(key,controller.signal);
         if(!session.closed){session.batches++;session.lastOutcome='ok';}
       }catch{
-        if(!session.closed){session.lastOutcome='failed';session.manual=true;}
+        if(!session.closed){
+          session.lastOutcome='failed';session.manual=true;
+          this.halt(session); // no uncontrolled retry after a failed update
+        }
       }finally{
         session.controller=null;
         session.running=null;
@@ -144,16 +156,29 @@ export class GraphifyWatchCoordinator {
     })();
     return session.running;
   }
+  halt(session){
+    if(session.closed)return;
+    session.closed=true;
+    if(session.timer){clearTimeout(session.timer);session.timer=null;}
+    session.controller?.abort();
+    for(const handle of session.handles){try{handle.close();}catch{/* close only */}}
+    session.handles=[];session.pending.clear();
+  }
+  /** Cancel now, but wait for in-flight writes to settle before manual writes. */
+  async stopAndWait(root){
+    let key;
+    try{key=normalizeRoot(root);}catch{return {...EMPTY};}
+    const running=this.sessions.get(key)?.running;
+    this.stop(key);
+    if(running)await running;
+    return {...EMPTY};
+  }
   stop(root){
     if(root===undefined){for(const key of [...this.sessions.keys()])this.stop(key);return;}
     let key;
     try{key=normalizeRoot(root);}catch{return;}
     const session=this.sessions.get(key);if(!session)return;
-    session.closed=true;
-    if(session.timer){clearTimeout(session.timer);session.timer=null;}
-    session.controller?.abort();
-    for(const h of session.handles){try{h.close();}catch{/* closed */}}
-    session.handles=[];session.pending.clear();
+    this.halt(session);
     this.sessions.delete(key);
   }
   close(){this.stop();}
