@@ -23,6 +23,7 @@ import { MetricsLedger } from './metrics-ledger.mjs';
 import {ProjectMemory, registerProjectMemoryFeature} from './project-memory.mjs';
 import {registerCapabilityCockpit} from './capability-cockpit.mjs';
 import { registerGraphifyCliFeature, normalizeGraphifyExecutable, composeGraphifyOrientation } from './graphify-cli.mjs';
+import { registerGraphifyDotnetFeature, normalizeGraphifyDotnetExecutable } from './graphify-dotnet-runtime.mjs';
 import { registerMetricsFeature } from './metrics-api.mjs';
 
 function homePath() {
@@ -164,6 +165,7 @@ export function registerEnvelope(pi, options = {}) {
   const codeApi = registerCodeFeature(pi, {project, getConfig:()=>config, loadCompiler:options.loadCompiler, loadTreeRuntime:options.loadTreeRuntime, getTreeGrammarPath:options.getTreeGrammarPath, watchGraphFactory:options.watchGraphFactory, home, observe});
   registerLspFeature(pi,{indexOf:codeApi.indexOf,getConfig:()=>config,home,observe});
   const graphifyCli = registerGraphifyCliFeature(pi,{project,getConfig:()=>config,observe,cli:options.graphifyCliBridge,watcher:options.graphifyWatcher});
+  const graphifyDotnet = registerGraphifyDotnetFeature(pi,{project,getConfig:()=>config,bridge:options.graphifyDotnetBridge});
 
   // One read-only preflight stage for write/edit; Tersio only rewrites bash.
   // Deliberately disabled until the user opts in, and never writes to disk.
@@ -191,7 +193,7 @@ export function registerEnvelope(pi, options = {}) {
     const policy=composePolicy(event?.systemPrompt,config.policy.enabled);
     return composeGraphifyOrientation(policy?.systemPrompt??event?.systemPrompt,project(ctx),config.graphify.orientationEnabled) || policy || undefined;
   });
-  pi.on('session_shutdown', () => { graphifyCli.close?.(); codeApi.close?.(); store?.close(); store = null; frontier?.close(); frontier=null; workflowLedger?.close(); metricLedger?.close(); metricLedger=null; });
+  pi.on('session_shutdown', () => { graphifyDotnet.close?.(); graphifyCli.close?.(); codeApi.close?.(); store?.close(); store = null; frontier?.close(); frontier=null; workflowLedger?.close(); metricLedger?.close(); metricLedger=null; });
 
   pi.registerTool?.({
     name: 'envelope_recall_output',
@@ -314,6 +316,40 @@ export function registerEnvelope(pi, options = {}) {
         try{config=saveConfig(settingsPath,{...config,memory:{enabled:value==='on'}});notify(ctx,`Envelope project memory ${value}`);}
         catch(err){notify(ctx,`Envelope memory settings failed: ${err.message}`,'warning');}
         return;
+      }
+      if (verb === 'graphify-dotnet') {
+        if ((!value || value==='status')&&!extra.length) {
+          const s=await graphifyDotnet.status(ctx);
+          notify(ctx,'Envelope Graphify.NET '+(s.enabled?'on':'off')+'; executable '+(s.available?'pinned and available':s.availabilityReason||'unavailable')+'; graph '+s.artifactState+' ('+s.nodes+' nodes, '+s.edges+' edges); AST-only human build, no model');return;
+        }
+        if(value==='binary') {
+          const selected=rawArgs.replace(/^\S+\s+\S+\s*/,'').trim();
+          try{
+            if(!selected)throw new Error('absolute executable path required');
+            const executable=selected.toLowerCase()==='none'?null:normalizeGraphifyDotnetExecutable(selected);
+            config=saveConfig(settingsPath,{...config,graphifyDotnet:{...config.graphifyDotnet,executable}});
+            graphifyDotnet.close?.();
+            notify(ctx,'Envelope Graphify.NET executable '+(executable?'pinned':'cleared')+'; never auto-installed');
+          }catch(err){notify(ctx,'Envelope Graphify.NET executable rejected: '+err.message,'warning');}
+          return;
+        }
+        if(value==='build'&&!extra.length){
+          try{
+            if(!config.code.enabled)throw new Error('Envelope code intelligence disabled');
+            const r=await graphifyDotnet.build(ctx);
+            notify(ctx,'Envelope Graphify.NET AST-only build: '+r.artifactState+'; '+r.nodes+' nodes, '+r.edges+' edges; changed '+(r.artifactChanged?'yes':'no')+'; external assertion only');
+          }catch(err){notify(ctx,'Envelope Graphify.NET build not enabled or failed: '+err.message,'warning');}
+          return;
+        }
+        if((value==='on'||value==='off')&&!extra.length){
+          try{
+            config=saveConfig(settingsPath,{...config,graphifyDotnet:{...config.graphifyDotnet,enabled:value==='on'}});
+            if(value==='off')graphifyDotnet.close?.();
+            notify(ctx,'Envelope Graphify.NET '+value+'; no automatic execution or provider billing');
+          }catch(err){notify(ctx,'Envelope Graphify.NET preference failed: '+err.message,'warning');}
+          return;
+        }
+        notify(ctx,'Usage: /envelope graphify-dotnet [status|binary <absolute path>|binary none|on|off|build]','warning');return;
       }
       if (verb === 'graphify') {
         if ((!value || value==='status') && !extra.length) {
@@ -509,7 +545,7 @@ export function registerEnvelope(pi, options = {}) {
         }
         try {
           config = saveConfig(settingsPath, { ...config, code:{...config.code,enabled:value === 'on'} });
-          if(value==='off'){codeApi.close?.();graphifyCli.close?.();} // Stop opt-in readers and CLI work on disable.
+          if(value==='off'){codeApi.close?.();graphifyCli.close?.();graphifyDotnet.close?.();} // Stop opt-in readers and CLI work on disable.
           notify(ctx, `Envelope code ${value}`);
         } catch(err) {notify(ctx, `Envelope code settings failed: ${err.message}`, 'warning');}
         return;
@@ -578,7 +614,7 @@ export function registerEnvelope(pi, options = {}) {
     }
   });
 
-  return { metrics, getConfig: () => config, close: () => {graphifyCli.close?.();codeApi.close?.(); store?.close(); frontier?.close(); projectMemory?.close(); workflowLedger?.close(); metricLedger?.close();} };
+  return { metrics, getConfig: () => config, close: () => {graphifyDotnet.close?.();graphifyCli.close?.();codeApi.close?.(); store?.close(); frontier?.close(); projectMemory?.close(); workflowLedger?.close(); metricLedger?.close();} };
 }
 
 export default registerEnvelope;
