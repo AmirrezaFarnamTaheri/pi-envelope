@@ -128,14 +128,14 @@ async function spawnBounded(binary,args,{cwd,timeoutMs,signal,spawnProcess=spawn
       if(cancelled)return finish(new Error('Graphify operation cancelled'));
       if(timedOut)return finish(new Error('Graphify process timed out'));
       if(oversized)return finish(new Error('Graphify output exceeded the 16 KiB limit; incomplete output discarded'));
-      if(code!==0||signalName)return finish(new Error(`Graphify process failed (exit ${code??'signal'})${stderr.length?': '+Buffer.concat(stderr).toString('utf8').slice(0,300):''}`));
+      if(code!==0||signalName)return finish(new Error(`Graphify process failed (exit ${code??'signal'}); stderr redacted`));
       finish(null,Buffer.concat(stdout).toString('utf8'));
     });
   });
 }
 
 export class GraphifyCliBridge {
-  constructor({spawnProcess=spawn}={}){this.spawnProcess=spawnProcess;this.active=new Set();}
+  constructor({spawnProcess=spawn}={}){this.spawnProcess=spawnProcess;this.active=new Set();this.activeWrites=new Set();}
   close(){for(const controller of this.active)controller.abort();}
   async run(projectRoot,config,params={},signal,{humanCommand=false}={}){
     if(!params||typeof params!=='object'||Array.isArray(params))throw new TypeError('Graphify params required');
@@ -155,6 +155,8 @@ export class GraphifyCliBridge {
     if(!candidate.available)throw new Error(`Graphify CLI unavailable or unsafe: ${candidate.reason}`);
     const write=action==='build'||action==='update';
     if(write&&!humanCommand)throw new Error('Graphify mutations require the human /envelope graphify build|update slash command');
+    if(write&&this.activeWrites.has(root))throw new Error('Graphify graph write already in progress for this project');
+    if(!write&&this.activeWrites.has(root))throw new Error('Graphify graph update in progress for this project');
     let args;
     if(action==='query'){
       const question=safeInput(params.question,'question');
@@ -180,9 +182,10 @@ export class GraphifyCliBridge {
     if(signal?.aborted)cancel();
     signal?.addEventListener('abort',cancel,{once:true});
     this.active.add(task);
+    if(write)this.activeWrites.add(root);
     let output;
     try{output=await spawnBounded(candidate.path,args,{cwd:root,timeoutMs,signal:task.signal,spawnProcess:this.spawnProcess});}
-    finally{signal?.removeEventListener('abort',cancel);this.active.delete(task);}
+    finally{signal?.removeEventListener('abort',cancel);this.active.delete(task);if(write)this.activeWrites.delete(root);}
     const after=write?localStatus(root):artifact;
     return {...base,action,artifactState:after.state,reasons:after.reasons??[],
       ...(write?{writeRequested:true,artifactChanged:after.graphSha256!==artifact.graphSha256,graphHash:after.graphSha256??null}:{}),
@@ -208,14 +211,18 @@ export function registerGraphifyCliFeature(pi,{project,getConfig,observe,cli=new
   };
   async function watch(ctx,{enabled,debounceMs}={}){
     const root=project(ctx);
-    if(enabled===false){watcher.stop(root);return watcher.status(root);}
+    if(enabled===false){await watcher.stopAndWait(root);return watcher.status(root);}
     if(enabled!==true)throw new TypeError('graph watcher requires explicit on/off');
     if(!getConfig().code.enabled||!getConfig().graphify.enabled)throw new Error('Code and Graphify CLI must be enabled before watching');
     const report=await cli.run(root,getConfig().graphify,{action:'status'});
     if(!report.available)throw new Error('Pinned Graphify executable is unavailable');
     if(!['unverified','declared-sources-match'].includes(report.artifactState))throw new Error('A readable, non-stale Graphify artifact must be built before enabling watch');
     return watcher.start(root,{debounceMs,
-      runUpdate:(_root,signal)=>run(ctx,{action:'update'},signal,{humanCommand:true})});
+      runUpdate:async(_root,signal)=>{
+        const result=await run(ctx,{action:'update'},signal,{humanCommand:true});
+        if(['missing','invalid','stale'].includes(result.artifactState))throw new Error('Graphify refresh did not produce a readable fresh artifact');
+        return result;
+      }});
   }
   const watchStatus=(ctx)=>watcher.status(project(ctx));
   pi.registerTool?.({
