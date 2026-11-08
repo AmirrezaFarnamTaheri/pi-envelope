@@ -4,7 +4,7 @@
   "baseCommit": "0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64",
   "candidateVersion": "0.22.0",
   "licenseAssumption": "User assumes compatibility; independent legal review not performed",
-  "implementationScope": "Native graph projection plus bounded local external Graphify/NetworkX node-link artifact reader and opt-in invalidation-only watcher; opt-in project notes, bounded Claude JSONL fact import, Git co-change/churn, source context cards; opt-in pinned Graphify Python CLI read-only query/path/explain plus human-only AST code build/update; optional graph orientation in existing Pi hook; revocable session-only code-change watcher for offline Graphify update (no provider, no persistent daemon); explicit bounded session-local symbol-delta baselines, source-verified declaration hashes, conservative static importer hints; source-verified lexical/exact entry static-import context slices with ETag references and strict serialized output budget; bounded, source-verified Git cochange versus direct static import advisory review (no causal or risk score); explicit private content-addressed file-graph metadata versions with human-only capture and pruning; opt-in, source-verified user-supplied cosine embeddings + lexical hybrid scoring, no provider inference; checkable SHA-verified file-import graph invariants with certificate/unknown semantics (no code-correctness proof)",
+  "implementationScope": "Native graph projection plus bounded local external Graphify/NetworkX node-link artifact reader and opt-in invalidation-only watcher; opt-in project notes, bounded Claude JSONL fact import, Git co-change/churn, source context cards; opt-in pinned Graphify Python CLI read-only query/path/explain plus human-only AST code build/update; optional graph orientation in existing Pi hook; revocable session-only code-change watcher for offline Graphify update (no provider, no persistent daemon); explicit bounded session-local symbol-delta baselines, source-verified declaration hashes, conservative static importer hints; source-verified lexical/exact entry static-import context slices with ETag references and strict serialized output budget; bounded, source-verified Git cochange versus direct static import advisory review (no causal or risk score); explicit private content-addressed file-graph metadata versions with human-only capture and pruning; opt-in, source-verified user-supplied cosine embeddings + lexical hybrid scoring, no provider inference; checkable SHA-verified file-import graph invariants with certificate/unknown semantics (no code-correctness proof); explicit human-only pinned Graphify.NET AST-only subprocess with separated untrusted export and no provider keys",
   "upstreams": [
     {
       "repo": "lucasrosati/claude-code-memory-setup",
@@ -17,7 +17,7 @@
       "repo": "elbruno/graphify-dotnet",
       "commit": "008477767c813f0cc48dda3644282330cc288c8b",
       "capabilities": "File extraction > typed graph > communities > report/export; AST or optional AI",
-      "adoption": "v0.20 actual .NET graph.json compatibility, v0.21 exporter-declared communities; .NET Copilot and SDK runtime are not bundled",
+      "adoption": "v0.20 actual .NET graph.json compatibility, v0.21 exporter-declared communities; .NET Copilot and SDK runtime are not bundled Stacked opt-in external .NET 10 CLI bridge: human-only pinned executable and AST-only `run` with isolated environment, status-only Pi tool, separate graph JSON and real pinned 0.7.0 hosted smoke. Not in-process SDK/Copilot provider.",
       "completePort": false
     },
     {
