@@ -32,6 +32,8 @@ export async function probePiRpc({root,piCommand='pi',piPrefixArgs=[],upstream,t
   return new Promise(resolveResult=>{
     let done=false,buffer=Buffer.alloc(0),child,stderr='',stderrBytes=0,stdinError=false,stdoutBytes=0;
     const rpcEventTypes=new Set();
+    const rpcUiMethods=new Set();
+    let cancelledDialogs=0;
     const settle=(value)=>{
       if(done)return;
       done=true;clearTimeout(timeout);
@@ -45,7 +47,7 @@ export async function probePiRpc({root,piCommand='pi',piPrefixArgs=[],upstream,t
     child.on('error',()=>settle({ok:false,reason:'Pi executable unavailable'}));
     // Close, unlike exit, fires after stdout/stderr have been fully drained.
     child.on('close',(status,signal)=>{
-      if(!done)settle({ok:false,reason:`Pi RPC closed before discovery (code ${status??'unknown'}${signal?`, signal ${signal}`:''}; stdout ${stdoutBytes} bytes; ${rpcStartupHint(stderr)}${rpcEventTypes.size?`; event types: ${[...rpcEventTypes].join(',')}`:''}${stderrBytes>8192?`; stderr truncated at 8192 bytes`:''}${stdinError?'; stdin closed early':''})`});
+      if(!done)settle({ok:false,reason:`Pi RPC closed before discovery (code ${status??'unknown'}${signal?`, signal ${signal}`:''}; stdout ${stdoutBytes} bytes; ${rpcStartupHint(stderr)}${rpcEventTypes.size?`; event types: ${[...rpcEventTypes].join(',')}`:''}${rpcUiMethods.size?`; UI methods: ${[...rpcUiMethods].join(',')}`:''}${stderrBytes>8192?`; stderr truncated at 8192 bytes`:''}${stdinError?'; stdin closed early':''})`});
     });
     child.stderr.on('data',chunk=>{
       stderrBytes+=chunk.length;
@@ -66,6 +68,19 @@ export async function probePiRpc({root,piCommand='pi',piPrefixArgs=[],upstream,t
           // Only report event *types*, never untrusted text, paths or other payload fields.
           const kind=String(response?.type??'unknown');
           if(/^[a-z][a-z_0-9]{0,39}$/.test(kind)&&rpcEventTypes.size<12)rpcEventTypes.add(kind);
+          if(kind==='extension_ui_request'){
+            const method=String(response.method??'');
+            if(/^(select|confirm|input|editor|notify|setStatus|setWidget|setTitle|set_editor_text)$/.test(method)){
+              rpcUiMethods.add(method);
+            }
+            if(/^(select|confirm|input|editor)$/.test(method)&&typeof response.id==='string'&&
+               response.id.length>0&&response.id.length<=128){
+              // Explicitly cancel; never approve a command or submit fake user input.
+              if(++cancelledDialogs>4){settle({ok:false,reason:'Too many startup UI dialogs'});return;}
+              try {child.stdin.write(JSON.stringify({type:'extension_ui_response',id:response.id,cancelled:true})+'\n');}
+              catch {stdinError=true;}
+            }
+          }
           continue;
         }
         if(response.id!=='envelope-smoke-commands'||response.command!=='get_commands'||response.success!==true){
