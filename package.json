@@ -1,6 +1,6 @@
 {
   "name": "pi-envelope",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "private": true,
   "description": "Envelope: one Pi coding-agent package with Tersio modes, reversible local output/context, code intelligence, worktree workflows and private metrics",
   "type": "module",
@@ -38,7 +38,11 @@
     "call-graph",
     "static-analysis",
     "code-evidence",
-    "incremental-index"
+    "incremental-index",
+    "knowledge-graph",
+    "graph-traversal",
+    "dependency-boundaries",
+    "mermaid"
   ],
   "dependencies": {
     "@krtclcdy/tersio": "2.25.18",

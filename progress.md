@@ -1,6 +1,6 @@
 # Envelope — release progress
 
-**Current source candidate:** v0.16.0 (unmerged; prior validated release candidate v0.15.0). The initial v0.1–v0.12 development plans and duplicate upstream ledger were interim planning artifacts; they are removed from the deliverable. The 33 pinned source references live only in `integrations/extraction-audit.json` and `docs/ALL_33_SOURCE_AUDIT.md`.
+**Current source candidate:** v0.17.0 (unmerged; prior validated release candidate v0.16.0). The initial v0.1–v0.12 development plans and duplicate upstream ledger were interim planning artifacts; they are removed from the deliverable. The 33 pinned source references live only in `integrations/extraction-audit.json` and `docs/ALL_33_SOURCE_AUDIT.md`.
 
 ## Integrated
 
@@ -24,4 +24,8 @@
 
 ## Explicitly incomplete
 
-Hosted v0.15.0 real Pi/Tersio/WASM/clangd gates passed on [run 42478614461](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42478614461). The new v0.16.0 candidate requires its own hosted checks before any release claim. The other partial integration items, rejected duplicates and external adapters remain recorded in the 33-source audit. No live provider-billed savings or complete 33-repository parity is claimed.
+Hosted v0.16.0 real Pi/Tersio/WASM/clangd gates passed on [run 42479440053](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42479440053). The new v0.17.0 native graph candidate requires its own hosted gates before any release claim. The other partial integration items, rejected duplicates and external adapters remain recorded in the 33-source audit. No live provider-billed savings or complete 33-repository parity is claimed.
+
+## v0.17.0 native graph source-adoption slice
+
+Sixteen additional repositories are pinned and decomposed in `docs/GRAPH_SOURCE_AUDIT.md`. One read-only CodeIndex-backed graph tool adds status, typed shortest paths, neighbors, degree hubs, weak components, directory-boundary audit, and bounded JSON/Mermaid export. External graph engines, memory, watchers, provider/model work, and UI remain separate follow-on phases.

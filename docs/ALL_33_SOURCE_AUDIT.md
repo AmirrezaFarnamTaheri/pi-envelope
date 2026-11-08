@@ -99,3 +99,7 @@ The original 33 pinned source commits are unchanged. The new code is an independ
 ## v0.16.0 Python module-alias call evidence delta
 
 The existing `gzy987/RepoPilot` and `kuangxiaoc/code-graph-pilot` partial adaptations gain a conservative Python module-import call path: alias-aware `import pkg.mod as x` and `from . import mod as x` are matched only against uniquely indexed module-level function declarations. Rebound aliases, conflicting package initializer names, duplicate imports and unresolved nested receivers are reported as unresolved, with bounded validated parser facts and no source execution. See `scripts/py-ast-helper.py`, `extensions/envelope/code-call-evidence.mjs`, and `tests/python-module-calls.test.mjs`. This is not a type checker, MRO interpreter, general Python dependency resolver or upstream code port. The original 33 pinned commits remain unchanged.
+
+## v0.17.0 independent 16-source graph cohort
+
+The 16 Graphify/CodeGraph/knowledge/memory/workflow sources are audited separately in `docs/GRAPH_SOURCE_AUDIT.md` and `integrations/graph-source-audit.json`, without changing the original pinned 33-source ledger. The new native graph projection from CodeIndex provides traceable static imports and conservative call edges plus bounded path/hub/component/boundary/export queries. Deferred backends, memory, watchers, semantic systems and UI are not claimed as delivered.
