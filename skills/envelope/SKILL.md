@@ -110,3 +110,7 @@ Only use `envelope_code_vector({action:"search",queryVector:[...],query:"optiona
 ### Checkable import-graph invariants
 
 Use `envelope_code_invariant({action:"acyclic"})` or `reach`/`no-path` with exact indexed paths for **static file-import graph properties only**. Inspect `verdict`, `complete`, `certificate` and `reasons`; if incomplete, missing paths are not proved absent. Cycle/path/order witnesses can be checked against current version, but do **not** assert type safety, program correctness, runtime call graph properties, formal IR proof or dynamic dependency completeness. No raw source is returned. See `docs/STATIC_GRAPH_INVARIANTS.md`.
+
+### Explicit Graphify.NET runtime
+
+Only humans can pin and enable a separately trusted Graphify.NET 10 executable with `/envelope graphify-dotnet binary <absolute path>`, `/envelope graphify-dotnet on`, then `/envelope graphify-dotnet build`. Agent-facing `envelope_graphify_dotnet` is **status only**. A build uses the upstream CLI's AST-only code run with a credential-isolated environment and separate `.envelope/graphify-dotnet-out/` output. Treat exported graph counts and edges as unverified outside assertions, never native AST, formal or semantic proof. Do not silently install, enable model backends or perform billable provider calls. See `docs/GRAPHIFY_DOTNET_RUNTIME.md`.
