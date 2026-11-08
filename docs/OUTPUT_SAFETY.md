@@ -1,0 +1,31 @@
+# Exact-output safety and anchored source integrity
+
+## What Envelope does
+
+One native Envelope `tool_result` hook (loaded after the Tersio RTK modules) processes **only completed, successful, single-text-part `bash` results**. Tersio remains the single owner of shell-command rewriting and its native `grep`/`glob` result filtering; Envelope never runs an RTK rewrite or changes tool arguments.
+
+The reducer examines a stripped-of-ANSI *view* for classification but emits every **retained original text record**, with its original ANSI escapes, CRLF/LF/CR separator and UTF-8 characters intact. A record containing a `[L123]` source marker, numeric/hashline anchor, or explicit edit-anchor terminology is never removed or rewritten, even if it resembles a success line. Warnings, errors, fatal and aborted diagnostics stay verbatim. Mixed output can therefore lose repetitive passing-check rows without disturbing a copy-pasteable source line.
+
+Only these full lines can disappear:
+
+- Recognizable successful Vitest/TAP-style rows, where the same row does not contain diagnostics or protected anchors.
+- Repeated build progress lines with recognized module counters.
+- Excess ordinary `git status` file entries, after a preview of the first ten; **all deletion, rename, copy, and merge-conflict index entries are always retained**, and all non-file lines remain in place and are never reordered.
+
+A bounded omitted-line count is appended. Exact recall rechecks the project-scoped SHA-256 and stored byte length; tampered object contents or symlinked object files are rejected instead of being returned as original evidence. If the result cannot achieve the configured minimum byte savings, or the final representation exceeds `output.maxChars` **UTF-8 bytes** (the historical setting name), nothing is changed. JSON, source-read tools, mixed image/text, structured output, failed tool calls, signaled/killed/aborted/timed-out/truncated results and unknown log categories are left unchanged.
+
+When a shortened result qualifies, Envelope **first persists** the complete incoming text in the project-scoped local `OutputStore` (SQLite metadata plus SHA-256-addressed exact UTF-8 text). Only after persistence succeeds does it return reduced text plus an `envelope_recall_output id=…` marker. Storage errors result in no output patch. The recall tool refuses access from another project scope.
+
+### Boundaries and limitations
+
+- **No live stream mutation.** This release does not sanitize streamed `tool_execution_update` chunks; the documented Pi update event is observational, and altering it would be an unsupported integration claim. v0.8.0 transforms complete `tool_result` blocks only.
+- **No source-code transformation.** The reducer preserves anchored content and skips the `read` tool; it does not implement the upstream RTK Optimizer's read-source filtering or anchor-aware partial truncation.
+- **No universal parser.** Line classifications are deliberately narrow and may decline to shorten unusual output. Exact-billed token savings and effectiveness on real tasks are not yet verified.
+- **Store boundaries.** Exact means the incoming Pi text result, after any earlier host/Tersio transformations; it does not recreate bytes that a shell or upstream hook already discarded. Text is encoded as UTF-8 in the store; arbitrary binary streams are not supported.
+- **Privacy and retention.** The exact-output store can include commands and raw tool text, is kept locally, and retains data indefinitely by default. `/envelope output retention <days>` enables opportunistic expiry; `/envelope output erase <id>` and `/envelope output prune <days>` remove project-scoped records from the local object store and index, but not backups or filesystem snapshots; see the README. This is separate from the numeric-only observability store.
+
+## Validation
+
+`node --test tests/compactor.test.mjs tests/extension.test.mjs` covers a red/green regression for mixed Pi anchors, the upstream numeric/hashline formats, source text with embedded success symbols, CRLF/ANSI/Unicode, Git messages interspersed with file entries, stringent byte caps, interrupted results and project-scoped exact recall. `npm run benchmark` emits `envelope-synthetic-v2`, including a mixed anchored fixture with `anchorsPreserved` and `diagnosticsPreserved`. Its bytes and local elapsed timings are empirical; the token proxy is deliberately labelled a heuristic, and no provider calls are made.
+
+Pattern references: [MasuRii/pi-rtk-optimizer pinned revision](https://github.com/MasuRii/pi-rtk-optimizer/tree/d155d253cb2f1358e34e717d47a82ebccb08cb8e) and [JayPokale/Chisle pinned revision](https://github.com/JayPokale/Chisle/tree/8851f7a17b6b20975e1c40a7de5c7e8523832658). No upstream implementation files were copied into this module.

@@ -1,0 +1,93 @@
+{
+  "name": "pi-envelope",
+  "version": "0.13.0",
+  "private": true,
+  "description": "Envelope: one Pi coding-agent package with Tersio modes, reversible local output/context, code intelligence, worktree workflows and private metrics",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-agent",
+    "coding-agent",
+    "context",
+    "rtk",
+    "token-optimization",
+    "code-intelligence",
+    "ast",
+    "typescript",
+    "workflows",
+    "agent-coordination",
+    "sqlite",
+    "git-worktree",
+    "handoff",
+    "observability",
+    "benchmarks",
+    "lsp",
+    "rename",
+    "diagnostics",
+    "python",
+    "golang",
+    "runtime-smoke",
+    "tree-sitter",
+    "wasm",
+    "s-expression",
+    "capture",
+    "call-graph",
+    "static-analysis",
+    "code-evidence",
+    "incremental-index"
+  ],
+  "dependencies": {
+    "@krtclcdy/tersio": "2.25.18",
+    "typescript": "5.8.3"
+  },
+  "bundledDependencies": [
+    "@krtclcdy/tersio",
+    "typescript"
+  ],
+  "pi": {
+    "extensions": [
+      "node_modules/@krtclcdy/tersio/extensions/caveman/caveman.ts",
+      "node_modules/@krtclcdy/tersio/extensions/pstack/pstack.ts",
+      "node_modules/@krtclcdy/tersio/extensions/headroom/headroom.ts",
+      "node_modules/@krtclcdy/tersio/extensions/rtk/session.ts",
+      "node_modules/@krtclcdy/tersio/extensions/rtk/filter.ts",
+      "node_modules/@krtclcdy/tersio/extensions/timing/timing.ts",
+      "node_modules/@krtclcdy/tersio/extensions/combo/combo.ts",
+      "node_modules/@krtclcdy/tersio/extensions/commands/commands.ts",
+      "./extensions/envelope/index.js"
+    ],
+    "skills": [
+      "node_modules/@krtclcdy/tersio/extensions/ponytail/skills",
+      "./skills/envelope"
+    ]
+  },
+  "files": [
+    "extensions/",
+    "skills/",
+    "docs/",
+    "fixtures/",
+    "integrations/",
+    "scripts/",
+    "README.md",
+    "LICENSES.md"
+  ],
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check": "node scripts/check-syntax.mjs && npm test",
+    "pack:check": "npm run doctor:bundle && npm run pack:source-check",
+    "doctor:bundle": "node scripts/verify-bundle.mjs",
+    "benchmark": "node scripts/benchmark.mjs",
+    "smoke:runtime": "node scripts/smoke-runtime.mjs",
+    "smoke:lsp-real": "node scripts/smoke-clangd.mjs",
+    "smoke:tree": "node scripts/smoke-tree-sitter.mjs",
+    "pack:source-check": "npm pack --dry-run --ignore-scripts"
+  },
+  "optionalDependencies": {
+    "web-tree-sitter": "0.25.3",
+    "tree-sitter-wasm": "2.0.4"
+  }
+}

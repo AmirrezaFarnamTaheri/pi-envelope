@@ -1,0 +1,16 @@
+{
+  "upstream": "KurutoDenzeru/tersio",
+  "revision": "bebc40e162cb",
+  "version": "2.25.18",
+  "extensions": [
+    "./extensions/caveman/caveman.ts",
+    "./extensions/pstack/pstack.ts",
+    "./extensions/headroom/headroom.ts",
+    "./extensions/rtk/session.ts",
+    "./extensions/rtk/filter.ts",
+    "./extensions/timing/timing.ts",
+    "./extensions/combo/combo.ts",
+    "./extensions/commands/commands.ts"
+  ],
+  "skills": ["./extensions/ponytail/skills"]
+}

@@ -1,0 +1,29 @@
+# Incremental, conservative call evidence
+
+`envelope_code_calls({"path":"src/feature.ts","symbol":"feature","limit":15})` reads from **the same shared `CodeIndex`** used by `envelope_code_lookup`, `envelope_code_impact`, `envelope_code_verify`, and optional Tree-sitter queries. It registers one Pi tool, not another indexer, language server, context owner, or tool-result hook. JavaScript/TypeScript is enabled with `/envelope code on`; Python and Go additionally require `/envelope code languages on` and a local stdlib parser executable.
+
+This is **syntactic, partial call evidence**, not a type-checked or runtime call graph. `complete: true` means indexed syntax was valid and the per-file call-fact cap was not hit; it does **not** mean all language-level calls or reachable functions were discovered. Production execution, type inference, class method dispatch, coverage and cross-language FFI remain unverified.
+
+## Evidence and output
+
+The tool returns a project-relative `path`, optional `symbol`, `mode: "static-syntax-call-evidence"`, `outgoing`, `incoming`, `unresolved`, totals, `complete`, `incompleteReasons`, `truncated`, and a statement of the limits. Each call edge records the source file, caller declaration and line, call-site line/UTF-16 column, callee spelling, target declaration path/name/line, and syntactic resolution category. `unresolved` entries have a specific `reason` (`shadowed`, `dynamic-member`, `unknown-target`, `ambiguous-import` or `ambiguous-target`). Source text, file contents and absolute paths are never included in the tool result.
+
+- **JS/TS:** Direct identifier calls inside module-level functions and named class methods, to a unique module-level function or explicitly aliased named import. Type-only imports, overload signatures without implementations, dynamic receiver calls, callbacks and indirect calls are not silently linked. Namespace imports can be linked only when the receiver is the unshadowed imported namespace and the named target is an exported function.
+- **Python:** Direct calls inside top-level functions or named class methods, to a unique module-level definition or an explicit `from .module import name [as alias]` binding with an indexed declaration. Parameters, assignments and nested declarations conservatively shadow names; dynamic attribute calls remain unresolved. Runtime monkey-patching, MRO, `getattr`, and module `__getattr__` are not resolved.
+- **Go:** Direct function calls in the same indexed package and selectors through an unshadowed, statically mapped local `go.mod` package import. A default import alias must agree with the indexed target's declared package name; explicit aliases are recognized. Interface dispatch, generic instantiation inference, build tags, generated code, cgo and library packages outside the indexed root are not type-checked or resolved.
+
+All resolved links describe matching **source syntax** only. A declaration's presence is not proof of a valid compiled program, module-resolution configuration or runtime target. Never use them as a substitute for typecheck, tests, LSP diagnostics or a diff review.
+
+## Refresh and boundedness
+
+Each project index stores parser facts per file; unchanged file signatures (`size:mtime:ctime`) reuse parsed records. A refresh reparses changed files, drops deleted paths, and recomputes all reverse call edges from the current source facts. `envelope_code_languages` exposes `reparsed`, `reused`, `removed`, `callSites`, `linkedCalls`, `unresolvedCalls`, `omittedCalls`, and unavailable parser reasons. This is **incremental parsing**, not an incremental graph-database update or cryptographic content-fingerprint guarantee; concurrent changes and filesystem timestamp anomalies require revalidation with the actual source.
+
+The index defaults to at most 1,000 files and 512 KB per source in the Pi adapter; parser batches are capped and fail explicitly on missing tools. JS/TS AST processing collects at most 200 call sites per file, as do the optional stdlib helpers. The tool returns at most 25 per category (the `CodeIndex` method has a hard maximum of 40), with counts/truncation indicators. Syntax-invalid sources yield `complete:false` and `incompleteReasons:["syntax-errors"]` instead of plausible-looking edges. When an optional parser is unavailable its files are unindexed, not reported as clean or known to have no calls. Calls in nested anonymous functions and several dynamic call forms are intentionally omitted, and `complete:true` does not override those deliberate exclusions.
+
+The Python helper reads source via stdin and uses `python3 -I -S` plus stdlib `ast`; the Go helper receives stdin and uses `go/parser`, `go/ast`, with network module fetching disabled. The package never executes the analyzed project. These helpers still run with ordinary user OS privileges and are **not a sandbox**.
+
+## Verification and provenance
+
+`npm run check` runs parser, caching, source-location, import-alias, caller/callee, shadowing, stale file, ambiguous package, bad syntax, path isolation and Pi integration regression tests. `npm run benchmark` checks a synthetic direct call and reverse caller without provider calls. The real Pi/Tersio runtime and real Tree-sitter WASM grammar remain unavailable in the offline environment; no live-agent, billed-token or type-precision improvement is claimed.
+
+The technique is **independently reimplemented**, adapting the conservative relationships and uncertainty boundaries investigated in [RepoPilot](https://github.com/gzy987/RepoPilot), [code-graph-pilot](https://github.com/kuangxiaoc/code-graph-pilot), [pi-repomap](https://github.com/EnTeQuAk/pi-repomap), and [pi-tree-sitter](https://github.com/UgoMendesDonelli/pi-tree-sitter). No upstream source code was copied.
