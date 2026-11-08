@@ -59,6 +59,12 @@ The human must explicitly enable `/envelope code tree on` before Tree-sitter que
 - If a child fails or a lease expires, inspect the preserved worktree before using `envelope_workflow_retry`. No automatic retry, parallel writer, auto-commit, automatic merge, auto-cleanup or recursive subagent loop is permitted.
 - `envelope_workflow_events` returns the bounded ownership/audit timeline; no always-on OpenRig daemon or full GSD autonomous scheduler is installed.
 
+## Opt-in project memory, history and source cards
+
+- Human must enable `/envelope memory on` before `envelope_memory` saves, reads or imports. Do not auto-save chat transcripts, secrets, or output captures. Only `importMarkdown` / `importClaudeTranscript` with a user-directed local project path may import text; manually inspect for sensitivity. Off means no new memory database.
+- Use `envelope_code_context_card` for short, hash-verified AST evidence; raw source snippets require `includeSnippet:true`, not the default. A card cannot prove runtime dispatch or semantic correctness.
+- Use `envelope_code_history` for Git co-change/churn within bounded commits. Historical co-change is **not** a static import/call edge, ownership proof or causal relationship. Check `complete` and `reasons`.
+
 ## Local telemetry and evaluation
 
 `envelope_metrics_snapshot({})` and `envelope_metrics_events({"limit":10})` provide private project-scoped numeric metrics. Do not present byte reductions as provider-billed token savings. `/envelope observability off` disables new collection only; `/envelope metrics` reads current local totals. `npm run benchmark` provides a synthetic offline exact-recovery check, not real coding effectiveness.

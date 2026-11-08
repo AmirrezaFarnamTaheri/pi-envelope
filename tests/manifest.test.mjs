@@ -32,5 +32,5 @@ test('bundles a pinned native AST parser alongside the Tersio base', () => {
   assert.equal(manifest.dependencies.typescript, '5.8.3');
   assert.ok(manifest.bundledDependencies.includes('typescript'));
   assert.ok(manifest.pi.extensions.includes('./extensions/envelope/index.js'));
-  assert.equal(manifest.version, '0.18.0');
+  assert.equal(manifest.version, '0.19.0');
 });

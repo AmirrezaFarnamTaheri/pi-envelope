@@ -107,3 +107,7 @@ The 16 Graphify/CodeGraph/knowledge/memory/workflow sources are audited separate
 ## v0.18.0 addendum: additional Graphify cohort
 
 An opt-in Graphify/NetworkX node-link artifact reader, SHA-256 source-byte status and invalidation-only watch are independently adapted and recorded in `docs/GRAPH_SOURCE_AUDIT.md`. The native AST graph remains authoritative for code evidence. This does **not** add or imply full Graphify AI semantic extraction, background indexing or other 16-source feature parity.
+
+## v0.19.0 additional 16-source cohort evolution
+
+The second source cohort (`docs/GRAPH_SOURCE_AUDIT.md`) now includes explicit project notes and session import, bounded Git-history co-change, and hash-verified symbol context cards, without changing original 33 pinned source commits. These are independently written partial adaptations; they do not imply full vendor parity, automatic transcripts, semantic vector RAG, ownership proof or model-token billing savings.

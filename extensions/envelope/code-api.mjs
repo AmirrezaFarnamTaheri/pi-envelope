@@ -3,6 +3,8 @@ import { CodeIndex } from './code-index.mjs';
 import { analyzeChangeImpact } from './change-evidence.mjs';
 import { inspectCodeGraph } from './graph-intelligence.mjs';
 import { ExternalGraphReader } from './graphify-adapter.mjs';
+import {inspectCodeHistory} from './code-history.mjs';
+import {projectContextCard} from './context-card.mjs';
 import { TreeSitterBroker, treeCaptureGroups } from './tree-sitter-broker.mjs';
 
 const result = (value,isError=false) => ({
@@ -87,6 +89,18 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
       enabled:{type:'boolean',description:'Explicit watch enable or disable (action: watch)'},
       debounceMs:intProp('Debounce invalidations between 100 and 5000 ms (action: watch)',100,5000)}),
     (index,params)=>graphReader(index).query(index,params));
+  tool('envelope_code_history','Envelope: Bounded Git Co-change Evidence',
+    'Read-only bounded Git commit co-occurrence, indexed-source churn and window completeness. Historical co-changes are NOT causal dependencies, authorship ownership or runtime call evidence.',
+    schema({action:{type:'string',enum:['status','cochange','churn']},
+      path:{type:'string',description:'Project-relative indexed source file for cochange'},
+      maxCommits:intProp('Maximum Git commits examined, 1-100',1,100),
+      limit:intProp('Maximum reported related/churn files, 1-20',1,20)}),
+    (index,params)=>inspectCodeHistory(index,params));
+  tool('envelope_code_context_card','Envelope: Bounded Source Context Card',
+    'One compact, hash-verified source symbol, imports, inbound/outbound syntactic call evidence and explicit uncertainty. Does not automatically expose source text or make model calls.',
+    schema({path:{type:'string',description:'Indexed project-relative source path'},symbol:{type:'string',description:'Optional exact declaration name'},
+      limit:intProp('Maximum items per evidence category (1-16)',1,16),includeSnippet:{type:'boolean',description:'Explicitly include <=450 source code points near indexed declaration'}} ,['path']),
+    (index,params)=>projectContextCard(index,params));
   tool('envelope_code_languages','Envelope: Structural Parser Status',
     'Display available indexed languages, skipped parser reasons, and whether optional local Python/Go AST parsing is enabled.',
     schema({}), (index)=>index.languageStatus());

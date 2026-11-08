@@ -20,6 +20,7 @@ import { guardMutation } from './mutation-guard.mjs';
 import { WorkflowLedger } from './workflow-ledger.mjs';
 import { registerWorkflowFeature } from './workflow-api.mjs';
 import { MetricsLedger } from './metrics-ledger.mjs';
+import {ProjectMemory, registerProjectMemoryFeature} from './project-memory.mjs';
 import { registerMetricsFeature } from './metrics-api.mjs';
 
 function homePath() {
@@ -63,6 +64,16 @@ export function registerEnvelope(pi, options = {}) {
     store = null;
     pi.logger?.warn?.(`[envelope] local store unavailable; output compaction disabled: ${err.message}`);
   }
+  // Memory is OFF by default and MUST NOT create a database before explicit opt-in.
+  let projectMemory=null;
+  const getMemory=()=>{
+    if(!config.memory.enabled)return null;
+    if(!projectMemory){
+      try{projectMemory=new ProjectMemory(join(home,'envelope-memory'));}
+      catch(err){pi.logger?.warn?.(`[envelope] optional project memory unavailable: ${err.message}`);}
+    }
+    return projectMemory;
+  };
   const lastOutputPrune = new Map();
   const metrics = { calls: 0, compacted: 0, rawBytes: 0, renderedBytes: 0, contextCalls: 0, contextCompacted: 0, contextRawBytes: 0, contextRenderedBytes: 0, workflowRuns: 0, workflowSubmitted: 0, workflowFailed: 0 };
   const ledger = new ContextLedger(join(home, 'envelope-context'));
@@ -79,6 +90,7 @@ export function registerEnvelope(pi, options = {}) {
     catch(err) { pi.logger?.warn?.(`[envelope] metrics write failed (ignored): ${err.message}`); }
   };
   registerMetricsFeature(pi,{getLedger:()=>metricLedger,project});
+  registerProjectMemoryFeature(pi,{getMemory,project,getConfig:()=>config});
   pi.on('message_end',(event,ctx)=>{
     const message=event?.message;
     if(message?.role!=='assistant'||!message.usage) return;
@@ -285,6 +297,16 @@ export function registerEnvelope(pi, options = {}) {
         notify(ctx, `Envelope: ${metrics.compacted}/${metrics.calls} results compacted; original ${metrics.rawBytes} B -> model ${metrics.renderedBytes} B; context ${metrics.contextCompacted} results compacted (${metrics.contextRawBytes} B -> ${metrics.contextRenderedBytes} B); ${local?.items ?? 0} stored outputs; workflows ${metrics.workflowRuns} spawned, ${metrics.workflowSubmitted} submitted, ${metrics.workflowFailed} failed`);
         return;
       }
+      if (verb === 'memory') {
+        if ((!value||value==='status')&&!extra.length) {
+          notify(ctx,`Envelope project memory ${config.memory.enabled?'on':'off'} (explicit notes/Markdown import only; no transcript capture)`);
+          return;
+        }
+        if(!['on','off'].includes(value)||extra.length){notify(ctx,'Usage: /envelope memory [status|on|off]','warning');return;}
+        try{config=saveConfig(settingsPath,{...config,memory:{enabled:value==='on'}});notify(ctx,`Envelope project memory ${value}`);}
+        catch(err){notify(ctx,`Envelope memory settings failed: ${err.message}`,'warning');}
+        return;
+      }
       if (verb === 'context') {
         if ((!value || value === 'status') && extra.length === 0) {
           try {
@@ -429,7 +451,7 @@ export function registerEnvelope(pi, options = {}) {
     }
   });
 
-  return { metrics, getConfig: () => config, close: () => {codeApi.close?.(); store?.close(); frontier?.close(); workflowLedger?.close(); metricLedger?.close();} };
+  return { metrics, getConfig: () => config, close: () => {codeApi.close?.(); store?.close(); frontier?.close(); projectMemory?.close(); workflowLedger?.close(); metricLedger?.close();} };
 }
 
 export default registerEnvelope;

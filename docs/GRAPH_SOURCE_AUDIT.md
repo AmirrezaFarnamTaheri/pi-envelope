@@ -1,6 +1,6 @@
 # 16-source graph, memory and workflow integration audit
 
-**Audit date:** 2026-11-08. **Baseline:** Envelope v0.16.0 commit `0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64`. **Candidate:** v0.18.0 on the unmerged review stack.
+**Audit date:** 2026-11-08. **Baseline:** Envelope v0.16.0 commit `0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64`. **Candidate:** v0.19.0 on the unmerged review stack.
 
 The user supplied an assumption that licensing clearance will be resolved separately. It is not a legal opinion. This implementation uses independently written graph code; retain upstream attribution if later copying actual source.
 
@@ -8,7 +8,7 @@ The repositories represent distinct *engines*, *host adapters*, *watchers*, *vie
 
 | Source (pinned SHA prefix) | Observed role | Envelope status / decision |
 |---|---|---|
-| [lucasrosati/claude-code-memory-setup](https://github.com/lucasrosati/claude-code-memory-setup) (`4cd2e6bd4319`) | Obsidian notes, chat import and session autosave | Graph-first orientation in v0.17; explicit project memory/import in a later phase |
+| [lucasrosati/claude-code-memory-setup](https://github.com/lucasrosati/claude-code-memory-setup) (`4cd2e6bd4319`) | Obsidian notes, chat import and session autosave | v0.19 opt-in project notes, Markdown import/export and explicit, bounded Claude Code JSONL session extraction; no automatic vault/session hooks |
 | [elbruno/graphify-dotnet](https://github.com/elbruno/graphify-dotnet) (`008477767c81`) | File extraction > typed graph > communities > report/export; AST or optional AI | Typed static provenance in v0.17; .NET / semantic Graphify bridge later |
 | [juhas96/graphify-pi](https://github.com/juhas96/graphify-pi) (`dd54ac9ae22b`) | Pi graphify CLI wrapper, freshness prompts and wiki-first guidance | Single native graph-query tool; v0.18 external node-link health and freshness adapter |
 | [franklywatson/claude-rig](https://github.com/franklywatson/claude-rig) (`54b4a5c79ebe`) | Claude cockpit, dependency detection, tool routing, skill-chain and metrics | Keep existing Tersio RTK/workflow ownership; future capability status |
@@ -18,12 +18,12 @@ The repositories represent distinct *engines*, *host adapters*, *watchers*, *vie
 | [yetanotheraryan/graphify-chokidar](https://github.com/yetanotheraryan/graphify-chokidar) (`9c584df9ab08`) | Debounced file watcher, code vs media classification, user-confirmed LLM rebuild | Existing incremental refresh; v0.18 optional invalidation-only debounced watcher |
 | [crafter-station/graphify-visualizer](https://github.com/crafter-station/graphify-visualizer) (`15c67d7e5a3c`) | Obsidian bridge that embeds Graphify HTML, not a graph extractor | Native bounded JSON/Mermaid export; UI bridge later |
 | [m4t0t0/cmd-mod-graphify](https://github.com/m4t0t0/cmd-mod-graphify) (`474ecaecbf18`) | CommandCode Graphify adapter with architecture exploration and god nodes | Native degree hubs/paths/exports; no competing host adapter |
-| [colbymchenry/codegraph](https://github.com/colbymchenry/codegraph) (`f72c9d2efb14`) | Rust/TS codegraph kernel, typed traversal, auto-sync, impact and agent tools | Deterministic bounded typed BFS over live CodeIndex; advanced bridges later |
+| [colbymchenry/codegraph](https://github.com/colbymchenry/codegraph) (`f72c9d2efb14`) | Rust/TS codegraph kernel, typed traversal, auto-sync, impact and agent tools | Typed native graph BFS plus v0.19 bounded Git co-change evidence; advanced multi-language backends later |
 | [AxiomCodeAI/axiomcodegraph](https://github.com/AxiomCodeAI/axiomcodegraph) (`29f7ecf05297`) | IR and formal-methods oriented call analysis with asserted links | Explicit uncertainty; no false proof claim; optional IR link adapters later |
-| [GlitterKill/sdl-mcp](https://github.com/GlitterKill/sdl-mcp) (`2a20acbd283a`) | Symbol delta ledger, compact context cards, graph slices, memory and policies | Existing context/retrieval plus bounded graph views; cards/memory later |
+| [GlitterKill/sdl-mcp](https://github.com/GlitterKill/sdl-mcp) (`2a20acbd283a`) | Symbol delta ledger, compact context cards, graph slices, memory and policies | Existing replay/FTS and graph plus v0.19 source-hash-verified context cards and opt-in notes; no independent SDL engine |
 | [Ancienttwo/repo-harness](https://github.com/Ancienttwo/repo-harness) (`6b3c8def0a5b`) | Repo-local task state, review proof, Pi hook bridge and capability contracts | Reuse Envelope workflow ledger; no second task scheduler |
-| [optave/ops-codegraph-tool](https://github.com/optave/ops-codegraph-tool) (`427c96f6da08`) | Dependency/impact graph, weak/semantic communities, boundaries, CI and co-change | Advisory import/call boundary audit and weak components; temporal gates later |
-| [artk0de/TeaRAGs-MCP](https://github.com/artk0de/TeaRAGs-MCP) (`5ba0ac24a02d`) | Semantic retrieval, call graph, Git trajectory, architecture and naming lexicon | Existing FTS/calls plus graph navigation; history/vector layers later |
+| [optave/ops-codegraph-tool](https://github.com/optave/ops-codegraph-tool) (`427c96f6da08`) | Dependency/impact graph, weak/semantic communities, boundaries, CI and co-change | Native advisory boundaries/weak components plus v0.19 bounded Git co-change/churn; no automatic CI policy gate |
+| [artk0de/TeaRAGs-MCP](https://github.com/artk0de/TeaRAGs-MCP) (`5ba0ac24a02d`) | Semantic retrieval, call graph, Git trajectory, architecture and naming lexicon | Existing FTS/calls and graph navigation plus v0.19 Git co-change and source context cards; embeddings/vector backends absent |
 
 ## Architecture decisions
 
@@ -37,9 +37,9 @@ The repositories represent distinct *engines*, *host adapters*, *watchers*, *vie
 ## Follow-on phases, separate review gates
 
 1. **18 (implemented in candidate):** Read-only Graphify/NetworkX graph artifact adapter with declared SHA-256 source checks and opt-in invalidation-only watch. No automatic CLI/LLM rebuild.
-2. **19:** Project-scoped, typed and consent-based notes, session/PR continuity, Obsidian Markdown import/export and explicit erasure; no default chat transcription.
-3. **20:** Temporal/co-change/ownership risk signals, optional architecture CI policies, reviewed workflow evidence and explicit uncertainty.
-4. **21:** Symbol-first graph context cards, hybrid evidence retrieval and optional semantic-provider adapters with reproducible answer-quality/cost evaluation.
+2. **19 (implemented in candidate):** Project-scoped, explicit typed notes, Markdown import/export, bounded Claude JSONL extraction, source SHA status and deletion; no default chat transcription or vault writes.
+3. **20 (partial in candidate):** Bounded Git co-change/churn with explicit uncertainty; full ownership-risk and architecture CI policies remain future work.
+4. **21 (partial in candidate):** Hash-verified symbol-first context cards plus existing lexical retrieval; embeddings, semantic providers and provider-billed evaluations remain future work.
 5. **22:** Read-only Graphify/Mermaid/Obsidian visual interoperability, optional MCP/GraphQL adapters, no required server or untrusted HTML execution.
 
 **Boundary:** Listing a source here is not a claim of full or byte-for-byte port. See `docs/GRAPH_NATIVE.md` for the implemented v0.17 API and limits.
@@ -47,3 +47,7 @@ The repositories represent distinct *engines*, *host adapters*, *watchers*, *vie
 ## v0.18 evidence boundary
 
 `extensions/envelope/graphify-adapter.mjs` adds an explicit reader for local `graphify-out/graph.json` NetworkX node-link documents. It preserves upstream `EXTRACTED`/`INFERRED`/`AMBIGUOUS` labels while tagging **every edge** as an untrusted external assertion; this never upgrades to native AST proof. A separate optional `graphify-out/envelope-sources.json` self-declared SHA-256 manifest can detect byte changes in named project-local source files and in the graph file, and `needs_update` marks known staleness. Files not in that manifest remain explicitly unattested; manifest possession does not prove origin or completeness. The watcher is off until expressly enabled and only reports invalidation. See [Graphify artifact interoperability](GRAPHIFY_ARTIFACTS.md).
+
+## v0.19 evidence boundary
+
+`envelope_memory` requires an explicit `/envelope memory on` toggle, stores notes in owner-only project-scoped SQLite, imports only specific project-local Markdown or Claude Code JSONL files when requested, and does not auto-capture chats. JSONL extraction omits raw commands and assistant responses. Source hashes indicate byte freshness, not truth. `envelope_code_history` computes limited non-merge Git co-change/churn without inferring causal dependency, ownership, or code quality. `envelope_code_context_card` rechecks indexed source SHA-256 and returns bounded symbols/imports/call candidates without source excerpts unless requested. These parts are independently adapted from the patterns documented above, not full ports of their engines. See `docs/PROJECT_MEMORY.md`, `docs/CODE_HISTORY.md`, and `docs/CONTEXT_CARDS.md`.
