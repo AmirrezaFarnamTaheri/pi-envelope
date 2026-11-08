@@ -25,14 +25,19 @@ export function sessionIdentity(ctx) {
 
 /**
  * @param {object} pi Pi's registration surface.
- * @param {{ledger:object,getStore:Function,getConfig:Function,project:Function,metrics:object}} deps
+ * @param {{ledger:object,frontier?:object,getStore:Function,getConfig:Function,project:Function,metrics:object}} deps
  */
 export function registerContextFeature(pi, deps) {
-  const {ledger,getStore,getConfig,project,metrics,observe} = deps;
+  const {ledger,frontier,getStore,getConfig,project,metrics,observe} = deps;
   const scope = (ctx) => ({project:project(ctx),sessionId:sessionIdentity(ctx)});
   const state = (ctx) => {
     const {project:cwd,sessionId} = scope(ctx);
-    return ledger.timeline(cwd,sessionId);
+    const timeline=ledger.timeline(cwd,sessionId);
+    const active=timeline.checkpoints.find(entry=>entry.name===timeline.active);
+    if (active && frontier) {
+      return {...timeline,replay:frontier.list({project:cwd,sessionId,anchorCallId:active.callId,limit:25})};
+    }
+    return timeline;
   };
   const restore = (ctx) => {
     const {project:cwd,sessionId} = scope(ctx);
@@ -44,14 +49,14 @@ export function registerContextFeature(pi, deps) {
     metrics.contextCalls++;
     const settings = getConfig().context;
     const store = getStore();
-    if (!settings.enabled || !store || !Array.isArray(event?.messages)) return;
+    if (!settings.enabled || !store || !frontier || !Array.isArray(event?.messages)) return;
     try {
       const {project:cwd,sessionId} = scope(ctx);
       const snapshot=ledger.read(cwd,sessionId);
       const active=snapshot.checkpoints.find((entry)=>entry.name===snapshot.active);
       if (!active) return;
       const result = projectContext(event.messages,{
-        ...settings,project:cwd,store,anchorCallId:active.callId
+        ...settings,project:cwd,sessionId,store,frontier,anchorCallId:active.callId
       });
       if (!result.changed) return;
       metrics.contextCompacted += result.compacted;
@@ -88,7 +93,7 @@ export function registerContextFeature(pi, deps) {
 
   pi.registerTool?.({
     name:'envelope_context_timeline',label:'Envelope: Context Timeline',
-    description:'View named checkpoints and which checkpoint, if any, bounds active recoverable historical pruning.',
+    description:'View named checkpoints and bounded exact-replay block IDs for the active checkpoint (no raw content).',
     parameters:noArgs,
     async execute(_id,_params,_signal,_update,ctx) {
       try {return reply(JSON.stringify(state(ctx),null,2));}
@@ -103,6 +108,7 @@ export function registerContextFeature(pi, deps) {
     async execute(_id,params,_signal,_update,ctx) {
       if (!getConfig().context.enabled) return reply('Context pruning is disabled. Use /envelope context on before activating a checkpoint.',true);
       if (!getStore()) return reply('Raw output store unavailable; pruning cannot preserve original results.',true);
+      if (!frontier) return reply('Context replay frontier unavailable; pruning cannot durably preserve replay references.',true);
       try {
         const {project:cwd,sessionId}=scope(ctx);
         const anchor=ledger.activate(cwd,sessionId,params?.checkpoint);
