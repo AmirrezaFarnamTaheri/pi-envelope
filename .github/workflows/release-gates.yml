@@ -22,12 +22,18 @@ jobs:
       CI: 'true'
       NO_COLOR: '1'
     steps:
+      - name: Initialize evidence before integration checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/envelope-dist"
+          printf 'run=%s\njob=%s\n' "$GITHUB_RUN_ID" "$GITHUB_JOB" > "$RUNNER_TEMP/envelope-dist/ci-context.txt"
       - name: Check out candidate (no persisted token)
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6 (node24)
         with:
           persist-credentials: false
       - name: Install Node.js 22
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6 (node24)
         with:
           node-version: '22'
       - name: Verify required runner toolchains
@@ -56,8 +62,10 @@ jobs:
           mkdir -p "$RUNNER_TEMP/envelope-ci-home"
           HOME="$RUNNER_TEMP/envelope-ci-home" npm run smoke:runtime
       - name: Prove real Tree-sitter WASM grammars
+        if: ${{ !cancelled() }}
         run: npm run smoke:tree
       - name: Ensure clangd exists
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           if ! command -v clangd >/dev/null 2>&1; then
@@ -66,8 +74,10 @@ jobs:
           fi
           clangd --version
       - name: Prove real clangd diagnostics
+        if: ${{ !cancelled() }}
         run: npm run smoke:lsp-real
       - name: Build, inspect, and test the actual npm tarball
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -euo pipefail
@@ -81,9 +91,9 @@ jobs:
           if [ -f package-lock.json ]; then cp package-lock.json "$RUNNER_TEMP/envelope-dist/package-lock.json"; fi
       - name: Publish inspectable CI artifacts (not npm)
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6 (node24)
         with:
           name: envelope-candidate-${{ github.run_id }}
           path: ${{ runner.temp }}/envelope-dist/
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 7
