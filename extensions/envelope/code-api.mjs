@@ -7,6 +7,7 @@ import {inspectCodeHistory} from './code-history.mjs';
 import {projectContextCard} from './context-card.mjs';
 import {SymbolDeltaLedger} from './symbol-delta.mjs';
 import {retrieveCodeEvidence} from './code-retrieval.mjs';
+import {buildContextSlice} from './context-slice.mjs';
 import {evaluateArchitecturePolicy} from './architecture-policy.mjs';
 import { TreeSitterBroker, treeCaptureGroups } from './tree-sitter-broker.mjs';
 
@@ -105,6 +106,18 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
     schema({path:{type:'string',description:'Indexed project-relative source path'},symbol:{type:'string',description:'Optional exact declaration name'},
       limit:intProp('Maximum items per evidence category (1-16)',1,16),includeSnippet:{type:'boolean',description:'Explicitly include <=450 source code points near indexed declaration'}} ,['path']),
     (index,params)=>projectContextCard(index,params));
+  tool('envelope_code_slice','Envelope: Budgeted Static Graph Context Slice',
+    'Build a bounded, source-verified context slice using lexical seeds or one exact source path and static import traversal. Conditional ETags, page-version guard, and a strict output byte budget; no model or vector search.',
+    schema({query:{type:'string',description:'Lexical task/identifier query (1-120 characters), mutually exclusive with path'},
+      path:{type:'string',description:'Exact indexed entry path, mutually exclusive with query'},
+      direction:{type:'string',enum:['incoming','outgoing','both']},
+      depth:intProp('Static import traversal depth (0-3)',0,3),
+      limit:intProp('Maximum context items (1-12)',1,12),
+      maxChars:intProp('Maximum serialized UTF-8 output bytes (900-16000)',900,16000),
+      offset:intProp('Candidate page offset; version required after first page',0,150),
+      ifVersion:{type:'string',description:'Exact context slice version from previous page'},
+      knownEtags:{type:'array',maxItems:30,items:{type:'string'}}}),
+    (index,params)=>buildContextSlice(index,params));
   tool('envelope_code_delta','Envelope: Source-Verified Symbol Delta',
     'Explicit session-local baseline and budgeted declaration changes from the shared CodeIndex. TypeScript/JavaScript AST node text hashes are precise syntactic evidence; Python/Go body changes remain uncertain. Static importer hints are not runtime impact. No raw source, provider calls, extra hooks or persistent capture.',
     schema({action:{type:'string',enum:['status','capture','compare','clear']},
