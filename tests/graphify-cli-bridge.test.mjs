@@ -65,7 +65,7 @@ test('mutating Graphify commands require direct human command path and remain AS
   const f=fixture(t);
   await assert.rejects(()=>bridge.run(f.root,f.config,{action:'build'}),/human|slash|mutation/i);
   const build=await bridge.run(f.root,f.config,{action:'build'},undefined,{humanCommand:true});
-  assert.deepEqual(JSON.parse(build.output).argv,['extract','.','--code-only','--no-cluster','--out','graphify-out']);
+  assert.deepEqual(JSON.parse(build.output).argv,['extract','.','--code-only','--no-cluster']);
   const update=await bridge.run(f.root,f.config,{action:'update'},undefined,{humanCommand:true});
   assert.deepEqual(JSON.parse(update.output).argv,['update','.','--no-cluster']);
   assert.equal(build.writeRequested,true);
