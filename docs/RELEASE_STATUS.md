@@ -81,3 +81,7 @@ A separate, explicit `/envelope graphify watch on [250..10000]` action can now d
 ## Explicit persistent file-graph metadata versions (stacked draft)
 
 `envelope_code_versions` provides status/list/compare of user-authorized, project-scoped source-hash + static-import version snapshots; capture and prune are only available through `/envelope code versions ...` human commands. Deterministic version IDs, 0600 storage, symlink/root and stale-source fences, explicit retention and JSON output limits have regression coverage. This is a durable **file graph metadata** history, not a full multi-version cross-language symbol graph, semantic model or runtime proof. Latest-head hosted regression and package testing must pass before marking the draft verified. See `docs/PERSISTENT_GRAPH_VERSIONS.md`.
+
+## Offline, source-verified user-supplied vector retrieval (stacked draft)
+
+`envelope_code_vector` adds cosine/hybrid ranking against a strictly validated project-local manifest of precomputed numeric embeddings. Off by default; only `/envelope code vectors on` enables search. Source SHA-256 re-verification, symlink/root fences, bounded dimensions/rows/bytes, deterministic query-version continuations and omission of embedding vectors/source text are regression-tested. No automatic text-to-embedding model, semantic relevance benchmark or network provider is bundled. See `docs/LOCAL_VECTOR_RETRIEVAL.md`; full latest-head hosted CI must pass before review-readiness claims.
