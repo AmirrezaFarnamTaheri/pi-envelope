@@ -5,6 +5,7 @@ import { inspectCodeGraph } from './graph-intelligence.mjs';
 import { ExternalGraphReader } from './graphify-adapter.mjs';
 import {inspectCodeHistory} from './code-history.mjs';
 import {projectContextCard} from './context-card.mjs';
+import {SymbolDeltaLedger} from './symbol-delta.mjs';
 import {retrieveCodeEvidence} from './code-retrieval.mjs';
 import {evaluateArchitecturePolicy} from './architecture-policy.mjs';
 import { TreeSitterBroker, treeCaptureGroups } from './tree-sitter-broker.mjs';
@@ -19,6 +20,7 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
   const indices=new Map();
   const treeBrokers=new Map();
   const graphReaders=new Map();
+  const symbolDelta=new SymbolDeltaLedger();
   function graphReader(index) {
     if(!graphReaders.has(index.root))graphReaders.set(index.root,new ExternalGraphReader(index.root,{...(watchGraphFactory?{watchFactory:watchGraphFactory}:{})}));
     return graphReaders.get(index.root);
@@ -103,6 +105,21 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
     schema({path:{type:'string',description:'Indexed project-relative source path'},symbol:{type:'string',description:'Optional exact declaration name'},
       limit:intProp('Maximum items per evidence category (1-16)',1,16),includeSnippet:{type:'boolean',description:'Explicitly include <=450 source code points near indexed declaration'}} ,['path']),
     (index,params)=>projectContextCard(index,params));
+  tool('envelope_code_delta','Envelope: Source-Verified Symbol Delta',
+    'Explicit session-local baseline and budgeted declaration changes from the shared CodeIndex. TypeScript/JavaScript AST node text hashes are precise syntactic evidence; Python/Go body changes remain uncertain. Static importer hints are not runtime impact. No raw source, provider calls, extra hooks or persistent capture.',
+    schema({action:{type:'string',enum:['status','capture','compare','clear']},
+      limit:intProp('Maximum reported changed declarations per page (1-30)',1,30),
+      offset:intProp('Zero-based page offset; requires comparison version if nonzero',0,25000),
+      ifVersion:{type:'string',description:'Comparison version from a previous page, required when offset > 0'},
+      maxChars:intProp('Maximum UTF-8 JSON response bytes (900-16000)',900,16000)}),
+    (index,params)=>{
+      const action=params.action??'status';
+      if(action==='status')return symbolDelta.status(index);
+      if(action==='capture')return symbolDelta.capture(index);
+      if(action==='clear')return symbolDelta.clear(index);
+      if(action==='compare')return symbolDelta.compare(index,params);
+      throw new TypeError('unsupported symbol delta action');
+    });
   tool('envelope_code_retrieve','Envelope: Local Symbol and Path Retrieval',
     'Rank bounded lexical matches from the existing AST symbol and path index, combine independent ranks and import evidence, and verify each original source SHA-256 before returning. No embeddings, network or source code execution.',
     schema({query:{type:'string',description:'Local identifier or file/path terms, max 120 characters'},
@@ -172,5 +189,5 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
       const report=index.verify(params.path,{content:params.content});
       return {...report,diagnostics:report.diagnostics.slice(0,20).map(d=>({...d,message:d.message.slice(0,400)}))};
     });
-  return {loaded:()=>indices.size,indexOf,close:()=>{for(const reader of graphReaders.values())reader.close();graphReaders.clear();}};
+  return {loaded:()=>indices.size,indexOf,close:()=>{symbolDelta.close();for(const reader of graphReaders.values())reader.close();graphReaders.clear();}};
 }
