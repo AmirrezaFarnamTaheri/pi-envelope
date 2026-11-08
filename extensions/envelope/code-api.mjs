@@ -8,6 +8,7 @@ import {inspectCochangeCoupling} from './cochange-review.mjs';
 import {GraphVersionStore} from './graph-versions.mjs';
 import {searchLocalVectors} from './local-vectors.mjs';
 import {verifyGraphInvariant} from './graph-invariants.mjs';
+import {inspectTypedSource} from './typechecker-evidence.mjs';
 import {homedir} from 'node:os';
 import {join} from 'node:path';
 import {projectContextCard} from './context-card.mjs';
@@ -108,6 +109,15 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
       maxCommits:intProp('Maximum Git commits examined, 1-100',1,100),
       limit:intProp('Maximum reported related/churn files, 1-20',1,20)}),
     (index,params)=>inspectCodeHistory(index,params));
+  tool('envelope_code_typecheck','Envelope: TypeScript Compiler Facts',
+    'Read-only TypeScript/JavaScript TypeChecker diagnostics or a typed symbol/declaration from verified indexed sources. No project emit, runtime execution, external language proof or source-body output.',
+    schema({action:{type:'string',enum:['diagnostics','symbol']},
+      path:{type:'string',description:'Exact indexed TypeScript/JavaScript source path'},
+      line:intProp('One-based TypeScript cursor line',1,100000),
+      column:intProp('One-based UTF-16 cursor column',1,100000),
+      limit:intProp('Max returned diagnostics 1-30',1,30),
+      maxChars:intProp('Serialized output byte cap 900-16000',900,16000)},['path']),
+    (index,params)=>inspectTypedSource(index,params));
   tool('envelope_code_invariant','Envelope: Checkable Static File-Graph Invariant',
     'Check SHA-verified current static file-import graph for acyclicity or reachability. Return inspectable cycle/path/order certificates or unknown; never claims program correctness.',
     schema({action:{type:'string',enum:['acyclic','reach','no-path']},
