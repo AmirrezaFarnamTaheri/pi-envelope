@@ -4,6 +4,7 @@ import { analyzeChangeImpact } from './change-evidence.mjs';
 import { inspectCodeGraph } from './graph-intelligence.mjs';
 import { ExternalGraphReader } from './graphify-adapter.mjs';
 import {inspectCodeHistory} from './code-history.mjs';
+import {inspectCochangeCoupling} from './cochange-review.mjs';
 import {projectContextCard} from './context-card.mjs';
 import {SymbolDeltaLedger} from './symbol-delta.mjs';
 import {retrieveCodeEvidence} from './code-retrieval.mjs';
@@ -101,6 +102,17 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
       maxCommits:intProp('Maximum Git commits examined, 1-100',1,100),
       limit:intProp('Maximum reported related/churn files, 1-20',1,20)}),
     (index,params)=>inspectCodeHistory(index,params));
+  tool('envelope_code_coupling','Envelope: Advisory Co-change Without Direct Import',
+    'Read-only, SHA-verified Git co-edit candidates compared with the current direct static import graph. No dependency absence proof, owner inference, model call or quality/risk score.',
+    schema({path:{type:'string',description:'Exact indexed source path to inspect'},
+      maxCommits:intProp('Git non-merge history window, 1-100 commits',1,100),
+      minShared:intProp('Minimum shared commits for a candidate, 1-20',1,20),
+      includeDirect:{type:'boolean',description:'Include pairs with detected direct static imports (default false)'},
+      limit:intProp('Maximum reported candidate pairs, 1-10',1,10),
+      offset:intProp('Page offset, with ifVersion required after page 0',0,20),
+      ifVersion:{type:'string',description:'Version token from prior page'},
+      maxChars:intProp('Maximum serialized JSON response bytes, 900-16000',900,16000)},['path']),
+    (index,params)=>inspectCochangeCoupling(index,params));
   tool('envelope_code_context_card','Envelope: Bounded Source Context Card',
     'One compact, hash-verified source symbol, imports, inbound/outbound syntactic call evidence and explicit uncertainty. Does not automatically expose source text or make model calls.',
     schema({path:{type:'string',description:'Indexed project-relative source path'},symbol:{type:'string',description:'Optional exact declaration name'},
