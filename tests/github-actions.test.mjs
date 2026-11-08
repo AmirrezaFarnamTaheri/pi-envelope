@@ -50,7 +50,9 @@ test('WASM, clangd and tarball checks still run after Pi RPC failure',()=>{
     'Prove real clangd diagnostics','Build, inspect, and test the actual npm tarball']) {
     const offset=yaml.indexOf('- name: '+name);
     assert.ok(offset>0, name);
-    assert.match(yaml.slice(offset, offset+200),/if:\s*\$\{\{ !cancelled\(\) \}\}/);
+    const end=yaml.indexOf('\n      - name: ',offset+1);
+    const stepBlock=yaml.slice(offset,end<0?undefined:end);
+    assert.match(stepBlock,/^\s*if:\s*\$\{\{ !cancelled\(\) \}\}\s*$/m);
   }
   assert.doesNotMatch(yaml,/continue-on-error:\s*true/);
 });
