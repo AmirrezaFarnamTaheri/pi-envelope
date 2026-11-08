@@ -98,3 +98,7 @@ Use `envelope_code_delta({action:"capture"})` **before** a planned edit, then `c
 ### Opt-in Graphify code watcher
 
 The user may enable `/envelope graphify watch on 1200` after pinning an external executable and building a graph. This is not an agent tool action. Watcher status is count-only. Code-like changes may run one debounced offline `graphify update . --no-cluster` at a time; doc/media, new directories and invalid paths require a manual rebuild, never an LLM. Failure stops automatic retries. A manual build/update first cancels and awaits an active watcher write, and concurrent graph writes are refused. Do not start a watcher just to answer a question. See `docs/GRAPHIFY_WATCH.md`.
+
+### Explicit persistent graph versions
+
+Only a human may run `/envelope code versions capture` or `prune 8`; the agent's `envelope_code_versions` tool can only `status`, `list` and `compare` private persisted **file-hash/static-import** snapshots. Do not auto-capture a repository as a side effect of asking a question. These snapshots do not prove typed dependency, runtime behavior, formal correctness or semantic similarity. Historical diff pages use exact version IDs and `ifVersion`. Source bodies are not persisted but file paths and declaration names are private metadata. See `docs/PERSISTENT_GRAPH_VERSIONS.md`.
