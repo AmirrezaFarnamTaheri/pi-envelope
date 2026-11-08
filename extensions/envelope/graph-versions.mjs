@@ -129,6 +129,19 @@ export class GraphVersionStore {
    if(size(result)>maxChars||(!result.returned&&result.truncated))throw new RangeError('maxChars budget too small for graph diff response');
    return result;
  }
+ snapshot(index,{version,limit=30,offset=0}={}){
+   limit=int(limit,30,1,50,'limit');offset=int(offset,0,0,512,'offset');
+   const {dir}=directory(this.storage,index),x=fetchRecord(dir,version);
+   if(offset>x.payload.files.length)throw new RangeError('snapshot offset exceeds file count');
+   const files=x.payload.files.slice(offset,offset+limit).map(f=>({path:f.path,sha256:f.sha256,language:f.language,
+      symbols:f.symbols.slice(0,30),imports:f.imports.slice(0,100),
+      truncatedSymbols:f.symbols.length>30,truncatedImports:f.imports.length>100}));
+   return {mode:'persisted-static-file-graph-metadata',version,
+     capturedAt:x.capturedAt,totalFiles:x.payload.files.length,offset,returned:files.length,
+     truncated:offset+files.length<x.payload.files.length,
+     ...(offset+files.length<x.payload.files.length?{nextOffset:offset+files.length}:{}),files,
+     notes:'Only explicitly captured private file metadata. Historical content-addressed integrity is verified; source bodies and semantic code proofs are absent.'};
+ }
  prune(index,{keep=8}={}){
    keep=int(keep,8,1,16,'keep');const {dir}=directory(this.storage,index);
    const {versions}=this.list(index),toRemove=versions.slice(keep);
