@@ -2,7 +2,7 @@
 
 This document is the current, user-facing release assessment. It replaces the historic execution plans and avoids retaining obsolete command and package examples.
 
-## v0.18.0 unmerged candidate: implemented locally
+## v0.20.0 unmerged candidate: implemented locally
 
 - Namespaced `pi-envelope` package, `envelope` command and `envelope_*` tools, `extensions/envelope` and `skills/envelope`. No `upper` command or extension is shipped.
 - Default-safe bash output compactor with exact recall, byte checks, durable FTS5 chunk search and bounded lexical/BM25 reciprocal-rank fusion, and optional retention/erasure, all project scoped. Raw output can contain secrets and no filesystem erasure claim covers backups/snapshots.
@@ -49,3 +49,7 @@ The v0.18.0 candidate adds `envelope_code_external_graph` under the existing Cod
 ## v0.19.0 explicit project memory, co-change evidence and cards
 
 Opt-in `envelope_memory` adds typed, project-scoped SQLite notes with manual Markdown and Claude Code JSONL import, source-hash freshness, explicit deletion and no automatic capture or vault write. `envelope_code_history` adds bounded, read-only non-merge Git co-change/churn, not causal/ownership proof. `envelope_code_context_card` composes bounded source-hash-verified AST symbol/import/call evidence; source excerpts are opt-in. New tests: `tests/project-memory.test.mjs`, `tests/code-history.test.mjs`, and `tests/context-card.test.mjs`. Full hosted regressions and real Pi/Tersio/WASM/clangd/packed-install gates must pass before publication or merge.
+
+## v0.20.0 .NET Graphify interoperability, retrieval and architecture policy
+
+The actual Graphify.NET exported JSON fields are now consumed in the local external graph reader, including `edges[].relationship` and nested source locations. Foreign absolute paths are redacted and cannot act as attestations. Local source retrieval combines AST symbol/path rankings, verifies source bytes before disclosure and reports candidate/verification gaps; no vector/embedding backend is implied. `envelope_code_policy` provides read-only advisory architecture checks and the manually invoked `architecture:gate` script with strict incomplete-evidence treatment, never an automatic failing CI step. Git co-change uses NUL-delimited filenames. The v0.19.0 predecessor passed hosted [run 42491266788](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42491266788) (361 pass, 0 fail, 1 skip); this v0.20.0 candidate requires its own complete hosted verification before release claims.

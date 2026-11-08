@@ -1,6 +1,6 @@
 {
   "name": "pi-envelope",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "private": true,
   "description": "Envelope: one Pi coding-agent package with Tersio modes, reversible local output/context, code intelligence, worktree workflows and private metrics",
   "type": "module",
@@ -51,7 +51,11 @@
     "obsidian-markdown",
     "context-cards",
     "git-cochange",
-    "evidence-provenance"
+    "evidence-provenance",
+    "code-retrieval",
+    "architecture-policy",
+    "graphify-dotnet",
+    "static-ci"
   ],
   "dependencies": {
     "@krtclcdy/tersio": "2.25.18",
@@ -97,7 +101,8 @@
     "smoke:runtime": "node scripts/smoke-runtime.mjs",
     "smoke:lsp-real": "node scripts/smoke-clangd.mjs",
     "smoke:tree": "node scripts/smoke-tree-sitter.mjs",
-    "pack:source-check": "npm pack --dry-run --ignore-scripts"
+    "pack:source-check": "npm pack --dry-run --ignore-scripts",
+    "architecture:gate": "node scripts/architecture-gate.mjs"
   },
   "optionalDependencies": {
     "web-tree-sitter": "0.25.3",

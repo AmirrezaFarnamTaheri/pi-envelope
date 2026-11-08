@@ -5,6 +5,8 @@ import { inspectCodeGraph } from './graph-intelligence.mjs';
 import { ExternalGraphReader } from './graphify-adapter.mjs';
 import {inspectCodeHistory} from './code-history.mjs';
 import {projectContextCard} from './context-card.mjs';
+import {retrieveCodeEvidence} from './code-retrieval.mjs';
+import {evaluateArchitecturePolicy} from './architecture-policy.mjs';
 import { TreeSitterBroker, treeCaptureGroups } from './tree-sitter-broker.mjs';
 
 const result = (value,isError=false) => ({
@@ -101,6 +103,20 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
     schema({path:{type:'string',description:'Indexed project-relative source path'},symbol:{type:'string',description:'Optional exact declaration name'},
       limit:intProp('Maximum items per evidence category (1-16)',1,16),includeSnippet:{type:'boolean',description:'Explicitly include <=450 source code points near indexed declaration'}} ,['path']),
     (index,params)=>projectContextCard(index,params));
+  tool('envelope_code_retrieve','Envelope: Local Symbol and Path Retrieval',
+    'Rank bounded lexical matches from the existing AST symbol and path index, combine independent ranks and import evidence, and verify each original source SHA-256 before returning. No embeddings, network or source code execution.',
+    schema({query:{type:'string',description:'Local identifier or file/path terms, max 120 characters'},
+      limit:intProp('Maximum verified indexed file hits (1-25)',1,25),
+      includeSnippet:{type:'boolean',description:'Explicitly include at most 450 source code points around a candidate symbol'}},['query']),
+    (index,params)=>retrieveCodeEvidence(index,params));
+  tool('envelope_code_policy','Envelope: Static Architecture Policy Evaluation',
+    'Evaluate explicit directory dependency boundaries and bounded incoming file degree over current native AST evidence. Advisory by default; use scripts/architecture-gate.mjs explicitly for a CI exit status. No execution or policy writes.',
+    schema({rules:{type:'array',maxItems:12,items:{type:'object',properties:{from:{type:'string'},forbid:{type:'array',minItems:1,maxItems:12,items:{type:'string'}}},required:['from','forbid'],additionalProperties:false}},
+      relation:{type:'string',enum:['imports','calls','both']},
+      maxIncomingFiles:intProp('Maximum distinct importing/calling files (1-500)',1,500),
+      requireComplete:{type:'boolean',description:'Fail closed on incomplete static evidence (default true)'},
+      limit:intProp('Maximum violations to display (1-50)',1,50)}),
+    (index,params)=>evaluateArchitecturePolicy(index,params));
   tool('envelope_code_languages','Envelope: Structural Parser Status',
     'Display available indexed languages, skipped parser reasons, and whether optional local Python/Go AST parsing is enabled.',
     schema({}), (index)=>index.languageStatus());

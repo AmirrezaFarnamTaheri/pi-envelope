@@ -21,15 +21,27 @@ function readHistory(index,maxCommits){
   const top=git(root,['rev-parse','--show-toplevel']);
   if(!top||realpathSync(resolve(top.trim()))!==root)return {available:false,reason:'git-not-at-project-root'};
   // A sentinel prevents ambiguous file names being interpreted as commits.
-  const lines=git(root,['log','--no-merges','--no-renames',`--max-count=${maxCommits+1}`,'--format=ENVELOPE_REV:%H','--name-only','--']);
+  // Both commit markers and filenames are NUL-framed. `--name-only` without -z
+  // C-quotes newlines/tabs and can silently erase exact indexed file evidence.
+  // The pretty format adds one display newline before the first path; strip
+  // only that separator and preserve every other filename byte.
+  const lines=git(root,['log','--no-merges','--no-renames',`--max-count=${maxCommits+1}`,
+    '--format=%x00ENVELOPE_REV:%H%x00','--name-only','-z','--']);
   if(lines===null)return {available:false,reason:'git-log-unavailable-or-over-budget'};
-  const revisions=[];let current=null;
-  for(const line of lines.split(/\r?\n/)){
-    if(line.startsWith('ENVELOPE_REV:')){
-      const sha=line.slice('ENVELOPE_REV:'.length);
+  const revisions=[];let current=null,firstPath=false;
+  for(const item of lines.split('\0')){
+    if(!item)continue;
+    if(item.startsWith('ENVELOPE_REV:')){
+      const sha=item.slice('ENVELOPE_REV:'.length);
       if(!SHA.test(sha))return {available:false,reason:'unexpected-git-log-format'};
-      current={sha,paths:new Set()};revisions.push(current);
-    }else if(line&&current&&index.files.has(line))current.paths.add(line);
+      current={sha,paths:new Set()};revisions.push(current);firstPath=true;
+    }else if(current){
+      const source=firstPath&&item.startsWith('\n')?item.slice(1):item;
+      firstPath=false;
+      // Prefer the path after removing Git's separator; an actual filename
+      // with a leading newline still survives because only one is removed.
+      if(index.files.has(source))current.paths.add(source);
+    }
   }
   const windowLimited=revisions.length>maxCommits;
   const selected=revisions.slice(0,maxCommits),commitOmitted=[];

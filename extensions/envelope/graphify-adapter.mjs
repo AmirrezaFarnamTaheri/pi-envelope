@@ -73,6 +73,18 @@ function graphSourcePath(root,value){
   const rel=isAbsolute(value)?relative(root,value).split(sep).join('/'):value;
   return cleanPath(rel).join('/');
 }
+/** .NET Graphify serializes `file_path` and metadata.source_file, often as
+ * absolute paths from a different checkout. Never follow or display them:
+ * only relative paths can serve as local source evidence. */
+function externalFilePath(root,value,counters){
+  if(value===undefined||value===null||value==='')return null;
+  if(typeof value!=='string'||value.length>250)throw new Error('invalid external source path');
+  if(isAbsolute(value)||/^[a-zA-Z]:[\\/]/u.test(value)||value.startsWith('\\\\')){
+    counters.externalSourcePathsRedacted++;
+    return null;
+  }
+  return graphSourcePath(root,value);
+}
 function decodeGraph(bytes,root){
   let raw;
   try {raw=JSON.parse(bytes.toString('utf8'));}catch{throw new Error('invalid graph JSON');}
@@ -83,7 +95,7 @@ function decodeGraph(bytes,root){
     raw.graph&&typeof raw.graph==='object'&&!Array.isArray(raw.graph)?raw.graph:raw;
   const records=data.nodes, links=data.edges??data.links;
   if(!Array.isArray(records)||!Array.isArray(links)||records.length>MAX_NODES||links.length>MAX_EDGES)throw new Error('unsupported or oversized Graphify node-link schema');
-  const nodes=[],ids=new Set();
+  const nodes=[],ids=new Set(),counters={externalSourcePathsRedacted:0};
   for(const record of records){
     if(!record||typeof record!=='object'||Array.isArray(record))throw new Error('invalid graph node');
     const id=record.id??record.name;
@@ -92,24 +104,29 @@ function decodeGraph(bytes,root){
     const name=record.label??record.name??id;
     const type=record.type??record.file_type??record.kind??'unknown';
     if(!safeString(name,240)||!safeString(type,100))throw new Error('invalid graph node attributes');
-    const path=graphSourcePath(root,record.source_file??record.file??record.path);
-    const location=record.source_location;
+    const path=record.source_file!==undefined||record.file!==undefined||record.path!==undefined
+      ?graphSourcePath(root,record.source_file??record.file??record.path)
+      :externalFilePath(root,record.file_path,counters);
+    const location=record.source_location??record.metadata?.source_location;
     if(location!==undefined&&!safeString(location,120))throw new Error('invalid graph node location');
+    const confidence=record.confidence;
+    if(confidence!==undefined&&!['EXTRACTED','INFERRED','AMBIGUOUS'].includes(confidence))throw new Error('invalid graph node confidence');
     nodes.push({id,name,type,...(path?{path}:{}),...(location?{sourceLocation:location}:{}),
-      evidence:'external-graph-assertion'});
+      ...(confidence?{confidence}:{}),evidence:'external-graph-assertion'});
   }
   const edges=[];
   for(const edge of links){
     if(!edge||typeof edge!=='object'||Array.isArray(edge))throw new Error('invalid graph edge');
     const source=typeof edge.source==='object'&&edge.source!==null?edge.source.id:edge.source;
     const target=typeof edge.target==='object'&&edge.target!==null?edge.target.id:edge.target;
-    const type=edge.relation??edge.type??edge.label??'related_to';
+    const type=edge.relation??edge.type??edge.relationship??edge.label??'related_to';
     if(!safeString(source,200)||!safeString(target,200)||!ids.has(source)||!ids.has(target)||!safeString(type,100))throw new Error('dangling or invalid graph edge');
     const confidence=edge.confidence,score=edge.confidence_score;
     if(confidence!==undefined&&!['EXTRACTED','INFERRED','AMBIGUOUS'].includes(confidence))throw new Error('invalid graph edge confidence');
     if(score!==undefined&&!(typeof score==='number'&&Number.isFinite(score)&&score>=0&&score<=1))throw new Error('invalid graph confidence score');
-    const sourcePath=graphSourcePath(root,edge.source_file);
-    const location=edge.source_location;
+    const sourcePath=edge.source_file!==undefined?graphSourcePath(root,edge.source_file):
+      externalFilePath(root,edge.metadata?.source_file,counters);
+    const location=edge.source_location??edge.metadata?.source_location;
     if(location!==undefined&&!safeString(location,120))throw new Error('invalid graph edge location');
     edges.push({source,target,type,evidence:'external-graph-assertion',
       ...(confidence?{confidence}:{}),...(score!==undefined?{confidenceScore:score}:{}),
@@ -117,7 +134,7 @@ function decodeGraph(bytes,root){
   }
   nodes.sort((a,b)=>a.id.localeCompare(b.id));
   edges.sort((a,b)=>a.source.localeCompare(b.source)||a.target.localeCompare(b.target)||a.type.localeCompare(b.type));
-  return {nodes,edges};
+  return {nodes,edges,...counters};
 }
 function decodeManifest(bytes){
   let raw;
@@ -144,9 +161,13 @@ function graphStatus(root){
   catch{return {state:'invalid',nodes:0,edges:0,verifiedFiles:0,reasons:['graph-schema-invalid'],trust:TRUST};}
   const graphSha256=sha256(graphBytes);
   const sourcePaths=new Set([...graph.nodes.map(n=>n.path),...graph.edges.map(e=>e.sourcePath)].filter(Boolean));
-  const noAttestation={declaredFiles:0,coveredGraphSources:0,unattestedNodeSources:sourcePaths.size,allGraphSourcesCovered:sourcePaths.size===0};
+  const noAttestation={declaredFiles:0,coveredGraphSources:0,unattestedNodeSources:sourcePaths.size,
+    externalSourcePathsRedacted:graph.externalSourcePathsRedacted,
+    allGraphSourcesCovered:sourcePaths.size===0&&graph.externalSourcePathsRedacted===0};
   const base={state:'unverified',nodes:graph.nodes.length,edges:graph.edges.length,graphSha256,verifiedFiles:0,
-    attestation:noAttestation,trust:TRUST,reasons:['no-source-hash-manifest']};
+    externalSourcePathsRedacted:graph.externalSourcePathsRedacted,
+    attestation:noAttestation,trust:TRUST,
+    reasons:['no-source-hash-manifest',...(graph.externalSourcePathsRedacted?['external-source-path-redacted']:[])]};
   const marker=fileExists(root,MARKER_PATH);
   let manifest;
   try {manifest=decodeManifest(rootSafeRead(root,MANIFEST_PATH,MANIFEST_BYTES));}
@@ -157,7 +178,7 @@ function graphStatus(root){
     if(marker)return {...base,state:'stale',reasons:['graphify-needs-update'],graph};
     return {...base,graph};
   }
-  const reasons=[];
+  const reasons=graph.externalSourcePathsRedacted?['external-source-path-redacted']:[];
   if(manifest.graphSha256!==graphSha256)reasons.push('artifact-hash-mismatch');
   if(marker)reasons.push('graphify-needs-update');
   let verifiedFiles=0;
@@ -174,9 +195,10 @@ function graphStatus(root){
   const declared=new Set(manifest.files.map(x=>x.path));
   const unattestedNodeSources=[...sourcePaths].filter(p=>!declared.has(p)).length;
   const attestation={declaredFiles:manifest.files.length,coveredGraphSources:sourcePaths.size-unattestedNodeSources,
-    unattestedNodeSources,allGraphSourcesCovered:unattestedNodeSources===0};
+    unattestedNodeSources,externalSourcePathsRedacted:graph.externalSourcePathsRedacted,
+    allGraphSourcesCovered:unattestedNodeSources===0&&graph.externalSourcePathsRedacted===0};
   if(unattestedNodeSources)reasons.push('partial-source-attestation');
-  const stale=reasons.some(x=>x!=='partial-source-attestation');
+  const stale=reasons.some(x=>!['partial-source-attestation','external-source-path-redacted'].includes(x));
   return {...base,verifiedFiles,declaredFiles:manifest.files.length,attestation,
     state:stale?'stale':'declared-sources-match',reasons,graph,
     manifestFiles:manifest.files.map(x=>x.path)};

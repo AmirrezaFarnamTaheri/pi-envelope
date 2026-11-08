@@ -72,3 +72,14 @@ test('Pi history tool is read-only and registered through CodeFeature without ne
  assert.equal(JSON.parse(result.content[0].text).related[0].path,'src/b.ts');
  assert.equal(hooks.length,0);api.close();
 });
+test('Git history preserves tracked filenames with spaces, tabs and newlines via NUL framing',t=>{
+ const {root,index,commit}=project(t);
+ commit({'src/a.ts':'export const a=15;\n','src/with space.ts':'export const space=1;\n',
+   'src/with\ttab.ts':'export const tab=1;\n','src/with\nnewline.ts':'export const newline=1;\n'},'tricky filenames');
+ index.refresh();
+ const evidence=inspectCodeHistory(index,{action:'cochange',path:'src/a.ts',maxCommits:20,limit:20});
+ const names=evidence.related.map(item=>item.path);
+ assert.ok(names.includes('src/with space.ts'),JSON.stringify(evidence));
+ assert.ok(names.includes('src/with\ttab.ts'),JSON.stringify(evidence));
+ assert.ok(names.includes('src/with\nnewline.ts'),JSON.stringify(evidence));
+});

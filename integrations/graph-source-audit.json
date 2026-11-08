@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "auditDate": "2026-11-08",
   "baseCommit": "0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64",
-  "candidateVersion": "0.19.0",
+  "candidateVersion": "0.20.0",
   "licenseAssumption": "User assumes compatibility; independent legal review not performed",
   "implementationScope": "Native graph projection plus bounded local external Graphify/NetworkX node-link artifact reader and opt-in invalidation-only watcher; opt-in project notes, bounded Claude JSONL fact import, Git co-change/churn, source context cards",
   "upstreams": [
@@ -17,7 +17,7 @@
       "repo": "elbruno/graphify-dotnet",
       "commit": "008477767c813f0cc48dda3644282330cc288c8b",
       "capabilities": "File extraction > typed graph > communities > report/export; AST or optional AI",
-      "adoption": "Typed static provenance in v0.17; .NET / semantic Graphify bridge later",
+      "adoption": "v0.20 adapter consumes actual .NET graph.json relationship and metadata fields, redacts foreign absolute source paths; runtime extractor is not bundled",
       "completePort": false
     },
     {
@@ -108,14 +108,14 @@
       "repo": "optave/ops-codegraph-tool",
       "commit": "427c96f6da08fed88559075ef3c3c9eaa2122319",
       "capabilities": "Dependency/impact graph, weak/semantic communities, boundaries, CI and co-change",
-      "adoption": "Native boundaries, weak components and bounded Git co-change/churn. No mandatory CI gates, vector search or 34-language engine.",
+      "adoption": "v0.20 opt-in static boundary/fan-in policy with standalone manually invoked CI gate; bounded Git co-change since v0.19; no full 34-language engine",
       "completePort": false
     },
     {
       "repo": "artk0de/TeaRAGs-MCP",
       "commit": "5ba0ac24a02d1b4daf3b4ca1027b13974a66b184",
       "capabilities": "Semantic retrieval, call graph, Git trajectory, architecture and naming lexicon",
-      "adoption": "Existing FTS5 and graph, plus v0.19 Git history and source-hash context cards; no embeddings or full MCP server.",
+      "adoption": "v0.20 local hash-verified AST symbol/path rank fusion and bounded graph navigation; no embedding engine or provider calls",
       "completePort": false
     }
   ],

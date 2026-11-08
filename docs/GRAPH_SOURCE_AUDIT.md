@@ -1,6 +1,6 @@
 # 16-source graph, memory and workflow integration audit
 
-**Audit date:** 2026-11-08. **Baseline:** Envelope v0.16.0 commit `0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64`. **Candidate:** v0.19.0 on the unmerged review stack.
+**Audit date:** 2026-11-08. **Baseline:** Envelope v0.16.0 commit `0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64`. **Candidate:** v0.20.0 on the unmerged review stack.
 
 The user supplied an assumption that licensing clearance will be resolved separately. It is not a legal opinion. This implementation uses independently written graph code; retain upstream attribution if later copying actual source.
 
@@ -9,7 +9,7 @@ The repositories represent distinct *engines*, *host adapters*, *watchers*, *vie
 | Source (pinned SHA prefix) | Observed role | Envelope status / decision |
 |---|---|---|
 | [lucasrosati/claude-code-memory-setup](https://github.com/lucasrosati/claude-code-memory-setup) (`4cd2e6bd4319`) | Obsidian notes, chat import and session autosave | v0.19 opt-in project notes, Markdown import/export and explicit, bounded Claude Code JSONL session extraction; no automatic vault/session hooks |
-| [elbruno/graphify-dotnet](https://github.com/elbruno/graphify-dotnet) (`008477767c81`) | File extraction > typed graph > communities > report/export; AST or optional AI | Typed static provenance in v0.17; .NET / semantic Graphify bridge later |
+| [elbruno/graphify-dotnet](https://github.com/elbruno/graphify-dotnet) (`008477767c81`) | File extraction > typed graph > communities > report/export; AST or optional AI | v0.20 reads actual .NET Graphify JSON edge/metadata fields; .NET SDK execution and semantic extraction remain external |
 | [juhas96/graphify-pi](https://github.com/juhas96/graphify-pi) (`dd54ac9ae22b`) | Pi graphify CLI wrapper, freshness prompts and wiki-first guidance | Single native graph-query tool; v0.18 external node-link health and freshness adapter |
 | [franklywatson/claude-rig](https://github.com/franklywatson/claude-rig) (`54b4a5c79ebe`) | Claude cockpit, dependency detection, tool routing, skill-chain and metrics | Keep existing Tersio RTK/workflow ownership; future capability status |
 | [gaodes/pi-graphify](https://github.com/gaodes/pi-graphify) (`4826f5eb351b`) | Pi graphify CLI query, paths, hubs, reports, watchers and exports | Native graph queries plus v0.18 external Graphify artifact read; no CLI/LLM backend |
@@ -22,8 +22,8 @@ The repositories represent distinct *engines*, *host adapters*, *watchers*, *vie
 | [AxiomCodeAI/axiomcodegraph](https://github.com/AxiomCodeAI/axiomcodegraph) (`29f7ecf05297`) | IR and formal-methods oriented call analysis with asserted links | Explicit uncertainty; no false proof claim; optional IR link adapters later |
 | [GlitterKill/sdl-mcp](https://github.com/GlitterKill/sdl-mcp) (`2a20acbd283a`) | Symbol delta ledger, compact context cards, graph slices, memory and policies | Existing replay/FTS and graph plus v0.19 source-hash-verified context cards and opt-in notes; no independent SDL engine |
 | [Ancienttwo/repo-harness](https://github.com/Ancienttwo/repo-harness) (`6b3c8def0a5b`) | Repo-local task state, review proof, Pi hook bridge and capability contracts | Reuse Envelope workflow ledger; no second task scheduler |
-| [optave/ops-codegraph-tool](https://github.com/optave/ops-codegraph-tool) (`427c96f6da08`) | Dependency/impact graph, weak/semantic communities, boundaries, CI and co-change | Native advisory boundaries/weak components plus v0.19 bounded Git co-change/churn; no automatic CI policy gate |
-| [artk0de/TeaRAGs-MCP](https://github.com/artk0de/TeaRAGs-MCP) (`5ba0ac24a02d`) | Semantic retrieval, call graph, Git trajectory, architecture and naming lexicon | Existing FTS/calls and graph navigation plus v0.19 Git co-change and source context cards; embeddings/vector backends absent |
+| [optave/ops-codegraph-tool](https://github.com/optave/ops-codegraph-tool) (`427c96f6da08`) | Dependency/impact graph, weak/semantic communities, boundaries, CI and co-change | v0.20 explicit native static boundary/fan-in policy and opt-in CI gate plus v0.19 Git co-change; no automatic policy activation |
+| [artk0de/TeaRAGs-MCP](https://github.com/artk0de/TeaRAGs-MCP) (`5ba0ac24a02d`) | Semantic retrieval, call graph, Git trajectory, architecture and naming lexicon | Existing FTS/calls and graph navigation plus v0.20 verified local symbol/path retrieval and v0.19 Git/cards; embeddings/vector backends absent |
 
 ## Architecture decisions
 
@@ -51,3 +51,7 @@ The repositories represent distinct *engines*, *host adapters*, *watchers*, *vie
 ## v0.19 evidence boundary
 
 `envelope_memory` requires an explicit `/envelope memory on` toggle, stores notes in owner-only project-scoped SQLite, imports only specific project-local Markdown or Claude Code JSONL files when requested, and does not auto-capture chats. JSONL extraction omits raw commands and assistant responses. Source hashes indicate byte freshness, not truth. `envelope_code_history` computes limited non-merge Git co-change/churn without inferring causal dependency, ownership, or code quality. `envelope_code_context_card` rechecks indexed source SHA-256 and returns bounded symbols/imports/call candidates without source excerpts unless requested. These parts are independently adapted from the patterns documented above, not full ports of their engines. See `docs/PROJECT_MEMORY.md`, `docs/CODE_HISTORY.md`, and `docs/CONTEXT_CARDS.md`.
+
+## v0.20 evidence boundary
+
+The actual Graphify.NET `JsonExporter` was inspected and used to make the external node-link reader compatible with `.NET` `file_path`, `relationship`, and nested location metadata, with foreign absolute paths redacted. Local `envelope_code_retrieve` adds AST symbol/path rank fusion with original-source hashes, no embeddings or automatic raw-source disclosure. Optional `envelope_code_policy`/`architecture-gate.mjs` evaluates reviewed architectural dependency and fan-in rules; it does not run automatically. Git-history co-change now uses NUL-framed filenames, preserving spaces/newlines/tabs. See `docs/GRAPHIFY_DOTNET.md`, `docs/CODE_RETRIEVAL.md` and `docs/ARCHITECTURE_POLICY.md`.
