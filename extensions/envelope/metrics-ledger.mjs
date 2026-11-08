@@ -6,7 +6,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 const KINDS=new Set(['output_compaction','context_projection','model_usage','code_query','workflow_action','graphify_cli']);
 const ACTIONS={
-  code_query:new Set(['envelope_code_overview','envelope_code_languages','envelope_code_tree_status','envelope_code_tree_query','envelope_code_tree_capture','envelope_code_lookup','envelope_code_calls','envelope_code_impact','envelope_code_change_impact','envelope_code_verify','envelope_code_delta','envelope_code_slice','envelope_code_coupling','envelope_code_versions','envelope_code_vector','envelope_code_invariant','envelope_code_typecheck']),
+  code_query:new Set(['envelope_code_overview','envelope_code_languages','envelope_code_tree_status','envelope_code_tree_query','envelope_code_tree_capture','envelope_code_lookup','envelope_code_calls','envelope_code_impact','envelope_code_change_impact','envelope_code_verify','envelope_code_delta','envelope_code_slice','envelope_code_coupling','envelope_code_versions','envelope_code_vector','envelope_code_invariant','envelope_code_typecheck','envelope_code_go_types']),
   graphify_cli:new Set(['status','query','path','explain','build','update']),
   workflow_action:new Set(['envelope_workflow_create','envelope_workflow_status','envelope_workflow_claim','envelope_workflow_finish','envelope_workflow_review','envelope_workflow_retry','envelope_workflow_events','envelope_workflow_handoff','envelope_workflow_run'])
 };
