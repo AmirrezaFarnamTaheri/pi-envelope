@@ -59,7 +59,11 @@ jobs:
       - name: Prove real Pi RPC command registration (no model calls)
         shell: bash
         run: |
-          mkdir -p "$RUNNER_TEMP/envelope-ci-home"
+          set -euo pipefail
+          # The Tersio first-run Combo select runs before Pi attaches its RPC stdin reader.
+          # Seed defaults only in this job's disposable HOME, never in user settings.
+          mkdir -p "$RUNNER_TEMP/envelope-ci-home/.tersio"
+          printf '{"comboSetupComplete":true,"comboDefault":"off"}\n' > "$RUNNER_TEMP/envelope-ci-home/.tersio/settings.json"
           HOME="$RUNNER_TEMP/envelope-ci-home" npm run smoke:runtime
       - name: Prove real Tree-sitter WASM grammars
         if: ${{ !cancelled() }}
