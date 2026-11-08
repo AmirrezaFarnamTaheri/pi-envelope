@@ -1,7 +1,7 @@
 /** Versioned, local settings. Independent of Tersio's existing mode state. */
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, isAbsolute } from 'node:path';
 
 export const DEFAULT_CONFIG = Object.freeze({
   version: 1,
@@ -11,6 +11,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   code: Object.freeze({ enabled: true, languagesEnabled: false, treeEnabled: false, guardEnabled: false, renameEnabled: false, lspCommand: null, lspTimeoutMs: 3500 }),
   workflow: Object.freeze({ enabled: true, runEnabled: false }),
   memory: Object.freeze({ enabled: false }),
+  graphify: Object.freeze({ enabled: false, executable: null, timeoutMs: 30000, orientationEnabled: false }),
   observability: Object.freeze({ enabled: true, retentionDays: 30 })
 });
 
@@ -32,6 +33,7 @@ export function normalizeConfig(raw = {}) {
   const code = source.code && typeof source.code === 'object' ? source.code : {};
   const workflow = source.workflow && typeof source.workflow === 'object' ? source.workflow : {};
   const memory = source.memory && typeof source.memory === 'object' ? source.memory : {};
+  const graphify = source.graphify && typeof source.graphify === 'object' && !Array.isArray(source.graphify) ? source.graphify : {};
   const observability = source.observability && typeof source.observability === 'object' ? source.observability : {};
   return {
     version: 1,
@@ -61,6 +63,14 @@ export function normalizeConfig(raw = {}) {
     },
     workflow: { enabled: safeBoolean(workflow.enabled, DEFAULT_CONFIG.workflow.enabled), runEnabled: safeBoolean(workflow.runEnabled, DEFAULT_CONFIG.workflow.runEnabled) },
     memory: { enabled: safeBoolean(memory.enabled, DEFAULT_CONFIG.memory.enabled) },
+    graphify: {
+      enabled: safeBoolean(graphify.enabled, DEFAULT_CONFIG.graphify.enabled),
+      executable: typeof graphify.executable === 'string' && graphify.executable.length > 1 &&
+        graphify.executable.length <= 1024 && isAbsolute(graphify.executable) &&
+        !/[\u0000-\u001f\u007f]/.test(graphify.executable) ? graphify.executable : null,
+      timeoutMs: safeInteger(graphify.timeoutMs, DEFAULT_CONFIG.graphify.timeoutMs, 50, 120000),
+      orientationEnabled: safeBoolean(graphify.orientationEnabled, DEFAULT_CONFIG.graphify.orientationEnabled)
+    },
     observability: { enabled: safeBoolean(observability.enabled, DEFAULT_CONFIG.observability.enabled), retentionDays: safeInteger(observability.retentionDays, DEFAULT_CONFIG.observability.retentionDays, 1, 365) }
   };
 }
