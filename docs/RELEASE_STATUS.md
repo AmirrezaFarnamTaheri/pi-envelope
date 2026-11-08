@@ -85,3 +85,7 @@ A separate, explicit `/envelope graphify watch on [250..10000]` action can now d
 ## Offline, source-verified user-supplied vector retrieval (stacked draft)
 
 `envelope_code_vector` adds cosine/hybrid ranking against a strictly validated project-local manifest of precomputed numeric embeddings. Off by default; only `/envelope code vectors on` enables search. Source SHA-256 re-verification, symlink/root fences, bounded dimensions/rows/bytes, deterministic query-version continuations and omission of embedding vectors/source text are regression-tested. No automatic text-to-embedding model, semantic relevance benchmark or network provider is bundled. See `docs/LOCAL_VECTOR_RETRIEVAL.md`; full latest-head hosted CI must pass before review-readiness claims.
+
+## Checkable static import graph invariants (stacked draft)
+
+A new `envelope_code_invariant` read-only tool verifies bounded SHA-attested static **file import** predicates (acyclic, reach, no-path) and returns independently checkable cycle/topological/path/closure certificates. It fails closed on stale source, symlinks and invalid input; incomplete parser or index/budget coverage produces `unknown`, not ungrounded proof. No compiler-backed IR, program logic prover, generated model, external service, second graph scanner or extra Pi hooks. See `docs/STATIC_GRAPH_INVARIANTS.md` and dedicated tests. Hosted head CI must pass before review-readiness.
