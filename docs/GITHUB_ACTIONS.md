@@ -32,3 +32,9 @@ The workflow verifies code loading and tool-protocol interoperability, not produ
 Hosted run 42465598056 reached the real WASM smoke and reported `Dynamic require of "fs/promises" is not supported` under the ESM entrypoint of `web-tree-sitter@0.25.3`. That package also publishes a CommonJS `require` entrypoint. The Node-only broker now selects it with `createRequire(import.meta.url)`; this change is subject to the next **real hosted WASM smoke**, not asserted as verified by injected-unit tests.
 
 The same run found the Pi subprocess emitted startup JSON without a command-discovery response. The smoke now records **event type names only** (bounded, without event payloads) to distinguish startup events from protocol replies. A zero exit code without `get_commands` remains a failed gate.
+
+### RPC startup UI handshake
+
+Run 42465842215 confirmed that Pi emitted `extension_ui_request` before its `get_commands` reply. For **only the model-free release smoke**, the RPC client now sends `{cancelled:true}` to recognized `confirm`, `select`, `input` and `editor` dialogs (at most four). It never consents, approves commands or supplies synthetic text. Notifications and status updates are not answered. This follows Pi's documented [RPC extension UI contract](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/rpc-extension-ui.md).
+
+The smoke still rejects missing/duplicate commands or an early exit; it now categorizes UI method names without logging request bodies. Real hosted validation is required to prove that the handshake unblocks Pi's startup.

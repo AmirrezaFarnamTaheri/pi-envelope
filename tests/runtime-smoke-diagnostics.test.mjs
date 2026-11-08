@@ -50,3 +50,26 @@ test('non-response RPC event types are reported without exposing untrusted event
   assert.match(result.reason, /startup_notice/);
   assert.doesNotMatch(result.reason, /ghp_SECRET_PRIVATE/);
 });
+
+test('read-only RPC smoke safely cancels startup UI dialogs and then discovers commands', async t => {
+  const { root, path } = mockPi(t, [
+    "process.stdout.write(JSON.stringify({type:'extension_ui_request',id:'confirm-1',method:'confirm',message:'Approve? yes/no'})+'\\n');",
+    "let pendingDiscovery=null;let cancelled=false;let buffer='';",
+    "process.stdin.setEncoding('utf8');",
+    "process.stdin.on('data',chunk=>{",
+    "  buffer+=chunk;",
+    "  while(buffer.includes('\\n')){",
+    "    const n=buffer.indexOf('\\n');const text=buffer.slice(0,n);buffer=buffer.slice(n+1);if(!text)continue;",
+    "    const item=JSON.parse(text);",
+    "    if(item.type==='get_commands'){pendingDiscovery=item;}",
+    "    if(item.type==='extension_ui_response'&&item.id==='confirm-1'){cancelled=item.cancelled===true&&!item.confirmed;}",
+    "    if(pendingDiscovery&&cancelled){",
+    "      process.stdout.write(JSON.stringify({type:'response',id:pendingDiscovery.id,command:'get_commands',success:true,data:{commands:[{name:'envelope',source:'extension'},{name:'tersio',source:'extension'}]}})+'\\n');",
+    "      pendingDiscovery=null;",
+    "    }",
+    "  }",
+    "});"
+  ].join('\n'));
+  const result = await probePiRpc({ root, piCommand: process.execPath, piPrefixArgs: [path], upstream, timeoutMs: 1200 });
+  assert.deepEqual(result, { ok: true, reason: 'Pi RPC loaded native Envelope and Tersio commands' });
+});
