@@ -114,3 +114,7 @@ Use `envelope_code_invariant({action:"acyclic"})` or `reach`/`no-path` with exac
 ### Explicit Graphify.NET runtime
 
 Only humans can pin and enable a separately trusted Graphify.NET 10 executable with `/envelope graphify-dotnet binary <absolute path>`, `/envelope graphify-dotnet on`, then `/envelope graphify-dotnet build`. Agent-facing `envelope_graphify_dotnet` is **status only**. A build uses the upstream CLI's AST-only code run with a credential-isolated environment and separate `.envelope/graphify-dotnet-out/` output. Treat exported graph counts and edges as unverified outside assertions, never native AST, formal or semantic proof. Do not silently install, enable model backends or perform billable provider calls. See `docs/GRAPHIFY_DOTNET_RUNTIME.md`.
+
+### Operator-launched MCP interoperability
+
+An external trusted client may manually spawn `scripts/envelope-mcp-stdio.mjs --project /absolute/root --home /absolute/envelope-home` after a human captures a private graph version. Tools are **read-only** versions/snapshot/compare; never enable a daemon, start a server, capture source, or expose arbitrary commands in an MCP reply. Snapshot labels and paths are private metadata. No Streamable HTTP authentication or GraphQL server is supplied by this stdio bridge. See `docs/MCP_STDIO_BRIDGE.md`.
