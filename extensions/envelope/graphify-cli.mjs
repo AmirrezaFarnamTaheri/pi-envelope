@@ -8,6 +8,7 @@ import {spawn} from 'node:child_process';
 import {accessSync, constants, realpathSync, statSync} from 'node:fs';
 import {isAbsolute, relative, resolve, sep} from 'node:path';
 import {ExternalGraphReader} from './graphify-adapter.mjs';
+import {GraphifyWatchCoordinator} from './graphify-watch.mjs';
 
 const ACTIONS=new Set(['status','query','path','explain','build','update']);
 const OUTPUT_LIMIT=16_384;
@@ -191,7 +192,7 @@ export class GraphifyCliBridge {
 }
 
 const textResult=(value,error=false)=>({isError:error,content:[{type:'text',text:typeof value==='string'?value:JSON.stringify(value,null,2)}],details:{}});
-export function registerGraphifyCliFeature(pi,{project,getConfig,observe,cli=new GraphifyCliBridge()}={}){
+export function registerGraphifyCliFeature(pi,{project,getConfig,observe,cli=new GraphifyCliBridge(),watcher=new GraphifyWatchCoordinator()}={}){
   if(typeof project!=='function'||typeof getConfig!=='function')throw new TypeError('Graphify CLI feature requires project/config access');
   const run=async(ctx,params,signal,{humanCommand=false}={})=>{
     const started=performance.now(),action=params.action??'status';
@@ -205,6 +206,18 @@ export function registerGraphifyCliFeature(pi,{project,getConfig,observe,cli=new
       throw err;
     }
   };
+  async function watch(ctx,{enabled,debounceMs}={}){
+    const root=project(ctx);
+    if(enabled===false){watcher.stop(root);return watcher.status(root);}
+    if(enabled!==true)throw new TypeError('graph watcher requires explicit on/off');
+    if(!getConfig().code.enabled||!getConfig().graphify.enabled)throw new Error('Code and Graphify CLI must be enabled before watching');
+    const report=await cli.run(root,getConfig().graphify,{action:'status'});
+    if(!report.available)throw new Error('Pinned Graphify executable is unavailable');
+    if(!['unverified','declared-sources-match'].includes(report.artifactState))throw new Error('A readable, non-stale Graphify artifact must be built before enabling watch');
+    return watcher.start(root,{debounceMs,
+      runUpdate:(_root,signal)=>run(ctx,{action:'update'},signal,{humanCommand:true})});
+  }
+  const watchStatus=(ctx)=>watcher.status(project(ctx));
   pi.registerTool?.({
     name:'envelope_graphify_cli',label:'Envelope: Explicit Graphify CLI Read Adapter',
     description:'Read-only Graphify CLI status, bounded question query, node path or explanation against the current project artifact. Requires a user-pinned executable and /envelope graphify on. No auto-install, provider calls, graph rebuild or agent-invoked update. External output is not native AST proof.',
@@ -218,9 +231,10 @@ export function registerGraphifyCliFeature(pi,{project,getConfig,observe,cli=new
       allowStale:{type:'boolean',description:'Explicit acknowledgement of known-stale graph'}},
       additionalProperties:false},
     async execute(_id,params,signal,_onUpdate,ctx){
-      try{return textResult(await run(ctx,params??{},signal));}
+      try{const outcome=await run(ctx,params??{},signal);
+        return textResult((params?.action??'status')==='status'?{...outcome,watch:watchStatus(ctx)}:outcome);}
       catch(err){return textResult(`Graphify CLI: ${err.message}`,true);}
     }
   });
-  return {run,close:()=>cli.close()};
+  return {run,watch,watchStatus,close:()=>{watcher.close();cli.close();}};
 }
