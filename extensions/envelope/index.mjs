@@ -12,6 +12,7 @@ import { OutputStore } from './store.mjs';
 import { readConfig, saveConfig } from './config.mjs';
 import { composePolicy } from './policy.mjs';
 import { ContextLedger } from './context-ledger.mjs';
+import { ContextFrontier } from './context-frontier.mjs';
 import { registerContextFeature } from './context-api.mjs';
 import { registerCodeFeature } from './code-api.mjs';
 import { registerLspFeature } from './lsp-api.mjs';
@@ -65,6 +66,9 @@ export function registerEnvelope(pi, options = {}) {
   const lastOutputPrune = new Map();
   const metrics = { calls: 0, compacted: 0, rawBytes: 0, renderedBytes: 0, contextCalls: 0, contextCompacted: 0, contextRawBytes: 0, contextRenderedBytes: 0, workflowRuns: 0, workflowSubmitted: 0, workflowFailed: 0 };
   const ledger = new ContextLedger(join(home, 'envelope-context'));
+  let frontier;
+  try {frontier=new ContextFrontier(join(home,'envelope-context'));}
+  catch(err){frontier=null;pi.logger?.warn?.(`[envelope] context replay frontier unavailable; pruning stays disabled: ${err.message}`);}
   const project = (ctx) => ctx?.cwd || pi.cwd || process.cwd();
   let metricLedger;
   try { metricLedger = new MetricsLedger(join(home,'envelope-metrics'),{retentionDays:config.observability.retentionDays}); }
@@ -139,7 +143,7 @@ export function registerEnvelope(pi, options = {}) {
   });
 
   const contextApi = registerContextFeature(pi, {
-    ledger, getStore:()=>store, getConfig:()=>config, project, metrics, observe
+    ledger, frontier, getStore:()=>store, getConfig:()=>config, project, metrics, observe
   });
 
   const codeApi = registerCodeFeature(pi, {project, getConfig:()=>config, loadCompiler:options.loadCompiler, loadTreeRuntime:options.loadTreeRuntime, getTreeGrammarPath:options.getTreeGrammarPath, observe});
@@ -168,7 +172,7 @@ export function registerEnvelope(pi, options = {}) {
   });
 
   pi.on('before_agent_start', (event) => composePolicy(event?.systemPrompt, config.policy.enabled) || undefined);
-  pi.on('session_shutdown', () => { store?.close(); store = null; workflowLedger?.close(); metricLedger?.close(); metricLedger=null; });
+  pi.on('session_shutdown', () => { store?.close(); store = null; frontier?.close(); frontier=null; workflowLedger?.close(); metricLedger?.close(); metricLedger=null; });
 
   pi.registerTool?.({
     name: 'envelope_recall_output',
@@ -192,11 +196,14 @@ export function registerEnvelope(pi, options = {}) {
   pi.registerTool?.({
     name: 'envelope_search_fragments',
     label: 'Envelope: Search Output Fragments',
-    description: 'Read-only project-scoped search of stored output sections, bounded line numbers and excerpts; exact original remains available by ID.',
+    description: 'Project-scoped search of bounded, verified output chunks. May incrementally index up to eight older local captures per call; raw outputs remain unchanged and recoverable by ID.',
     parameters:{type:'object',properties:{query:{type:'string',description:'Terms in historical output'},limit:{type:'integer',minimum:1,maximum:25}},required:['query'],additionalProperties:false},
     async execute(_id,p,_signal,_update,ctx){
       if(!store)return textReply('Local output store unavailable.',true);
-      try{return textReply(JSON.stringify(store.searchFragments(p?.query,{project:project(ctx),limit:p?.limit??10}),null,2));}
+      try {
+        const report=store.searchFragmentsReport(p?.query,{project:project(ctx),limit:p?.limit??10});
+        return textReply(JSON.stringify(report.hits,null,2),false,{chunkIndex:report.index});
+      }
       catch(err){return textReply(`Could not search fragments: ${err.message}`,true);}
     }
   });
@@ -233,8 +240,11 @@ export function registerEnvelope(pi, options = {}) {
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       if (!store) return textReply('Local output store unavailable.', true);
       try {
-        const hits = store.search(params?.query, {project: project(ctx), limit: params?.limit});
-        return textReply(hits.length ? JSON.stringify(hits, null, 2) : 'No captured output matched this query.');
+        const {hits,coverage} = store.searchReport(params?.query, {project: project(ctx), limit: params?.limit});
+        const message=hits.length?JSON.stringify(hits,null,2)
+          : coverage.partial?'No verified captured output matched this query (search incomplete; see searchCoverage).'
+            :'No captured output matched this query.';
+        return textReply(message,false,{searchCoverage:coverage});
       } catch (err) { return textReply(`Could not search output: ${err.message}`, true); }
     }
   });
@@ -415,7 +425,7 @@ export function registerEnvelope(pi, options = {}) {
     }
   });
 
-  return { metrics, getConfig: () => config, close: () => {store?.close(); workflowLedger?.close(); metricLedger?.close();} };
+  return { metrics, getConfig: () => config, close: () => {store?.close(); frontier?.close(); workflowLedger?.close(); metricLedger?.close();} };
 }
 
 export default registerEnvelope;

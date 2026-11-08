@@ -14,6 +14,7 @@ A compacted result includes an `envelope_recall_output id=<64-hex-hash>` marker.
 - Read the compact result first. If it has everything needed, do not retrieve the original merely because it exists.
 - When an omitted detail matters, call `envelope_recall_output` with the exact ID. The returned text is the original output, not a reconstructed summary.
 - If you know an error phrase but not the ID, prefer `envelope_search_fragments` for bounded, line-numbered excerpts; use `envelope_search_output` for candidate IDs and recall the exact original only when needed.
+- Fragment search uses a local chunk index; after an upgrade it may index at most eight legacy captures per query. Check `details.chunkIndex.partial` and repeat as needed before treating a result as exhaustive. A `partial` result may also indicate a retrieval safety budget. It never runs embeddings or external searches.
 - Both tools default to the current project. The original data never leaves the local machine by these tools.
 
 ## Behavioral rules
@@ -35,9 +36,10 @@ A compacted result includes an `envelope_recall_output id=<64-hex-hash>` marker.
 ## Project-aware code tools (JS/TS; optional Python and Go)
 
 - Use `envelope_code_overview` for a bounded AST-based repository map when orienting in unfamiliar code. Do not call it repeatedly on every turn.
+- Use `envelope_code_graph` for source-grounded file relationships: `status`, `neighbors`, shortest `path`, inbound-degree `hubs`, weak `components`, advisory `boundaries`, or bounded JSON/Mermaid `export`. Choose `relation: "imports"|"calls"|"both"` and interpret `complete` / `reasons`: no path with incomplete evidence is not proof of absence. Never automatically run a Graphify CLI, import a provider, or execute external HTML.
 - Use `envelope_code_lookup` for declarations and exact source locations, and targeted reads when the original source body matters.
 - Before changing an imported module, `envelope_code_impact` can show known direct and transitive *static relative importers*. Never claim this is a runtime call graph, full test impact or type-aware relationship proof.
-- Use `envelope_code_calls` to inspect bounded direct-call **syntactic evidence** and explicit unresolved candidates. Do not treat `complete:true` as full call-graph coverage, type accuracy or runtime verification. Inbound/outbound edges are project-scoped; optional Python/Go parsing still requires the language toggle.
+- Use `envelope_code_calls` to inspect bounded direct-call **syntactic evidence** and explicit unresolved candidates. Python module aliases (`import pkg.mod as x` / `from . import mod as x`) may link to uniquely indexed functions, but dynamic attribute chains, rebinding, MRO and type inference are not proved. Do not treat `complete:true` as full call-graph coverage, type accuracy or runtime verification. Inbound/outbound edges are project-scoped; optional Python/Go parsing still requires the language toggle.
 - Use `envelope_code_verify` to check existing or proposed JS/TS source, or opt-in Python/Go syntax, without writing files. It does not replace typechecking, tests, LSP or runtime verification.
 - Use `/envelope code languages on` to enable local Python/Go stdlib AST parsers and `envelope_code_languages` for status. They are not Tree-sitter, and the LSP rename transaction is strictly JS/TS-only. All code tools use one shared per-project index, can be disabled with `/envelope code off`, and do not rely on extra independently installed Pi code plugins.
 
