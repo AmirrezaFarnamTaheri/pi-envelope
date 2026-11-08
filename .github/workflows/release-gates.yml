@@ -104,6 +104,18 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/smoke-graphify-dotnet-real.mjs "$RUNNER_TEMP/envelope-graphify-dotnet/graphify"
+      - name: Install isolated reference GraphQL parser (CI only)
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --ignore-scripts --no-audit --no-fund --package-lock=false graphql@16.15.0
+      - name: Prove genuine authenticated loopback GraphQL interoperability
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/smoke-graphql-real.mjs
       - name: Prove real Tree-sitter WASM grammars
         if: ${{ !cancelled() }}
         run: npm run smoke:tree
