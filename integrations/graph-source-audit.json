@@ -4,7 +4,7 @@
   "baseCommit": "0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64",
   "candidateVersion": "0.22.0",
   "licenseAssumption": "User assumes compatibility; independent legal review not performed",
-  "implementationScope": "Native graph projection plus bounded local external Graphify/NetworkX node-link artifact reader and opt-in invalidation-only watcher; opt-in project notes, bounded Claude JSONL fact import, Git co-change/churn, source context cards; opt-in pinned Graphify Python CLI read-only query/path/explain plus human-only AST code build/update; optional graph orientation in existing Pi hook",
+  "implementationScope": "Native graph projection plus bounded local external Graphify/NetworkX node-link artifact reader and opt-in invalidation-only watcher; opt-in project notes, bounded Claude JSONL fact import, Git co-change/churn, source context cards; opt-in pinned Graphify Python CLI read-only query/path/explain plus human-only AST code build/update; optional graph orientation in existing Pi hook; revocable session-only code-change watcher for offline Graphify update (no provider, no persistent daemon)",
   "upstreams": [
     {
       "repo": "lucasrosati/claude-code-memory-setup",
@@ -59,7 +59,7 @@
       "repo": "yetanotheraryan/graphify-chokidar",
       "commit": "9c584df9ab087425fec3d030e3ef7d1a29431707",
       "capabilities": "Debounced file watcher, code vs media classification, user-confirmed LLM rebuild",
-      "adoption": "Existing incremental refresh; explicit opt-in watcher later v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded.",
+      "adoption": "Existing incremental refresh; explicit opt-in watcher later v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded. v0.22 follow-up: user-authorized session-scoped code-only Graphify update watcher, bounded 64-directory/256-path scan, debounce, explicit stop/await, symlink exclusion, fail-closed filesystem errors, no automatic doc/media LLM, single-writer guard. Not full upstream parity.",
       "completePort": false
     },
     {
