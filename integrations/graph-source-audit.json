@@ -4,7 +4,7 @@
   "baseCommit": "0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64",
   "candidateVersion": "0.22.0",
   "licenseAssumption": "User assumes compatibility; independent legal review not performed",
-  "implementationScope": "Native graph projection plus bounded local external Graphify/NetworkX node-link artifact reader and opt-in invalidation-only watcher; opt-in project notes, bounded Claude JSONL fact import, Git co-change/churn, source context cards; opt-in pinned Graphify Python CLI read-only query/path/explain plus human-only AST code build/update; optional graph orientation in existing Pi hook; revocable session-only code-change watcher for offline Graphify update (no provider, no persistent daemon); explicit bounded session-local symbol-delta baselines, source-verified declaration hashes, conservative static importer hints; source-verified lexical/exact entry static-import context slices with ETag references and strict serialized output budget",
+  "implementationScope": "Native graph projection plus bounded local external Graphify/NetworkX node-link artifact reader and opt-in invalidation-only watcher; opt-in project notes, bounded Claude JSONL fact import, Git co-change/churn, source context cards; opt-in pinned Graphify Python CLI read-only query/path/explain plus human-only AST code build/update; optional graph orientation in existing Pi hook; revocable session-only code-change watcher for offline Graphify update (no provider, no persistent daemon); explicit bounded session-local symbol-delta baselines, source-verified declaration hashes, conservative static importer hints; source-verified lexical/exact entry static-import context slices with ETag references and strict serialized output budget; bounded, source-verified Git cochange versus direct static import advisory review (no causal or risk score)",
   "upstreams": [
     {
       "repo": "lucasrosati/claude-code-memory-setup",
@@ -108,14 +108,14 @@
       "repo": "optave/ops-codegraph-tool",
       "commit": "427c96f6da08fed88559075ef3c3c9eaa2122319",
       "capabilities": "Dependency/impact graph, weak/semantic communities, boundaries, CI and co-change",
-      "adoption": "v0.20 opt-in static boundary/fan-in policy with standalone manually invoked CI gate; bounded Git co-change since v0.19; no full 34-language engine",
+      "adoption": "v0.20 opt-in static boundary/fan-in policy with standalone manually invoked CI gate; bounded Git co-change since v0.19; no full 34-language engine New stacked advisory Git co-edit/direct static import juxtaposition for manual review; no 34-language kernel or automatic CI quality gate.",
       "completePort": false
     },
     {
       "repo": "artk0de/TeaRAGs-MCP",
       "commit": "5ba0ac24a02d1b4daf3b4ca1027b13974a66b184",
       "capabilities": "Semantic retrieval, call graph, Git trajectory, architecture and naming lexicon",
-      "adoption": "v0.20 local hash-verified AST symbol/path rank fusion and bounded graph navigation; no embedding engine or provider calls Stacked delta candidate adds source-verified changed-declaration metadata for code review; no semantic embeddings, vector index, owner inference or evidence of automatic test coverage. Next staged candidate adds bounded task-shaped lexical context with importer navigation; no semantic/vector ranking, historical trajectory risk, ownership or test-coverage proof.",
+      "adoption": "v0.20 local hash-verified AST symbol/path rank fusion and bounded graph navigation; no embedding engine or provider calls Stacked delta candidate adds source-verified changed-declaration metadata for code review; no semantic embeddings, vector index, owner inference or evidence of automatic test coverage. Next staged candidate adds bounded task-shaped lexical context with importer navigation; no semantic/vector ranking, historical trajectory risk, ownership or test-coverage proof. New stacked advisory cochange diagnostic counts repeated co-edits without detected direct static imports; root/byte verified and history bounded. No causal claim or trajectory engine.",
       "completePort": false
     }
   ],
