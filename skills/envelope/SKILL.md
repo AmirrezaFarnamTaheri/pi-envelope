@@ -118,3 +118,7 @@ Only humans can pin and enable a separately trusted Graphify.NET 10 executable w
 ### Operator-launched MCP interoperability
 
 An external trusted client may manually spawn `scripts/envelope-mcp-stdio.mjs --project /absolute/root --home /absolute/envelope-home` after a human captures a private graph version. Tools are **read-only** versions/snapshot/compare; never enable a daemon, start a server, capture source, or expose arbitrary commands in an MCP reply. Snapshot labels and paths are private metadata. No Streamable HTTP authentication or GraphQL server is supplied by this stdio bridge. See `docs/MCP_STDIO_BRIDGE.md`.
+
+### TypeScript compiler facts
+
+Use `envelope_code_typecheck({action:"diagnostics",path:"src/file.ts"})` or `symbol` with one-based UTF-16 `line`/`column` for the real pinned TypeScript TypeChecker over current SHA-256-verified indexed JS/TS source. It returns bounded diagnostics or a type plus indexed declaration locations without source bodies. Do not treat a clean result as build/runtime correctness, and check `complete`, `reasons` and unresolved imports. Python/Go AST and external LSP data remain distinct evidence; there is no unified cross-language typed resolver. See `docs/TYPESCRIPT_COMPILER_EVIDENCE.md`.
