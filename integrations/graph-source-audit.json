@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "auditDate": "2026-11-08",
   "baseCommit": "0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64",
-  "candidateVersion": "0.20.0",
+  "candidateVersion": "0.21.0",
   "licenseAssumption": "User assumes compatibility; independent legal review not performed",
   "implementationScope": "Native graph projection plus bounded local external Graphify/NetworkX node-link artifact reader and opt-in invalidation-only watcher; opt-in project notes, bounded Claude JSONL fact import, Git co-change/churn, source context cards",
   "upstreams": [
@@ -17,7 +17,7 @@
       "repo": "elbruno/graphify-dotnet",
       "commit": "008477767c813f0cc48dda3644282330cc288c8b",
       "capabilities": "File extraction > typed graph > communities > report/export; AST or optional AI",
-      "adoption": "v0.20 adapter consumes actual .NET graph.json relationship and metadata fields, redacts foreign absolute source paths; runtime extractor is not bundled",
+      "adoption": "v0.20 actual .NET graph.json compatibility, v0.21 exporter-declared communities; .NET Copilot and SDK runtime are not bundled",
       "completePort": false
     },
     {
@@ -31,7 +31,7 @@
       "repo": "franklywatson/claude-rig",
       "commit": "54b4a5c79ebea0d81c576c449d1828c349f3e453",
       "capabilities": "Claude cockpit, dependency detection, tool routing, skill-chain and metrics",
-      "adoption": "Keep existing Tersio RTK/workflow ownership; future capability status",
+      "adoption": "v0.21 local capability cockpit, external binary presence detection and manual workflow route advice; no Claude host hooks or automatic tool dispatch",
       "completePort": false
     },
     {
@@ -66,14 +66,14 @@
       "repo": "crafter-station/graphify-visualizer",
       "commit": "15c67d7e5a3c717a3917f6af410e09bc0d9142ed",
       "capabilities": "Obsidian bridge that embeds Graphify HTML, not a graph extractor",
-      "adoption": "Native bounded JSON/Mermaid export; UI bridge later",
+      "adoption": "v0.21 static XML-escaped SVG and Obsidian-safe Markdown Mermaid exports; no arbitrary graph.html or Obsidian plugin execution",
       "completePort": false
     },
     {
       "repo": "m4t0t0/cmd-mod-graphify",
       "commit": "474ecaecbf181832572af9934dba99d1dddbf06b",
       "capabilities": "CommandCode Graphify adapter with architecture exploration and god nodes",
-      "adoption": "Native degree hubs/paths/exports; no competing host adapter",
+      "adoption": "v0.21 native hubs/paths and deterministic static visual exports; no CommandCode host adapter",
       "completePort": false
     },
     {

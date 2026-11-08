@@ -214,12 +214,13 @@ function safeMermaid(path){
   // escaped quotes. Use Mermaid's own numeric entities instead.
   return '"'+String(path).replace(/&/g,'#amp;').replace(/"/g,'#quot;')
     .replace(/</g,'#lt;').replace(/>/g,'#gt;')
-    .replace(/[\r\n]/g,'#10;')+'"';
+    .replace(/[`\r\n]/g,ch=>ch==='`'?'#96;':'#10;')+'"';
 }
 function exported(graph,args){
   const limit=boundedInteger(args.limit,30,1,100,'limit');
   const format=args.format||'json';
-  if(!['json','mermaid'].includes(format))throw new TypeError('format must be json or mermaid');
+  if(!['json','mermaid','obsidian','svg'].includes(format))throw new TypeError('format must be json, mermaid, obsidian or svg');
+  if(format==='svg'&&limit>30)throw new RangeError('svg limit must be 1..30');
   const nodes=graph.nodes.slice(0,limit).map(path=>({path}));
   const selected=new Set(nodes.map(n=>n.path));
   const edges=graph.edges.filter(e=>selected.has(e.source)&&selected.has(e.target)).slice(0,250);
@@ -227,9 +228,37 @@ function exported(graph,args){
   if(format==='json')return {action:'export',format,mode:'project-relative-static-evidence',nodes,edges,truncated,
     totalFiles:graph.nodes.length,totalEdges:graph.edges.length,complete:graph.reasons.length===0,reasons:graph.reasons};
   const ids=new Map(nodes.map((n,i)=>[n.path,`n${i}`]));
-  const content=['flowchart LR',...nodes.map(n=>`  ${ids.get(n.path)}[${safeMermaid(n.path)}]`),
+  const mermaid=['flowchart LR',...nodes.map(n=>`  ${ids.get(n.path)}[${safeMermaid(n.path)}]`),
     ...edges.map(e=>`  ${ids.get(e.source)} -->|${e.type}| ${ids.get(e.target)}`)].join('\n');
-  return {action:'export',format,content,truncated,totalFiles:graph.nodes.length,totalEdges:graph.edges.length,
+  if(format==='obsidian'){
+    // Percent-encode path targets and escape Markdown wiki-link delimiters.
+    // No raw Graphify HTML, script, vault write or Markdown template execution.
+    const wikiDisplay=path=>String(path).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/[\[\]|\r\n`]/g,'_');
+    const links=nodes.map(n=>`- [[${encodeURIComponent(n.path)}|${wikiDisplay(n.path)}]]`).join('\n');
+    const content=`# Native static code graph\n\nEvidence: indexed imports / syntactic calls only.\n\n\`\`\`mermaid\n${mermaid}\n\`\`\`\n\n## Indexed files\n${links}\n`;
+    return {action:'export',format,content,truncated,totalFiles:graph.nodes.length,totalEdges:graph.edges.length,
+      complete:graph.reasons.length===0,reasons:graph.reasons};
+  }
+  if(format==='svg'){
+    const esc=x=>String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c])).replace(/[\r\n]/g,'&#10;');
+    const cols=Math.max(1,Math.ceil(Math.sqrt(nodes.length)));
+    const rows=Math.ceil(nodes.length/cols);
+    const layout=new Map(nodes.map((n,i)=>[n.path,{x:155+245*(i%cols),y:90+145*Math.floor(i/cols)}]));
+    const lines=edges.map(e=>{
+      const a=layout.get(e.source),b=layout.get(e.target);
+      return `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#777" stroke-width="1.5"/>`;
+    });
+    const circles=nodes.map(n=>{
+      const p=layout.get(n.path);
+      return `<circle cx="${p.x}" cy="${p.y}" r="16" fill="#e1e7ef" stroke="#526480"/><text x="${p.x}" y="${p.y+29}" font-size="10" text-anchor="middle" fill="#17253c">${esc(n.path)}</text>`;
+    });
+    const width=cols*245+40,height=rows*145+40;
+    const content=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Static source dependency diagram">${lines.join('')}${circles.join('')}</svg>`;
+    return {action:'export',format,content,truncated,totalFiles:graph.nodes.length,totalEdges:graph.edges.length,
+      complete:graph.reasons.length===0,reasons:graph.reasons};
+  }
+  return {action:'export',format,content:mermaid,truncated,totalFiles:graph.nodes.length,totalEdges:graph.edges.length,
     complete:graph.reasons.length===0,reasons:graph.reasons};
 }
 /** Inspect the live already-refreshed index. No disk writes, providers or execution. */

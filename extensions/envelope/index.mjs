@@ -21,6 +21,7 @@ import { WorkflowLedger } from './workflow-ledger.mjs';
 import { registerWorkflowFeature } from './workflow-api.mjs';
 import { MetricsLedger } from './metrics-ledger.mjs';
 import {ProjectMemory, registerProjectMemoryFeature} from './project-memory.mjs';
+import {registerCapabilityCockpit} from './capability-cockpit.mjs';
 import { registerMetricsFeature } from './metrics-api.mjs';
 
 function homePath() {
@@ -90,6 +91,7 @@ export function registerEnvelope(pi, options = {}) {
     catch(err) { pi.logger?.warn?.(`[envelope] metrics write failed (ignored): ${err.message}`); }
   };
   registerMetricsFeature(pi,{getLedger:()=>metricLedger,project});
+  registerCapabilityCockpit(pi,{getConfig:()=>config});
   registerProjectMemoryFeature(pi,{getMemory,project,getConfig:()=>config});
   pi.on('message_end',(event,ctx)=>{
     const message=event?.message;

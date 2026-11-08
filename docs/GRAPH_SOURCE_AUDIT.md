@@ -1,6 +1,6 @@
 # 16-source graph, memory and workflow integration audit
 
-**Audit date:** 2026-11-08. **Baseline:** Envelope v0.16.0 commit `0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64`. **Candidate:** v0.20.0 on the unmerged review stack.
+**Audit date:** 2026-11-08. **Baseline:** Envelope v0.16.0 commit `0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64`. **Candidate:** v0.21.0 on the unmerged review stack.
 
 The user supplied an assumption that licensing clearance will be resolved separately. It is not a legal opinion. This implementation uses independently written graph code; retain upstream attribution if later copying actual source.
 
@@ -9,15 +9,15 @@ The repositories represent distinct *engines*, *host adapters*, *watchers*, *vie
 | Source (pinned SHA prefix) | Observed role | Envelope status / decision |
 |---|---|---|
 | [lucasrosati/claude-code-memory-setup](https://github.com/lucasrosati/claude-code-memory-setup) (`4cd2e6bd4319`) | Obsidian notes, chat import and session autosave | v0.19 opt-in project notes, Markdown import/export and explicit, bounded Claude Code JSONL session extraction; no automatic vault/session hooks |
-| [elbruno/graphify-dotnet](https://github.com/elbruno/graphify-dotnet) (`008477767c81`) | File extraction > typed graph > communities > report/export; AST or optional AI | v0.20 reads actual .NET Graphify JSON edge/metadata fields; .NET SDK execution and semantic extraction remain external |
+| [elbruno/graphify-dotnet](https://github.com/elbruno/graphify-dotnet) (`008477767c81`) | File extraction > typed graph > communities > report/export; AST or optional AI | v0.20 reads actual .NET Graphify JSON; v0.21 navigates exporter-declared communities; .NET SDK/provider execution remains external |
 | [juhas96/graphify-pi](https://github.com/juhas96/graphify-pi) (`dd54ac9ae22b`) | Pi graphify CLI wrapper, freshness prompts and wiki-first guidance | Single native graph-query tool; v0.18 external node-link health and freshness adapter |
-| [franklywatson/claude-rig](https://github.com/franklywatson/claude-rig) (`54b4a5c79ebe`) | Claude cockpit, dependency detection, tool routing, skill-chain and metrics | Keep existing Tersio RTK/workflow ownership; future capability status |
+| [franklywatson/claude-rig](https://github.com/franklywatson/claude-rig) (`54b4a5c79ebe`) | Claude cockpit, dependency detection, tool routing, skill-chain and metrics | v0.21 native read-only capability cockpit, opt-in mode status and manual route advice; no Claude Code hooks or enforced tool chains |
 | [gaodes/pi-graphify](https://github.com/gaodes/pi-graphify) (`4826f5eb351b`) | Pi graphify CLI query, paths, hubs, reports, watchers and exports | Native graph queries plus v0.18 external Graphify artifact read; no CLI/LLM backend |
 | [QuantumKuba/dsh-graphify-plugin](https://github.com/QuantumKuba/dsh-graphify-plugin) (`74a2c72b31ab`) | DSH graph adapter, project-root fencing, freshness/status and MCP lifecycle | Reuse CodeIndex project isolation; v0.18 external graph artifact root fencing |
-| [nainglinnphyo/OpenGraphify](https://github.com/nainglinnphyo/OpenGraphify) (`4732f159ffc7`) | NestJS/GraphQL server with Apollo playground, unrelated to AST Graphify | No native runtime role; optional GraphQL read-only projection later |
+| [nainglinnphyo/OpenGraphify](https://github.com/nainglinnphyo/OpenGraphify) (`4732f159ffc7`) | NestJS/GraphQL server with Apollo playground, unrelated to AST Graphify | Not a code graph engine; native NestJS/Prisma/Apollo server deliberately not included. Optional separate GraphQL adapter remains outside current runtime |
 | [yetanotheraryan/graphify-chokidar](https://github.com/yetanotheraryan/graphify-chokidar) (`9c584df9ab08`) | Debounced file watcher, code vs media classification, user-confirmed LLM rebuild | Existing incremental refresh; v0.18 optional invalidation-only debounced watcher |
-| [crafter-station/graphify-visualizer](https://github.com/crafter-station/graphify-visualizer) (`15c67d7e5a3c`) | Obsidian bridge that embeds Graphify HTML, not a graph extractor | Native bounded JSON/Mermaid export; UI bridge later |
-| [m4t0t0/cmd-mod-graphify](https://github.com/m4t0t0/cmd-mod-graphify) (`474ecaecbf18`) | CommandCode Graphify adapter with architecture exploration and god nodes | Native degree hubs/paths/exports; no competing host adapter |
+| [crafter-station/graphify-visualizer](https://github.com/crafter-station/graphify-visualizer) (`15c67d7e5a3c`) | Obsidian bridge that embeds Graphify HTML, not a graph extractor | v0.21 bounded static SVG and Obsidian-safe Mermaid Markdown exports; no untrusted graph.html embedding or automatic vault writes |
+| [m4t0t0/cmd-mod-graphify](https://github.com/m4t0t0/cmd-mod-graphify) (`474ecaecbf18`) | CommandCode Graphify adapter with architecture exploration and god nodes | Native degree hubs/paths plus v0.21 static SVG/Obsidian export; no competing CommandCode host adapter |
 | [colbymchenry/codegraph](https://github.com/colbymchenry/codegraph) (`f72c9d2efb14`) | Rust/TS codegraph kernel, typed traversal, auto-sync, impact and agent tools | Typed native graph BFS plus v0.19 bounded Git co-change evidence; advanced multi-language backends later |
 | [AxiomCodeAI/axiomcodegraph](https://github.com/AxiomCodeAI/axiomcodegraph) (`29f7ecf05297`) | IR and formal-methods oriented call analysis with asserted links | Explicit uncertainty; no false proof claim; optional IR link adapters later |
 | [GlitterKill/sdl-mcp](https://github.com/GlitterKill/sdl-mcp) (`2a20acbd283a`) | Symbol delta ledger, compact context cards, graph slices, memory and policies | Existing replay/FTS and graph plus v0.19 source-hash-verified context cards and opt-in notes; no independent SDL engine |
@@ -55,3 +55,7 @@ The repositories represent distinct *engines*, *host adapters*, *watchers*, *vie
 ## v0.20 evidence boundary
 
 The actual Graphify.NET `JsonExporter` was inspected and used to make the external node-link reader compatible with `.NET` `file_path`, `relationship`, and nested location metadata, with foreign absolute paths redacted. Local `envelope_code_retrieve` adds AST symbol/path rank fusion with original-source hashes, no embeddings or automatic raw-source disclosure. Optional `envelope_code_policy`/`architecture-gate.mjs` evaluates reviewed architectural dependency and fan-in rules; it does not run automatically. Git-history co-change now uses NUL-framed filenames, preserving spaces/newlines/tabs. See `docs/GRAPHIFY_DOTNET.md`, `docs/CODE_RETRIEVAL.md` and `docs/ARCHITECTURE_POLICY.md`.
+
+## v0.21 capability and visualization evidence boundary
+
+`envelope_capabilities` reports local mode state and safely checks names of optional PATH executables without launching them; route sequences are advisory only, not dispatched or enforced. Native graph export adds bounded, XML-escaped static SVG and sanitized Obsidian Markdown with Mermaid; no third-party HTML, server, or vault writes. External Graphify / Graphify.NET artifact reader exposes declared communities as untrusted grouping metadata, not inferred graph structure. See `docs/CAPABILITY_COCKPIT.md` and `docs/GRAPH_VIEW_EXPORT.md`.

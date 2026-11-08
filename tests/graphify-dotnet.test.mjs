@@ -66,3 +66,19 @@ test('malicious relative traversal is still rejected rather than sanitized into 
  const {reader,index}=fixture(t,graph);
  assert.equal(reader.query(index,{action:'status'}).state,'invalid');
 });
+test('Graphify.NET declared community labels support bounded, non-semantic read-only grouping',t=>{
+ const graph={nodes:[
+   {id:'a',label:'A',type:'Entity',community:4},
+   {id:'b',label:'B',type:'Entity',community:4},
+   {id:'c',label:'C',type:'Entity',community:7},
+   {id:'unknown',label:'Unknown',type:'Entity'}],
+   edges:[{source:'a',target:'b',relationship:'calls'}]};
+ const {reader,index}=fixture(t,graph);
+ const response=reader.query(index,{action:'communities',limit:5});
+ assert.equal(response.total,2);
+ assert.deepEqual(response.communities.map(c=>[c.id,c.size]),[[4,2],[7,1]]);
+ assert.deepEqual(response.communities[0].sample,['a','b']);
+ assert.equal(response.complete,false);
+ assert.equal(response.evidence,'exporter-declared-community-not-inferred');
+ assert.throws(()=>reader.query(index,{action:'communities',limit:27}),/limit/i);
+});

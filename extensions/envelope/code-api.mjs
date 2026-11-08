@@ -75,12 +75,12 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
       direction:{type:'string',enum:['incoming','outgoing','both']},
       maxDepth:intProp('Shortest-path depth bound, 1-8',1,8),
       limit:intProp('Maximum results or exported nodes, 1-100; action-specific smaller limits apply',1,100),
-      format:{type:'string',enum:['json','mermaid']},
+      format:{type:'string',enum:['json','mermaid','obsidian','svg']},
       rules:{type:'array',maxItems:12,items:{type:'object',properties:{from:{type:'string'},forbid:{type:'array',minItems:1,maxItems:12,items:{type:'string'}}},required:['from','forbid'],additionalProperties:false}}
     }), (index,params)=>inspectCodeGraph(index,params));
   tool('envelope_code_external_graph','Envelope: External Graphify Artifact',
     'Explicitly inspect a local graphify-out/graph.json node-link graph as untrusted external assertions. Check hash-attested source freshness, bounded nodes/paths/edges, and opt-in debounce watcher. Never merges edges with native AST, runs Graphify or makes model calls.',
-    schema({action:{type:'string',enum:['status','nodes','neighbors','path','watch']},
+    schema({action:{type:'string',enum:['status','nodes','neighbors','communities','path','watch']},
       source:{type:'string',description:'External node ID for neighbors or path'},
       target:{type:'string',description:'External destination node ID for path'},
       query:{type:'string',description:'Optional node name/ID/type substring filter'},

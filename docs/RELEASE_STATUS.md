@@ -2,7 +2,7 @@
 
 This document is the current, user-facing release assessment. It replaces the historic execution plans and avoids retaining obsolete command and package examples.
 
-## v0.20.0 unmerged candidate: implemented locally
+## v0.21.0 unmerged candidate: implemented locally
 
 - Namespaced `pi-envelope` package, `envelope` command and `envelope_*` tools, `extensions/envelope` and `skills/envelope`. No `upper` command or extension is shipped.
 - Default-safe bash output compactor with exact recall, byte checks, durable FTS5 chunk search and bounded lexical/BM25 reciprocal-rank fusion, and optional retention/erasure, all project scoped. Raw output can contain secrets and no filesystem erasure claim covers backups/snapshots.
@@ -53,3 +53,7 @@ Opt-in `envelope_memory` adds typed, project-scoped SQLite notes with manual Mar
 ## v0.20.0 .NET Graphify interoperability, retrieval and architecture policy
 
 The actual Graphify.NET exported JSON fields are now consumed in the local external graph reader, including `edges[].relationship` and nested source locations. Foreign absolute paths are redacted and cannot act as attestations. Local source retrieval combines AST symbol/path rankings, verifies source bytes before disclosure and reports candidate/verification gaps; no vector/embedding backend is implied. `envelope_code_policy` provides read-only advisory architecture checks and the manually invoked `architecture:gate` script with strict incomplete-evidence treatment, never an automatic failing CI step. Git co-change uses NUL-delimited filenames. The v0.19.0 predecessor passed hosted [run 42491266788](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42491266788) (361 pass, 0 fail, 1 skip); this v0.20.0 candidate requires its own complete hosted verification before release claims.
+
+## v0.21.0 discovery and visual export
+
+The new `envelope_capabilities` tool is a read-only capability status and advisory route planner. Optional `graphify`/`jcodemunch`/`rtk`/`headroom` PATH detections are presence-only, never executed. Native file graphs can export bounded static SVG and Obsidian Mermaid Markdown with security-focused escaping; declared external Graphify community IDs are queryable separately from native graph evidence. This phase does not automatically run tools, invoke models, install viewers, start servers, or write Obsidian files. Tests `tests/capability-cockpit.test.mjs`, `tests/graph-visualization.test.mjs`, and `tests/graphify-dotnet.test.mjs`. The prior v0.20.0 candidate passed hosted run 42492265689 (376 passed, 0 failed, 1 skipped); this candidate requires independent hosted CI.

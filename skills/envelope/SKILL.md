@@ -76,3 +76,5 @@ The human must explicitly enable `/envelope code tree on` before Tree-sitter que
 - Never report full compatibility with the 33 original repositories: several are comparison-only, third-party apps or excluded grammars, and Pi/Tersio/Tree-sitter real runtimes must pass independent smokes before any such assertion.
 
 - Use `envelope_code_retrieve` for hash-verified lexical AST symbol/file retrieval; raw snippets require explicit `includeSnippet:true`. Use `envelope_code_policy` for advisory static architecture rules, and the optional `scripts/architecture-gate.mjs` only when the user deliberately configures an architecture CI gate. No automatic provider calls or CI enforcement.
+
+- Use `envelope_capabilities` for mode and optional executable presence with manual-only route suggestions; never treat detection as activation. Use native `envelope_code_graph export format:svg|obsidian` for static, safely escaped graph views. `envelope_code_external_graph action:communities` reports only external exporter-declared groups.

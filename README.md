@@ -73,3 +73,7 @@ Envelope's native modules are independently authored adaptations; the 33 origina
 ## Additional native graph/retrieval tooling (v0.20.0 candidate)
 
 `envelope_code_retrieve` ranks and hash-verifies local indexed symbols/files without a model or embeddings; `envelope_code_policy` evaluates user-supplied architecture boundaries and incoming-file-degree heuristics. An optional standalone `scripts/architecture-gate.mjs` can fail a user-configured CI job but **does not run by default**. The external graph reader also consumes actual Graphify.NET `graph.json` edge and source-location fields and redacts foreign Windows/UNC paths. See [retrieval](docs/CODE_RETRIEVAL.md), [policies](docs/ARCHITECTURE_POLICY.md), and [.NET interoperability](docs/GRAPHIFY_DOTNET.md).
+
+## Capability discovery and read-only visual interoperability (v0.21.0 candidate)
+
+`envelope_capabilities` shows actual Envelope mode toggles, detected-but-unverified external CLI presence and manual orientation/review/resume tool sequences. `envelope_code_graph` can export a bounded static SVG or Obsidian-compatible Mermaid Markdown note with safely encoded labels. `envelope_code_external_graph` can inspect Graphify/Graphify.NET exporter-declared communities, never as native inferred graph proof. None of these changes install new host adapters, execute external CLI tools, modify a vault or publish a service. See [capability cockpit](docs/CAPABILITY_COCKPIT.md) and [visual exports](docs/GRAPH_VIEW_EXPORT.md).

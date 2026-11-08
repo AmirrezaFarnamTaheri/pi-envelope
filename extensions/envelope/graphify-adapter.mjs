@@ -18,7 +18,7 @@ const MAX_EDGES=8000;
 const MAX_WATCH_DIRS=16;
 const HASH=/^[a-f0-9]{64}$/;
 const TRUST='external-assertion-not-native-AST';
-const ACTIONS=new Set(['status','nodes','neighbors','path','watch']);
+const ACTIONS=new Set(['status','nodes','neighbors','communities','path','watch']);
 const DIRS=new Set(['outgoing','incoming','both']);
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 const safeString=(value,max)=>typeof value==='string' && value.length>0 && value.length<=max && !/[\u0000-\u001f\u007f]/.test(value);
@@ -109,10 +109,12 @@ function decodeGraph(bytes,root){
       :externalFilePath(root,record.file_path,counters);
     const location=record.source_location??record.metadata?.source_location;
     if(location!==undefined&&!safeString(location,120))throw new Error('invalid graph node location');
+    const community=record.community;
+    if(community!==undefined&&community!==null&&!((Number.isInteger(community)&&community>=0&&community<=100000)||safeString(community,80)))throw new Error('invalid graph node community');
     const confidence=record.confidence;
     if(confidence!==undefined&&!['EXTRACTED','INFERRED','AMBIGUOUS'].includes(confidence))throw new Error('invalid graph node confidence');
     nodes.push({id,name,type,...(path?{path}:{}),...(location?{sourceLocation:location}:{}),
-      ...(confidence?{confidence}:{}),evidence:'external-graph-assertion'});
+      ...(confidence?{confidence}:{}),...(community===null||community===undefined?{}:{community}),evidence:'external-graph-assertion'});
   }
   const edges=[];
   for(const edge of links){
@@ -270,6 +272,19 @@ export class ExternalGraphReader {
     const common={state:status.state,trust:TRUST,reasons:[...status.reasons,...warning],
       complete:false,watch};
     const limit=bounded(args.limit,15,1,25,'limit');
+    if(action==='communities'){
+      const groups=new Map();
+      for(const node of graph.nodes){
+        if(node.community===undefined)continue;
+        const id=node.community,key=String(id);
+        if(!groups.has(key))groups.set(key,{id,members:[]});
+        groups.get(key).members.push(node.id);
+      }
+      const ranked=[...groups.values()].map(c=>({id:c.id,size:c.members.length,sample:c.members.sort().slice(0,8),
+        sampleTruncated:c.members.length>8})).sort((a,b)=>b.size-a.size||String(a.id).localeCompare(String(b.id)));
+      return {action,...common,evidence:'exporter-declared-community-not-inferred',
+        total:ranked.length,communities:ranked.slice(0,limit),truncated:ranked.length>limit};
+    }
     if(action==='nodes'){
       const term=typeof args.query==='string'?args.query.toLowerCase():'';
       if(term.length>150)throw new RangeError('query length exceeded');

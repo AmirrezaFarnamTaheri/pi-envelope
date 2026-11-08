@@ -6,7 +6,7 @@ const pkg=JSON.parse(read('package.json'));
 import {listSyntaxFiles} from '../scripts/check-syntax.mjs';
 
 test('current distribution checks and ships observability and benchmark without extra Pi hooks',()=>{
-  assert.equal(pkg.version,'0.20.0');
+  assert.equal(pkg.version,'0.21.0');
   assert.equal(pkg.pi.extensions.filter(s=>s.endsWith('/envelope/index.js')).length,1);
   for(const path of ['extensions/envelope/metrics-ledger.mjs','extensions/envelope/metrics-api.mjs','scripts/benchmark.mjs']){
     assert.equal(existsSync(new URL('../'+path,import.meta.url)),true,path);
