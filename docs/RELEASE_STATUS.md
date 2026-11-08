@@ -101,3 +101,7 @@ A manually launched newline-delimited JSON-RPC MCP 2025-11-25 stdio process can 
 ## Bounded TypeScript compiler facts (stacked draft)
 
 `envelope_code_typecheck` uses the actual TypeScript 5.8.3 TypeChecker over bounded SHA-verified JS/TS source from the shared CodeIndex. It provides type errors, exact indexed declaration positions and aliases across modules; it does not run/emit project code, compile Python/Go/C#, resolve arbitrary npm packages or certify program correctness. Unresolved modules and coverage gaps are explicit. Seven TypeScript compiler tests cover real type resolution, mismatch diagnostics, staleness, unsafe paths and one native Pi tool. See `docs/TYPESCRIPT_COMPILER_EVIDENCE.md`; hosted CI must pass on this head before claiming review readiness.
+
+## Authenticated read-only GraphQL local projection (stacked draft)
+
+An operator-launched `scripts/envelope-graphql-local.mjs` uses optional reference GraphQL.js on `127.0.0.1`, requiring a strong bearer token. Its only queries list, inspect and diff previously captured private file-graph versions. Browser `Origin`, GET, mutation, introspection and excessive AST/query/request/output shapes fail closed. No public endpoint, source rescanning, model, automatic service startup, database migration or new Pi hook is added. Local HTTP/security tests and a separate real pinned GraphQL.js hosted smoke are required. This is **not** the full OpenGraphify NestJS/Apollo/Prisma application. See `docs/GRAPHQL_HISTORY_BRIDGE.md`.
