@@ -41,6 +41,7 @@ pi install .
 | Local vectors (explicit opt-in) | `envelope_code_vector` | Source-hash verified cosine/hybrid ranking over user-provided numeric embeddings, no encoder or provider calls |
 | Static graph invariant checks | `envelope_code_invariant` | Verified import cycles, reachability and no-path closures with checkable witnesses; no program-correctness proof |
 | TypeScript compiler evidence | `envelope_code_typecheck` | Real pinned TypeScript 5.8.3 typechecker diagnostics and cross-module declaration/type facts over verified indexed JS/TS |
+| Go compiler evidence | `envelope_code_go_types` | Actual offline Go `go/types` package-local typed declarations/diagnostics from source-hash-verified Go index; no project builds or cross-language proof |
 | Graphify.NET CLI (explicit) | `envelope_graphify_dotnet` status; `/envelope graphify-dotnet ...` | Separate .NET 10 AST-only runtime, pinned executable, no credential inheritance, separate unverified graph output |
 | Graphify CLI (opt-in) | `/envelope graphify status/on/off/binary/timeout/orientation/build/update/watch`, `envelope_graphify_cli` | User-pinned external Graphify executable: status, read-only query/path/explain, explicit human build/update or consent-only session code watch, no LLM provider keys; bounded and stale-aware |
 | Changes | `envelope_code_change_impact` | Commit-pinned clean-checkout diff with changed-line evidence, static dependents, and candidate tests; not a complete semantic blast radius |
@@ -104,3 +105,5 @@ For explicit durable static graph history, see [persistent graph version command
 [TypeScript compiler evidence](docs/TYPESCRIPT_COMPILER_EVIDENCE.md) documents checked JS/TS types, bounded diagnostic provenance, and explicit multi-language gaps.
 
 **Optional local GraphQL:** an operator-started [GraphQL.js history bridge](docs/GRAPHQL_HISTORY_BRIDGE.md) offers authenticated **loopback-only, read-only** queries over previously captured graph metadata. It does not start a public server, scan code, or install GraphQL.js automatically.
+
+[Go compiler evidence](docs/GO_COMPILER_EVIDENCE.md) documents the scoped offline go/types adapter, trust boundaries and unsupported external imports.
