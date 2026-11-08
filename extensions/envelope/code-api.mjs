@@ -80,7 +80,7 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
     }), (index,params)=>inspectCodeGraph(index,params));
   tool('envelope_code_external_graph','Envelope: External Graphify Artifact',
     'Explicitly inspect a local graphify-out/graph.json node-link graph as untrusted external assertions. Check hash-attested source freshness, bounded nodes/paths/edges, and opt-in debounce watcher. Never merges edges with native AST, runs Graphify or makes model calls.',
-    schema({action:{type:'string',enum:['status','nodes','neighbors','communities','path','watch']},
+    schema({action:{type:'string',enum:['status','nodes','neighbors','communities','path','explain','watch']},
       source:{type:'string',description:'External node ID for neighbors or path'},
       target:{type:'string',description:'External destination node ID for path'},
       query:{type:'string',description:'Optional node name/ID/type substring filter'},
