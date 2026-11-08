@@ -165,7 +165,7 @@ export class GraphifyCliBridge {
     }else if(action==='explain'){
       args=['explain',safeInput(params.source,'source',200)];
     }else if(action==='build'){
-      args=['extract','.','--code-only','--no-cluster','--out','graphify-out'];
+      args=['extract','.','--code-only','--no-cluster'];
     }else if(action==='update'){
       args=['update','.','--no-cluster'];
     }
