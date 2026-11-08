@@ -7,6 +7,7 @@ import {inspectCodeHistory} from './code-history.mjs';
 import {inspectCochangeCoupling} from './cochange-review.mjs';
 import {GraphVersionStore} from './graph-versions.mjs';
 import {searchLocalVectors} from './local-vectors.mjs';
+import {verifyGraphInvariant} from './graph-invariants.mjs';
 import {homedir} from 'node:os';
 import {join} from 'node:path';
 import {projectContextCard} from './context-card.mjs';
@@ -107,6 +108,14 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
       maxCommits:intProp('Maximum Git commits examined, 1-100',1,100),
       limit:intProp('Maximum reported related/churn files, 1-20',1,20)}),
     (index,params)=>inspectCodeHistory(index,params));
+  tool('envelope_code_invariant','Envelope: Checkable Static File-Graph Invariant',
+    'Check SHA-verified current static file-import graph for acyclicity or reachability. Return inspectable cycle/path/order certificates or unknown; never claims program correctness.',
+    schema({action:{type:'string',enum:['acyclic','reach','no-path']},
+      source:{type:'string',description:'Exact indexed origin path for reach/no-path'},
+      target:{type:'string',description:'Exact indexed destination path for reach/no-path'},
+      maxNodes:intProp('Maximum graph nodes 1-500',1,500),
+      maxChars:intProp('Maximum serialized JSON bytes 900-16000',900,16000)}),
+    (index,params)=>verifyGraphInvariant(index,params));
   tool('envelope_code_vector','Envelope: Opt-In Local Vector and Lexical Retrieval',
     'Offline cosine/hybrid ranking of user-supplied embeddings, matched to current source SHA-256. No automatic model download or provider call; explicit /envelope code vectors on required.',
     schema({action:{type:'string',enum:['status','search']},
