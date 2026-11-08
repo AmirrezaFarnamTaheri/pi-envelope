@@ -104,14 +104,16 @@ export function projectContext(messages, options) {
           if (!recalled || recalled.project !== options.project || recalled.text !== original) continue;
         } else {
           if (newBlocks.length >= 128) break; // Bounded, cache-friendly batch per invocation.
-          const saved = options.store.save({text:original,project:options.project,tool:message.toolName,command});
+          if(options.store.isErased?.(id,options.project))continue;
+          const saved = options.store.save({text:original,project:options.project,tool:message.toolName,command,historical:true});
           if (saved.id !== id) continue;
           newBlocks.push({callId:message.toolCallId,outputId:id,commandHash,
             sourceBytes:originalBytes,renderedBytes:Buffer.byteLength(result)});
         }
       } else {
         // Backwards compatible stateless API for isolated projection consumers.
-        options.store.save({text:original,project:options.project,tool:message.toolName,command});
+        if(options.store.isErased?.(id,options.project))continue;
+        options.store.save({text:original,project:options.project,tool:message.toolName,command,historical:true});
       }
       if (rendered === messages) rendered = messages.slice();
       rendered[i] = { ...message, content:[{ ...message.content[0], text:result }] };
@@ -125,7 +127,7 @@ export function projectContext(messages, options) {
   if (newBlocks.length) {
     try {options.frontier.recordBatch({project:options.project,sessionId:options.sessionId,
       anchorCallId:options.anchorCallId,blocks:newBlocks});}
-    catch {return unchanged(messages);} // Never publish unjournaled previews.
+    catch {return {...unchanged(messages),storageFailure:"context replay frontier write failed"};} // Never publish unjournaled previews.
   }
   return { changed:compacted > 0, messages:rendered, compacted, rawBytes, renderedBytes };
 }

@@ -58,6 +58,7 @@ export function registerContextFeature(pi, deps) {
       const result = projectContext(event.messages,{
         ...settings,project:cwd,sessionId,store,frontier,anchorCallId:active.callId
       });
+      if (result.storageFailure){pi.logger?.warn?.('[envelope] '+result.storageFailure+'; original context retained');return;}
       if (!result.changed) return;
       metrics.contextCompacted += result.compacted;
       metrics.contextRawBytes += result.rawBytes;

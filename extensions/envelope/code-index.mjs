@@ -145,6 +145,28 @@ function resolvePythonModule(from, spec, available) {
   return candidates.filter(candidate=>available.has(candidate));
 }
 
+/** An existing but ignored, oversized, unreadable or unparsed Python initializer
+ * cannot be treated like an absent namespace-package initializer. */
+function initializerUnavailable(root,from,spec,files){
+  const dots=/^\.+/.exec(spec)?.[0].length||0;
+  if(!dots)return false;
+  const folder=posix.dirname(from);
+  const segments=folder==='.'?[]:folder.split('/');
+  if(dots>segments.length)return true;
+  const names=spec.slice(dots).split('.').filter(Boolean);
+  const base=[...segments.slice(0,segments.length-(dots-1)),...names].join('/');
+  for(const suffix of ['__init__.py','__init__.pyi']){
+    const key=base?`${base}/${suffix}`:suffix;
+    if(files.has(key)){
+      const record=files.get(key);
+      if(record?.diagnostics?.length || record?.moduleBindingsTruncated)return true;
+      continue;
+    }
+    try{lstatSync(join(root,key));return true;}catch(err){if(err?.code!=='ENOENT')return true;}
+  }
+  return false;
+}
+
 /** Go import edges are package-level: all indexed .go files in the imported module directory. */
 function goModule(root) {
   try {
@@ -295,7 +317,8 @@ export class CodeIndex {
         this.importers.get(imported).add(file);
       }
     }
-    this.callGraph=buildCallEvidence(this.files,{resolveModule,resolvePythonModule,resolveGoPackage,goModule:moduleName});
+    this.callGraph=buildCallEvidence(this.files,{resolveModule,resolvePythonModule,resolveGoPackage,goModule:moduleName,
+      initializerUnavailable:(file,spec)=>initializerUnavailable(this.root,file,spec,this.files)});
     const languages={};
     for(const record of this.files.values())languages[record.language]=(languages[record.language]||0)+1;
     this.lastRefresh={revision:this.lastRevision,files:this.files.size,symbols:[...this.files.values()].reduce((n,r)=>n+r.symbols.length,0),

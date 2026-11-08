@@ -54,24 +54,27 @@ export class ContextFrontier {
     this.closed=false;
     try{
       chmodSync(path,0o600);
-      const version=this.db.prepare('PRAGMA user_version').get().user_version;
-      if(version!==0&&version!==VERSION)throw new Error(`unsupported context frontier schema version: ${version}`);
-      this.db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;');
-      if(version===0){
-        this.db.exec(`
-          BEGIN IMMEDIATE;
-          CREATE TABLE context_blocks (
-            scope TEXT NOT NULL, anchor TEXT NOT NULL, call_key TEXT NOT NULL,
-            output_id TEXT NOT NULL, command_hash TEXT NOT NULL,
-            source_bytes INTEGER NOT NULL, rendered_bytes INTEGER NOT NULL,
-            created_at TEXT NOT NULL,
-            PRIMARY KEY(scope, anchor, call_key)
-          );
-          CREATE INDEX context_blocks_by_checkpoint ON context_blocks(scope,anchor,created_at,call_key);
-          PRAGMA user_version=1;
-          COMMIT;
-        `);
-      }
+      this.db.exec('PRAGMA busy_timeout=2500; PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;');
+      // Serialize the version check with table creation across Pi processes.
+      this.db.exec('BEGIN IMMEDIATE');
+      try {
+        const version=this.db.prepare('PRAGMA user_version').get().user_version;
+        if(version!==0&&version!==VERSION)throw new Error(`unsupported context frontier schema version: ${version}`);
+        if(version===0){
+          this.db.exec(`
+            CREATE TABLE IF NOT EXISTS context_blocks (
+              scope TEXT NOT NULL, anchor TEXT NOT NULL, call_key TEXT NOT NULL,
+              output_id TEXT NOT NULL, command_hash TEXT NOT NULL,
+              source_bytes INTEGER NOT NULL, rendered_bytes INTEGER NOT NULL,
+              created_at TEXT NOT NULL,
+              PRIMARY KEY(scope, anchor, call_key)
+            );
+            CREATE INDEX IF NOT EXISTS context_blocks_by_checkpoint ON context_blocks(scope,anchor,created_at,call_key);
+            PRAGMA user_version=1;
+          `);
+        }
+        this.db.exec('COMMIT');
+      }catch(err){this.db.exec('ROLLBACK');throw err;}
       this.lookup=this.db.prepare('SELECT output_id,command_hash,source_bytes,rendered_bytes FROM context_blocks WHERE scope=? AND anchor=? AND call_key=?');
       this.insert=this.db.prepare('INSERT INTO context_blocks (scope,anchor,call_key,output_id,command_hash,source_bytes,rendered_bytes,created_at) VALUES (?,?,?,?,?,?,?,?)');
       this.listRows=this.db.prepare('SELECT call_key,output_id,source_bytes,rendered_bytes FROM context_blocks WHERE scope=? AND anchor=? ORDER BY created_at,call_key LIMIT ?');

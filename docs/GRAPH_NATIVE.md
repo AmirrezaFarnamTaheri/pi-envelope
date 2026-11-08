@@ -14,7 +14,7 @@ One tool is registered by `registerCodeFeature`: **`envelope_code_graph`**. It i
 | `hubs` | relation, limit | Ranked by **distinct inbound files**, plus source/call count details |
 | `components` | relation, limit | Weakly connected components, at most 25 displayed; **not** Louvain or semantic communities |
 | `boundaries` | `rules:[{from:'src/domain/',forbid:['src/infra/']}]`, relation, limit | Up to 50 advisory violations found in current static import/call graph; **not** a CI gate |
-| `export` | `format:'json'|'mermaid'`, relation, limit | At most 100 nodes and 250 edges in read-only tool result, no file writes |
+| `export` | `format:'json'\|'mermaid'`, relation, limit | At most 100 nodes and 250 edges in read-only tool result, no file writes |
 
 Examples:
 
@@ -34,7 +34,7 @@ Examples:
 
 - An `imports` edge means `CodeIndex` resolved a **static** JS/TS, opted-in Python or Go package import. A `calls` edge means the existing call-evidence linker found a uniquely resolved **syntactic** candidate; it is not type-checked or runtime proof. The `evidence` property is always `parsed-static-import` or `resolved-syntactic-call`.
 - The existing `indexOf(ctx)` performs hash-aware `refresh()` immediately before each query. The inherited `checkedPath` rejects outside-root and unindexed paths, including symlink substitutions.
-- At most 2,000 indexed files, 15,000 file edges and 400 visited path nodes are admitted by this derived projection. Unavailable optional parsers, omitted or unresolved call facts, edge caps, path depth caps and visit caps mark `complete:false` with explicit `reasons`. A graph exceeding the 2,000-file hard budget returns an error rather than a misleading partial graph. A missing route is **not** negative proof if the search is incomplete. A `complete:true` result still only claims complete traversal of known source-evidence edges, not semantic completeness.
+- At most 2,000 indexed files, 15,000 file edges and 400 visited path nodes are admitted by this derived projection. Unavailable optional parsers, omitted or unresolved call facts, edge caps, path depth caps and visit caps mark `complete:false` with explicit `reasons`. A graph exceeding the 2,000-file hard budget returns an error rather than a misleading partial graph. A missing route is **not** negative proof if the search is incomplete. A `complete:true` result only covers known source-evidence edges, not semantic completeness. A successful `path` can report `complete:true` without visiting every reachable edge: it guarantees a shortest path in the known source-evidence graph.
 - Exports use project-relative paths and do not write to disk, execute code, fetch URLs, spawn providers, embed arbitrary graph HTML or expose raw source bodies. The underlying CodeIndex refresh can run bounded Git and optional stdlib AST subprocesses as before.
 
 ## Non-goals and follow-on work

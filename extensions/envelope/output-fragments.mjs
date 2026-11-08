@@ -63,7 +63,7 @@ export function rankFragments(chunks,query,{limit=10,maxPreviewChars=320}={}) {
 /** Bounded indexing segments; long individual lines are split with overlap.
  * Each segment carries a 1-based line span into the original, unmodified output.
  * Unlike display snippets, these sections are also a durable search boundary. */
-export function splitIndexedChunks(text,{maxChars=1200,overlap=80}={}) {
+export function splitIndexedChunks(text,{maxChars=1200,overlap=256}={}) {
   if (!Number.isInteger(maxChars) || maxChars<300 || maxChars>1400 ||
     !Number.isInteger(overlap) || overlap<0 || overlap>=maxChars/2) {
     throw new RangeError('invalid chunk length/overlap');

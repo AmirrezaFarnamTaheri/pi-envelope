@@ -202,7 +202,9 @@ export function registerEnvelope(pi, options = {}) {
       if(!store)return textReply('Local output store unavailable.',true);
       try {
         const report=store.searchFragmentsReport(p?.query,{project:project(ctx),limit:p?.limit??10});
-        return textReply(JSON.stringify(report.hits,null,2),false,{chunkIndex:report.index});
+        const result=textReply(JSON.stringify(report.hits,null,2),false,{chunkIndex:report.index});
+        if(report.index.partial)result.content.push({type:'text',text:`Search incomplete; index coverage: ${JSON.stringify(report.index)}`});
+        return result;
       }
       catch(err){return textReply(`Could not search fragments: ${err.message}`,true);}
     }
@@ -241,10 +243,11 @@ export function registerEnvelope(pi, options = {}) {
       if (!store) return textReply('Local output store unavailable.', true);
       try {
         const {hits,coverage} = store.searchReport(params?.query, {project: project(ctx), limit: params?.limit});
-        const message=hits.length?JSON.stringify(hits,null,2)
-          : coverage.partial?'No verified captured output matched this query (search incomplete; see searchCoverage).'
-            :'No captured output matched this query.';
-        return textReply(message,false,{searchCoverage:coverage});
+        const message=hits.length?JSON.stringify(hits,null,2):coverage.partial
+          ?'No verified captured output matched this query (search incomplete).':'No captured output matched this query.';
+        const result=textReply(message,false,{searchCoverage:coverage});
+        if(coverage.partial)result.content.push({type:'text',text:`Search incomplete; coverage: ${JSON.stringify(coverage)}`});
+        return result;
       } catch (err) { return textReply(`Could not search output: ${err.message}`, true); }
     }
   });

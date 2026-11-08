@@ -90,6 +90,10 @@ jobs:
           archive="$(node -e "const fs=require('node:fs');const a=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));if(a.length!==1||!a[0].filename)process.exit(1);process.stdout.write(a[0].filename)" "$RUNNER_TEMP/pack-metadata.json")"
           tar -xzf "$RUNNER_TEMP/envelope-dist/$archive" -C "$RUNNER_TEMP/envelope-unpacked"
           node "$RUNNER_TEMP/envelope-unpacked/package/scripts/verify-bundle.mjs"
+          # The packed-runtime step is independently runnable even if prior
+          # smoke gates failed: initialize only this job's disposable HOME.
+          mkdir -p "$RUNNER_TEMP/envelope-ci-home/.tersio"
+          printf '{"comboSetupComplete":true,"comboDefault":"off"}\n' > "$RUNNER_TEMP/envelope-ci-home/.tersio/settings.json"
           HOME="$RUNNER_TEMP/envelope-ci-home" node "$RUNNER_TEMP/envelope-unpacked/package/scripts/smoke-runtime.mjs"
           cp "$RUNNER_TEMP/pack-metadata.json" "$RUNNER_TEMP/envelope-dist/pack-metadata.json"
           if [ -f package-lock.json ]; then cp package-lock.json "$RUNNER_TEMP/envelope-dist/package-lock.json"; fi

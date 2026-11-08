@@ -92,10 +92,11 @@ export function scanTsCallFacts(ts,sf){
 }
 
 function atMostOne(values){return values.length===1?values[0]:null;}
-function chooseTarget(file,call,files,resolveImport,goModule,goPackageFunctions){
+function chooseTarget(file,call,files,resolveImport,goModule,goPackageFunctions,initializerUnavailable){
   if(call.form==='direct'&&call.shadowed)return {reason:'shadowed'};
   const record=files.get(file);
   const declarations=record.declarations||[];
+  if(record.language==='python'&&record.moduleBindingsTruncated)return {reason:'ambiguous-target'};
   // The same local name can be introduced by a declaration and an import.
   // Python rebinding order can be dynamic; never guess which one is callable.
   const candidates=(record.bindings||[]).filter(b=>{
@@ -108,8 +109,10 @@ function chooseTarget(file,call,files,resolveImport,goModule,goPackageFunctions)
     // A named import can rebind a module alias even though it is not itself a
     // namespace candidate. Likewise, module-level functions/classes bind names.
     if((record.bindings||[]).filter(b=>b.local===call.receiver).length>1)return {reason:'ambiguous-import'};
-    if(declarations.some(decl=>decl.name===call.receiver)||
-      record.symbols?.some(s=>s.kind==='class'&&s.name===call.receiver))return {reason:'ambiguous-target'};
+    // `moduleAssigned` contains only outer/module-scoped bindings. A nested
+    // class of the same name inside another function is irrelevant here.
+    if(declarations.some(decl=>decl.name===call.receiver))return {reason:'ambiguous-target'};
+    if(record.moduleAssigned?.includes(call.receiver))return {reason:'shadowed'};
   }
   let matches=[];
   if(call.form==='direct'){
@@ -129,9 +132,13 @@ function chooseTarget(file,call,files,resolveImport,goModule,goPackageFunctions)
   if(!binding)return {reason:call.form==='member'?'dynamic-member':'unknown-target'};
   if(call.form==='direct'&&binding.kind==='named'&&binding.imported==='*')return {reason:'ambiguous-import'};
   if(record.language==='python'&&binding.fromPackage){
+    // A parsed but truncated initializer is ambiguous; a physically existing
+    // initializer that was omitted from the index is unavailable.
+    const parents=resolveImport(record,file,{spec:binding.fromPackage},goModule,files);
+    if(parents.some(parent=>files.get(parent)?.moduleBindingsTruncated))return {reason:'ambiguous-target'};
+    if(initializerUnavailable(file,binding.fromPackage))return {reason:'initializer-unavailable'};
     // "from . import module" can also resolve a same-named attribute in
     // __init__. A statically declared competing name makes this ambiguous.
-    const parents=resolveImport(record,file,{spec:binding.fromPackage},goModule,files);
     if(parents.some(parent=>{
       const record=files.get(parent);
       return record?.moduleBindingsTruncated || record?.moduleAssigned?.includes(binding.imported) ||
@@ -145,6 +152,9 @@ function chooseTarget(file,call,files,resolveImport,goModule,goPackageFunctions)
     if(binding.kind==='package'&&!binding.explicit&&targetRecord?.package!==binding.local)continue;
     for(const decl of targetRecord?.declarations||[]){
       if(decl.name!==(binding.kind==='named'?binding.imported:call.name))continue;
+      if(targetRecord.language==='python' && (targetRecord.moduleBindingsTruncated ||
+          targetRecord.moduleAssigned?.includes(decl.name) ||
+          targetRecord.bindings?.some(b=>b.local===decl.name)))return {reason:'ambiguous-target'};
       if(targetRecord.language==='typescript'&&!decl.exported)continue;
       if(targetRecord.language==='go'&&!/^[A-Z]/.test(decl.name))continue;
       matches.push({path:targetFile,name:decl.name,line:decl.line});
@@ -156,7 +166,7 @@ function chooseTarget(file,call,files,resolveImport,goModule,goPackageFunctions)
 }
 
 /** Link cached per-file facts without reparsing files, with deterministic source order. */
-export function buildCallEvidence(files,{resolveModule,resolvePythonModule,resolveGoPackage,goModule}={}){
+export function buildCallEvidence(files,{resolveModule,resolvePythonModule,resolveGoPackage,goModule,initializerUnavailable=()=>false}={}){
   const outgoing=new Map(),incoming=new Map(),unresolved=new Map();
   let linkedCalls=0,unresolvedCalls=0,callSites=0,omittedCalls=0;
   const available=new Set(files.keys());
@@ -187,7 +197,7 @@ export function buildCallEvidence(files,{resolveModule,resolvePythonModule,resol
     for(const call of record.calls||[]){
       callSites++;
       const base={path,caller:call.caller,name:call.name,form:call.form,line:call.line,column:call.column};
-      const verdict=chooseTarget(path,call,files,resolveImport,goModule,goPackageFunctions);
+      const verdict=chooseTarget(path,call,files,resolveImport,goModule,goPackageFunctions,initializerUnavailable);
       if(verdict.target){
         const edge={...base,target:verdict.target,resolution:verdict.resolution};
         resolved.push(edge);linkedCalls++;

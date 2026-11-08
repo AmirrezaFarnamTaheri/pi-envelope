@@ -37,3 +37,14 @@ Pattern references: [MasuRii/pi-rtk-optimizer pinned revision](https://github.co
 ## v0.17.0 whole-output search integrity hardening
 
 The legacy `envelope_search_output` search index is treated as **candidate discovery only**, just as the newer chunk index is. Results are returned only when the project scope agrees in both FTS and raw metadata, the content-addressed object passes exact SHA-256/byte validation, and the query terms exist in the verified original. Preview text is created exclusively from that original, never from a possibly stale or poisoned FTS snippet. Missing or corrupt raw objects are skipped rather than leaked through the index. Search is bounded to at most 100 candidates and 8 MB of verified original text per request; its `details.searchCoverage` reports skipped/unverified candidates, candidate-budget limits, and an explicit `partial` flag. A partial no-match response does **not** prove no evidence exists. Tests: `tests/output-search-integrity.test.mjs`.
+
+## 2026-11-08 review hardening
+
+Erasure creates a hash-only, project-scoped tombstone, preventing context
+projection under another checkpoint from re-creating a deleted historical
+object. Fresh tool execution may create a matching object again. Optional
+chunk-index initialization failures do not prevent exact recall, and owner-
+authorized deletion removes derived chunks by output ID even if FTS project
+metadata was tampered with. Search indexes are untrusted; integrity failures,
+resource budgets, and interrupted migration are reported as incomplete, both
+in tool details and a separate model-visible text block.

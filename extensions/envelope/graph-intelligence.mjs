@@ -209,7 +209,13 @@ function boundaries(graph,args){
     ruleCount:rules.length,total:found.length,violations:found.slice(0,limit),truncated:found.length>limit,
     complete:graph.reasons.length===0,reasons:graph.reasons};
 }
-function safeMermaid(path){return JSON.stringify(path).replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('&quot;','\\"');}
+function safeMermaid(path){
+  // Mermaid quoted-string lexer does not treat JSON backslash escapes as
+  // escaped quotes. Use Mermaid's own numeric entities instead.
+  return '"'+String(path).replace(/&/g,'#amp;').replace(/"/g,'#quot;')
+    .replace(/</g,'#lt;').replace(/>/g,'#gt;')
+    .replace(/[\r\n]/g,'#10;')+'"';
+}
 function exported(graph,args){
   const limit=boundedInteger(args.limit,30,1,100,'limit');
   const format=args.format||'json';

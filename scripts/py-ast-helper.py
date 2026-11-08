@@ -5,6 +5,7 @@ import sys
 
 MAX_CALLS = 200
 MAX_MODULE_BINDINGS = 1000
+MAX_IMPORT_BINDINGS = 1000
 
 
 def parse(record):
@@ -85,21 +86,34 @@ def parse(record):
                     report['bindings'].append({'kind': 'named', 'local': (alias.asname or alias.name)[:128],
                                                'imported': alias.name[:128], 'spec': base})
 
+    # Keep each parsed file valid when an enormous source exceeds the import-fact cap.
+    # A truncated module is never granted trusted static import edges.
+    imports_truncated = len(report['bindings']) > MAX_IMPORT_BINDINGS
+    report['bindings'] = report['bindings'][:MAX_IMPORT_BINDINGS]
+
     # Any top-level assignment/rebinding can invalidate a module alias, even if
     # hidden in an if/for/with/try branch. Never scan the body of a nested scope.
     module_assignments = set()
 
     class TopLevelBinder(ast.NodeVisitor):
         def visit_FunctionDef(self, node):
-            return
+            # Only functions visited via a module-level conditional/loop are
+            # competing module bindings; their bodies are separate scopes.
+            module_assignments.add(node.name)
         visit_AsyncFunctionDef = visit_FunctionDef
         def visit_ClassDef(self, node):
             module_assignments.add(node.name)
+            # Class body assignments are class attributes, not module names.
         def visit_Lambda(self, node):
             return
         def visit_Import(self, node):
-            return  # Expected imports are checked for ambiguity by the linker.
-        visit_ImportFrom = visit_Import
+            # Imports in a module-level conditional are rebinding candidates.
+            for alias in node.names:
+                module_assignments.add(alias.asname or alias.name.split('.')[0])
+        def visit_ImportFrom(self, node):
+            for alias in node.names:
+                if alias.name != '*':
+                    module_assignments.add(alias.asname or alias.name)
         def visit_Name(self, node):
             if isinstance(node.ctx, (ast.Store, ast.Del)):
                 module_assignments.add(node.id)
@@ -118,13 +132,32 @@ def parse(record):
             if node.rest:
                 module_assignments.add(node.rest)
             self.generic_visit(node)
+        def visit_ListComp(self, node):
+            self.visit(node.elt)
+            for generator in node.generators:
+                self.visit(generator.iter)
+                for condition in generator.ifs:
+                    self.visit(condition)
+        visit_SetComp = visit_ListComp
+        visit_GeneratorExp = visit_ListComp
+        def visit_DictComp(self, node):
+            self.visit(node.key)
+            self.visit(node.value)
+            for generator in node.generators:
+                self.visit(generator.iter)
+                for condition in generator.ifs:
+                    self.visit(condition)
 
     binder = TopLevelBinder()
     for item in root.body:
+        # Root function declarations are handled by `declarations`; only
+        # conditionally declared functions count as uncertain rebinding.
+        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Import, ast.ImportFrom)):
+            continue
         binder.visit(item)
     ordered = sorted(module_assignments)
     report['moduleAssigned'] = [name[:128] for name in ordered[:MAX_MODULE_BINDINGS]]
-    report['moduleBindingsTruncated'] = len(ordered) > MAX_MODULE_BINDINGS
+    report['moduleBindingsTruncated'] = imports_truncated or len(ordered) > MAX_MODULE_BINDINGS
 
     def function_calls(fn, name):
         local = set(module_assignments)
@@ -152,6 +185,21 @@ def parse(record):
             def visit_ImportFrom(self, node):
                 for alias in node.names:
                     local.add(alias.asname or alias.name)
+            def visit_ExceptHandler(self, node):
+                if node.name:
+                    local.add(node.name)
+                self.generic_visit(node)
+            def visit_MatchAs(self, node):
+                if node.name:
+                    local.add(node.name)
+                self.generic_visit(node)
+            def visit_MatchStar(self, node):
+                if node.name:
+                    local.add(node.name)
+            def visit_MatchMapping(self, node):
+                if node.rest:
+                    local.add(node.rest)
+                self.generic_visit(node)
         binder = LocalBinder()
         for statement in fn.body:
             binder.visit(statement)

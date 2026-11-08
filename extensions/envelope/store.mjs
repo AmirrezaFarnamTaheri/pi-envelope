@@ -9,9 +9,11 @@ import { join } from 'node:path';
 import { splitIndexedChunks } from './output-fragments.mjs';
 
 const ID = /^[0-9a-f]{64}$/;
-const SEARCH_TERM = /[\p{L}\p{N}_]+/gu;
+const SEARCH_TERM = /[\p{L}\p{N}]+/gu;
 const DEFAULT_MAX_CAPTURE = 2_000_000;
 const BACKFILL_BATCH = 8;
+const BACKFILL_SCAN = 64;
+const CHUNK_FORMAT_VERSION = '2';
 const MAX_SEARCH_CANDIDATES = 200;
 const MAX_VERIFIED_OUTPUTS = 40;
 const MAX_VERIFIED_BYTES = 8_000_000;
@@ -23,19 +25,30 @@ const METADATA_SEARCH_VERIFY_BYTES = 8_000_000;
 function normalizedTerms(text) {
   return String(text).normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().match(SEARCH_TERM) || [];
 }
-function verifiedSearchExcerpt(text, words) {
-  const codepoints=Array.from(text);
-  const lower=text.toLowerCase();
+/** Convert normalized-codepoint indexes to source indexes without losing accents. */
+function normalizedWithOffsets(text) {
+  const original=Array.from(text), offsets=[];
+  let flat='';
+  for(let i=0;i<original.length;i++) {
+    const folded=original[i].normalize('NFD').replace(/\p{M}/gu,'').toLowerCase();
+    for(let j=0;j<folded.length;j++)offsets.push(i);
+    flat+=folded;
+  }
+  return {flat,offsets,original};
+}
+function previewAt(text,words,padding=60) {
+  const {flat,offsets,original}=normalizedWithOffsets(text);
   let first=Infinity;
-  for(const word of words){
-    const at=lower.indexOf(word);
+  for(const word of words) {
+    const at=flat.indexOf(word);
     if(at>=0 && at<first)first=at;
   }
-  const matchStart=Number.isFinite(first)?Array.from(text.slice(0,first)).length:0;
-  const start=Math.max(0,matchStart-60);
-  const end=Math.min(codepoints.length,start+PREVIEW_CHARS);
-  return (start?'…':'')+codepoints.slice(start,end).join('')+(end<codepoints.length?'…':'');
+  const position=Number.isFinite(first)?offsets[first]??0:0;
+  const start=Math.max(0,position-padding),end=Math.min(original.length,start+PREVIEW_CHARS);
+  return {preview:(start?'…':'')+original.slice(start,end).join('')+(end<original.length?'…':''),
+    previewTruncated:start>0||end<original.length};
 }
+function verifiedSearchExcerpt(text, words) {return previewAt(text,words).preview;}
 
 /** @param {string} query */
 function matchExpression(query) {
@@ -44,20 +57,7 @@ function matchExpression(query) {
 }
 
 /** Show the matching span, not a possibly irrelevant prefix; preserve Unicode. */
-function chunkPreview(text,words){
-  const chars=Array.from(text);
-  const haystack=text.toLowerCase();
-  let first=text.length;
-  for(const word of words){
-    const offset=haystack.indexOf(word);
-    if(offset>=0 && offset<first)first=offset;
-  }
-  const codepointStart=first<text.length?Array.from(text.slice(0,first)).length:0;
-  const start=Math.max(0,codepointStart-70);
-  const end=Math.min(chars.length,start+PREVIEW_CHARS);
-  const preview=(start?'…':'')+chars.slice(start,end).join('')+(end<chars.length?'…':'');
-  return {preview,previewTruncated:start>0||end<chars.length};
-}
+function chunkPreview(text,words){return previewAt(text,words,70);}
 
 /** Refuse symlinks and any body whose bytes differ from its project-scoped ID.
  * Open with O_NOFOLLOW when supported to close the final-component symlink race. */
@@ -107,16 +107,6 @@ export class OutputStore {
         id UNINDEXED, project UNINDEXED, tool UNINDEXED, command, text,
         tokenize='unicode61'
       );
-      CREATE TABLE IF NOT EXISTS output_chunks_state (
-        id TEXT PRIMARY KEY REFERENCES outputs(id) ON DELETE CASCADE,
-        project TEXT NOT NULL,
-        chunk_count INTEGER NOT NULL
-      );
-      CREATE VIRTUAL TABLE IF NOT EXISTS output_chunks_fts USING fts5(
-        id UNINDEXED, project UNINDEXED, ordinal UNINDEXED,
-        line_start UNINDEXED, line_end UNINDEXED, text,
-        tokenize='unicode61'
-      );
     `);
     this.lookup = this.db.prepare('SELECT id, project, tool, command, bytes, created_at FROM outputs WHERE id = ?');
     this.insertMeta = this.db.prepare(
@@ -131,21 +121,60 @@ export class OutputStore {
       WHERE outputs_fts MATCH ? AND outputs_fts.project = ? AND o.project = ?
       ORDER BY bm25(outputs_fts), o.id LIMIT ?
     `);
+    this.erasureAvailable=false;
+    try {
+      this.db.exec(`CREATE TABLE IF NOT EXISTS output_erasure_tombstones (
+        id TEXT PRIMARY KEY, project TEXT NOT NULL, deleted_at TEXT NOT NULL
+      )`);
+      this.erasureLookup = this.db.prepare('SELECT 1 AS erased FROM output_erasure_tombstones WHERE id=? AND project=?');
+      this.erasureInsert = this.db.prepare('INSERT OR REPLACE INTO output_erasure_tombstones (id,project,deleted_at) VALUES (?,?,?)');
+      this.erasureClear = this.db.prepare('DELETE FROM output_erasure_tombstones WHERE id=? AND project=?');
+      this.erasureAvailable=true;
+    } catch {
+      // Keep legacy exact recall usable. Historical recapture and deletion
+      // must fail closed when durable erasure protection cannot be provided.
+    }
+    this.chunkAvailable=false;
+    this.backfillCursor=new Map();
+    try {
+      this.db.exec(`
+      CREATE TABLE IF NOT EXISTS output_chunks_state (
+        id TEXT PRIMARY KEY REFERENCES outputs(id) ON DELETE CASCADE,
+        project TEXT NOT NULL,
+        chunk_count INTEGER NOT NULL
+      );
+      CREATE VIRTUAL TABLE IF NOT EXISTS output_chunks_fts USING fts5(
+        id UNINDEXED, project UNINDEXED, ordinal UNINDEXED,
+        line_start UNINDEXED, line_end UNINDEXED, text,
+        tokenize='unicode61'
+      );
+      CREATE TABLE IF NOT EXISTS output_chunk_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      `);
+      // Invalidate v1 windows that could split a token across the old overlap.
+      const version=this.db.prepare("SELECT value FROM output_chunk_meta WHERE key='format'").get()?.value;
+      if(version!==CHUNK_FORMAT_VERSION){
+        this.db.exec('BEGIN IMMEDIATE');
+        try {
+          this.db.exec('DELETE FROM output_chunks_fts; DELETE FROM output_chunks_state;');
+          this.db.prepare("INSERT OR REPLACE INTO output_chunk_meta (key,value) VALUES ('format',?)").run(CHUNK_FORMAT_VERSION);
+          this.db.exec('COMMIT');
+        }catch(e){this.db.exec('ROLLBACK');throw e;}
+      }
     this.chunkState = this.db.prepare('SELECT chunk_count FROM output_chunks_state WHERE id = ?');
     this.chunkMark = this.db.prepare('INSERT INTO output_chunks_state (id, project, chunk_count) VALUES (?, ?, ?)');
     this.chunkInsert = this.db.prepare('INSERT INTO output_chunks_fts (id, project, ordinal, line_start, line_end, text) VALUES (?, ?, ?, ?, ?, ?)');
-    this.chunkDelete = this.db.prepare('DELETE FROM output_chunks_fts WHERE id = ? AND project = ?');
+    this.chunkDelete = this.db.prepare('DELETE FROM output_chunks_fts WHERE id = ?');
     this.chunkStateDelete = this.db.prepare('DELETE FROM output_chunks_state WHERE id = ? AND project = ?');
     this.chunkCandidates = this.db.prepare(`
-      SELECT id, project, ordinal, line_start AS lineStart, line_end AS lineEnd,
-        text, bm25(output_chunks_fts) AS bm25score
-      FROM output_chunks_fts
-      WHERE output_chunks_fts MATCH ? AND project = ?
+      SELECT output_chunks_fts.id AS id, output_chunks_fts.project AS project, ordinal, line_start AS lineStart, line_end AS lineEnd,
+        text, o.bytes AS sourceBytes, bm25(output_chunks_fts) AS bm25score
+      FROM output_chunks_fts JOIN outputs o ON o.id=output_chunks_fts.id
+      WHERE output_chunks_fts MATCH ? AND output_chunks_fts.project = ? AND o.project = ?
       ORDER BY bm25score, id, ordinal LIMIT ?
     `);
     this.chunkPending = this.db.prepare(`
       SELECT o.id FROM outputs o LEFT JOIN output_chunks_state s ON s.id=o.id
-      WHERE o.project=? AND s.id IS NULL ORDER BY o.created_at,o.id LIMIT ?
+      WHERE o.project=? AND s.id IS NULL AND o.id>? ORDER BY o.id LIMIT ?
     `);
     this.chunkCount = this.db.prepare(`
       SELECT COUNT(*) AS total,
@@ -154,12 +183,24 @@ export class OutputStore {
       FROM outputs o LEFT JOIN output_chunks_state s ON o.id=s.id
       WHERE o.project=?
     `);
+      this.chunkAvailable=true;
+    } catch(error) {
+      // A failed *optional* chunk schema must never disable exact output recall.
+      this.chunkError='chunk index unavailable';
+    }
     this.statsStmt = this.db.prepare('SELECT COUNT(*) AS items, COALESCE(SUM(bytes), 0) AS capturedBytes FROM outputs');
     this.statsProjectStmt = this.db.prepare('SELECT COUNT(*) AS items, COALESCE(SUM(bytes), 0) AS capturedBytes FROM outputs WHERE project = ?');
     this.findOld = this.db.prepare('SELECT id FROM outputs WHERE project = ? AND created_at < ? ORDER BY created_at, id LIMIT ?');
     this.deleteMeta = this.db.prepare('DELETE FROM outputs WHERE id = ? AND project = ?');
     this.deleteIndex = this.db.prepare('DELETE FROM outputs_fts WHERE id = ? AND project = ?');
     this.closed = false;
+  }
+
+  isErased(id,project){
+    if(!ID.test(id))throw new TypeError('invalid output identifier');
+    if(this.closed)throw new Error('store is closed');
+    if(!this.erasureAvailable)throw new Error('durable erasure protection unavailable');
+    return Boolean(this.erasureLookup.get(id,project));
   }
 
   objectPath(id) {
@@ -179,6 +220,9 @@ export class OutputStore {
       throw new RangeError('raw output exceeds capture limit');
     }
     const id = createHash('sha256').update(project).update('\0').update(data.text).digest('hex');
+    // Historical projections cannot resurrect a user-erased output. New
+    // live tool results may legitimately create the same content again.
+    if(data.historical && this.isErased(id,project))throw new Error('historical output was erased');
     const body = this.objectPath(id);
     if (!existsSync(body)) {
       const tmp = `${body}.${process.pid}.${randomUUID()}.tmp`;
@@ -195,7 +239,9 @@ export class OutputStore {
     const createdAt = new Date().toISOString();
     this.db.exec('BEGIN IMMEDIATE');
     try {
+      if(data.historical && this.isErased(id,project))throw new Error('historical output was erased');
       const inserted = this.insertMeta.run(id, project, tool, command, bytes, createdAt);
+      if(!data.historical && this.erasureAvailable)this.erasureClear.run(id,project);
       if (inserted.changes) this.insertSearch.run(id, project, tool, command, data.text);
       this.db.exec('COMMIT');
     } catch (error) {
@@ -261,6 +307,7 @@ export class OutputStore {
   deleteRecords(ids, project) {
     if (this.closed) throw new Error('store is closed');
     if (typeof project !== 'string' || !project) throw new TypeError('project scope is required');
+    if(!this.erasureAvailable)throw new Error('durable erasure protection unavailable');
     this.db.exec('BEGIN IMMEDIATE');
     const removed = [];
     try {
@@ -268,8 +315,8 @@ export class OutputStore {
         if (!ID.test(id)) throw new TypeError('invalid output identifier');
         const row = this.lookup.get(id);
         if (!row || row.project !== project) continue;
-        this.chunkDelete.run(id, project);
-        this.chunkStateDelete.run(id, project);
+        if(this.chunkAvailable){this.chunkDelete.run(id);this.chunkStateDelete.run(id, project);}
+        this.erasureInsert.run(id,project,new Date().toISOString());
         this.deleteIndex.run(id, project);
         if (this.deleteMeta.run(id, project).changes) removed.push(id);
       }
@@ -304,6 +351,7 @@ export class OutputStore {
   /** Index one verified raw output, in one transaction, without duplicating rows. */
   indexOutputChunks({id,project,text}) {
     if(this.closed)throw new Error('store is closed');
+    if(!this.chunkAvailable)return false;
     if(this.chunkState.get(id))return false;
     const chunks=splitIndexedChunks(text);
     this.db.exec('BEGIN IMMEDIATE');
@@ -321,20 +369,36 @@ export class OutputStore {
 
   /** Only existing, integrity-checked output objects can be lazily migrated. */
   backfillOutputChunks(project){
-    let indexed=0;
-    for(const {id} of this.chunkPending.all(project,BACKFILL_BATCH)){
-      try {
-        const row=this.retrieve(id); // SHA-256 verified, owner-scoped body
-        if(row?.project===project && this.indexOutputChunks({id,project,text:row.text}))indexed++;
-      }catch{/* Broken/missing raw objects stay pending; never index unverified data. */}
+    if(!this.chunkAvailable)return {indexed:0,integritySkipped:0};
+    let indexed=0,integritySkipped=0,attempts=0;
+    let cursor=this.backfillCursor.get(project)||'';
+    let wrapped=false;
+    while(indexed<BACKFILL_BATCH && attempts<BACKFILL_SCAN){
+      const pending=this.chunkPending.all(project,cursor,Math.min(BACKFILL_BATCH,BACKFILL_SCAN-attempts));
+      if(!pending.length){
+        if(wrapped)break;
+        cursor='';wrapped=true;
+        continue;
+      }
+      for(const {id} of pending){
+        cursor=id;attempts++;
+        try {
+          const row=this.retrieve(id);
+          if(row?.project===project && this.indexOutputChunks({id,project,text:row.text}))indexed++;
+          else integritySkipped++;
+        }catch{integritySkipped++;}
+        if(indexed>=BACKFILL_BATCH||attempts>=BACKFILL_SCAN)break;
+      }
     }
-    return indexed;
+    this.backfillCursor.set(project,cursor);
+    return {indexed,integritySkipped};
   }
 
   /** Project-only counts; no command bodies, filenames, previews or raw text. */
   chunkIndexStatus(project){
     if(this.closed)throw new Error('store is closed');
     if(typeof project!=='string'||!project)throw new TypeError('project scope required');
+    if(!this.chunkAvailable)return {indexed:0,pending:0,chunks:0,partial:true,indexUnavailable:true};
     const {total,pending,chunks}=this.chunkCount.get(project);
     return {indexed:total-pending,pending,chunks,partial:pending>0};
   }
@@ -345,31 +409,32 @@ export class OutputStore {
     if(typeof project!=='string'||!project)throw new TypeError('project scope required');
     if(!Number.isInteger(limit)||limit<1||limit>25)throw new RangeError('limit must be 1..25');
     const expression=matchExpression(query);
+    if(!this.chunkAvailable)return {hits:[],index:this.chunkIndexStatus(project)};
     if(!expression)return {hits:[],index:this.chunkIndexStatus(project)};
-    this.backfillOutputChunks(project);
-    const rows=this.chunkCandidates.all(expression,project,MAX_SEARCH_CANDIDATES);
+    const backfill=this.backfillOutputChunks(project);
+    const rows=this.chunkCandidates.all(expression,project,project,MAX_SEARCH_CANDIDATES);
     const verified=new Map(),candidates=[];
-    let verifiedBytes=0,verificationLimited=false;
-    const words=String(query).toLowerCase().match(SEARCH_TERM)?.slice(0,8)||[];
+    let verifiedBytes=0,verificationLimited=false,integritySkipped=backfill.integritySkipped;
+    const words=normalizedTerms(query).slice(0,8);
     for(const row of rows){
       if(!verified.has(row.id)){
-        if(verified.size>=MAX_VERIFIED_OUTPUTS || verifiedBytes>=MAX_VERIFIED_BYTES){
+        if(verified.size>=MAX_VERIFIED_OUTPUTS || verifiedBytes+row.sourceBytes>MAX_VERIFIED_BYTES){
           verificationLimited=true;
           continue;
         }
+        verifiedBytes+=row.sourceBytes; // Charge before I/O even on verification failures.
         try {
           const output=this.retrieve(row.id);
           if(output?.project===project){
-            verifiedBytes+=output.bytes;
             verified.set(row.id,{output,chunks:splitIndexedChunks(output.text)});
-          }else verified.set(row.id,null);
-        }catch{verified.set(row.id,null);}
+          }else{verified.set(row.id,null);integritySkipped++;}
+        }catch{verified.set(row.id,null);integritySkipped++;}
       }
       const match=verified.get(row.id);
       const expected=match?.chunks[Number(row.ordinal)];
       if(!expected || expected.text!==row.text || expected.lineStart!==Number(row.lineStart)
-        || expected.lineEnd!==Number(row.lineEnd))continue;
-      const lower=expected.text.toLowerCase();
+        || expected.lineEnd!==Number(row.lineEnd)){if(match)integritySkipped++;continue;}
+      const lower=expected.text.normalize('NFD').replace(/\p{M}/gu,'').toLowerCase();
       const lexical=words.reduce((score,word)=>score+lower.split(word).length-1,0);
       candidates.push({...row,tool:match.output.tool,lexical});
     }
@@ -387,7 +452,8 @@ export class OutputStore {
       if(hits.length>=limit)break;
     }
     const index=this.chunkIndexStatus(project);
-    return {hits,index:{...index,candidateLimited,verificationLimited,partial:index.partial||candidateLimited||verificationLimited}};
+    return {hits,index:{...index,candidateLimited,verificationLimited,integritySkipped,
+      partial:index.partial||candidateLimited||verificationLimited||integritySkipped>0}};
   }
 
   /** Preserve the original public return shape for existing Pi callers. */

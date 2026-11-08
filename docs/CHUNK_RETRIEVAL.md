@@ -9,7 +9,7 @@ Before v0.15.0, `envelope_search_fragments` performed a whole-body FTS query cap
 The sole local `OutputStore` now maintains `output_chunks_fts` (FTS5, with BM25 scoring) and `output_chunks_state` in its existing project-scoped SQLite database. The raw output object remains authoritative and retains its exact content-addressed, SHA-256-scoped ID. Chunk text is an **additional local full-text copy of potentially secret output**, not a remote embedding or telemetry feed.
 
 - On capture, exact-output metadata commits first. Chunk indexing is an additive SQLite transaction; an indexing error cannot discard the original object or block exact recall/compaction.
-- Each heading-aware section is split into at most 1,200 Unicode code points per index record; oversized single lines get short overlapping windows. Results carry original 1-based line ranges and bounded match-centered previews. Overlaps may produce multiple candidate windows from the same line.
+- Each heading-aware section is split into at most 1,200 Unicode code points per index record; oversized single lines get overlapping windows (256-codepoint default overlap for long lines). Results carry original 1-based line ranges and bounded match-centered previews. Overlaps may produce multiple candidate windows from the same line.
 - FTS5 matches query terms **inside the same indexed chunk**, rather than across unrelated sections of one original output. Up to 200 candidates (and at most 40 distinct originals / approximately 8 MB of verified raw text) are ranked via BM25 and lexical-frequency reciprocal-rank fusion (RRF, rank constant 60). At most two chunks per output are returned per call, with a global limit of 25.
 - Before returning any candidate, retrieval re-opens the exact output object, verifies its content hash/bytes, and checks the indexed chunk against a fresh deterministic split. Stale, corrupt or erased objects cannot be rendered as verified snippets. `envelope_recall_output` continues to return the byte-exact incoming text by ID.
 - `erase` and `prune` remove chunk text and indexing metadata in the same SQLite transaction as the original output search metadata. Files are deleted after database commit, as before.
@@ -27,3 +27,21 @@ Project scope is enforced on the SQL query **and** on verified original retrieva
 ## Evidence
 
 Run `node --test tests/output-chunk-index.test.mjs` for co-located matching past the old 25-output cap, incremental persistence, bounded legacy migration, transaction deletion, corrupt-object suppression, Unicode line splitting, capped candidate diagnostics, safe source previews, and a real Pi tool registration harness. Run `npm run check`, `npm run benchmark`, and the hosted real Pi/Tersio/WASM/clangd package gates before claiming a distributable release.
+
+### Index revision and incomplete results (review fixes)
+
+The chunk index is independently versioned from raw captures. Upgrading from
+an older boundary split clears only the derived local chunk index and lazily
+rebuilds it from verified raw objects. A 256-codepoint window overlap preserves
+common identifiers spanning a chunk boundary; extraordinarily long tokens
+that exceed the fixed maximum window remain outside its completeness guarantee.
+A bounded rotating migration cursor prevents missing or damaged oldest objects
+from starving later healthy captures. Integrity failures and verification
+budgets explicitly mark the report incomplete. The search tool keeps the
+legacy hit-array in its first text block for callers and emits a second,
+model-visible coverage block when results are partial.
+
+The chunk index is optional: a failed upgrade cannot disable exact raw-output
+recall. An intentionally erased historical object is protected by a persistent
+project-scoped tombstone and cannot be silently recreated by a new checkpoint.
+A **new live tool execution** can legitimately create the same content again.
