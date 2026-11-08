@@ -31,6 +31,7 @@ export async function probePiRpc({root,piCommand='pi',piPrefixArgs=[],upstream,t
   const args=[...piPrefixArgs,...flags];
   return new Promise(resolveResult=>{
     let done=false,buffer=Buffer.alloc(0),child,stderr='',stderrBytes=0,stdinError=false,stdoutBytes=0;
+    const rpcEventTypes=new Set();
     const settle=(value)=>{
       if(done)return;
       done=true;clearTimeout(timeout);
@@ -44,7 +45,7 @@ export async function probePiRpc({root,piCommand='pi',piPrefixArgs=[],upstream,t
     child.on('error',()=>settle({ok:false,reason:'Pi executable unavailable'}));
     // Close, unlike exit, fires after stdout/stderr have been fully drained.
     child.on('close',(status,signal)=>{
-      if(!done)settle({ok:false,reason:`Pi RPC closed before discovery (code ${status??'unknown'}${signal?`, signal ${signal}`:''}; stdout ${stdoutBytes} bytes; ${rpcStartupHint(stderr)}${stderrBytes>8192?`; stderr truncated at 8192 bytes`:''}${stdinError?'; stdin closed early':''})`});
+      if(!done)settle({ok:false,reason:`Pi RPC closed before discovery (code ${status??'unknown'}${signal?`, signal ${signal}`:''}; stdout ${stdoutBytes} bytes; ${rpcStartupHint(stderr)}${rpcEventTypes.size?`; event types: ${[...rpcEventTypes].join(',')}`:''}${stderrBytes>8192?`; stderr truncated at 8192 bytes`:''}${stdinError?'; stdin closed early':''})`});
     });
     child.stderr.on('data',chunk=>{
       stderrBytes+=chunk.length;
@@ -61,9 +62,13 @@ export async function probePiRpc({root,piCommand='pi',piPrefixArgs=[],upstream,t
         buffer=buffer.subarray(n+1);
         if(!line)continue;
         let response;try{response=JSON.parse(line);}catch{settle({ok:false,reason:'Pi RPC sent invalid JSON'});return;}
-        if(response?.type!=='response'||response.id!=='envelope-smoke-commands'||response.command!=='get_commands'||response.success!==true){
-          // Non-response event records can be emitted during Pi startup.
-          if(response?.type!=='response')continue;
+        if(response?.type!=='response'){
+          // Only report event *types*, never untrusted text, paths or other payload fields.
+          const kind=String(response?.type??'unknown');
+          if(/^[a-z][a-z_0-9]{0,39}$/.test(kind)&&rpcEventTypes.size<12)rpcEventTypes.add(kind);
+          continue;
+        }
+        if(response.id!=='envelope-smoke-commands'||response.command!=='get_commands'||response.success!==true){
           settle({ok:false,reason:'Unexpected Pi RPC discovery response'});return;
         }
         const commands=response.data?.commands;

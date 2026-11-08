@@ -39,3 +39,14 @@ test('a valid RPC discovery response is accepted even if process closes immediat
   const result = await probePiRpc({ root, piCommand: process.execPath, piPrefixArgs: [path], upstream, timeoutMs: 2000 });
   assert.deepEqual(result, { ok: true, reason: 'Pi RPC loaded native Envelope and Tersio commands' });
 });
+
+test('non-response RPC event types are reported without exposing untrusted event bodies', async t => {
+  const { root, path } = mockPi(t, [
+    "process.stdout.write(JSON.stringify({type:'startup_notice',prompt:'ghp_SECRET_PRIVATE'})+'\\n');",
+    "process.exit(0);"
+  ].join('\n'));
+  const result = await probePiRpc({ root, piCommand: process.execPath, piPrefixArgs: [path], upstream, timeoutMs: 2000 });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /startup_notice/);
+  assert.doesNotMatch(result.reason, /ghp_SECRET_PRIVATE/);
+});
