@@ -12,6 +12,17 @@ Open the repository **Actions** tab and select **Envelope release gates** for th
 
 The repository currently does not commit a lockfile: transitives are therefore not fully reproducible across runs. The workflow emits the lockfile for review so it may be committed in a separate dependency-pinning change. A passing hosted install indicates compatibility with the dependency versions resolved at that time, not a guarantee against future upstream changes.
 
+## Real GitHub runner evidence and follow-up
+
+On [run 42464944338](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42464944338), early attempts had **no executed steps**. A later attempt allocated a **hosted runner** and successfully installed pinned Tersio, TypeScript and Pi, ran the regression suite, and passed the bundle doctor. The remaining error was **`Pi RPC exited before discovery (0)`**. That is a real command-discovery failure, not evidence of billing or runner starvation.
+
+The RPC probe now drains output until process `close`, and reports only bounded, categorized stderr diagnostics rather than printing arbitrary extension output that might contain secrets. A failing smoke still fails CI; a subprocess exit code of zero does not imply successful command registration.
+
+Tree-sitter, clangd and packed-artifact checks now use `if: !cancelled()` to continue independently when Pi RPC fails, without `continue-on-error`. The overall job remains red until all gates pass. A small evidence file is created before installation, so the CI artifact exists even if an earlier step fails.
+
+The pinned GitHub Actions v6 releases use Node.js 24 internally, eliminating the old action-runtime deprecation warning. Pi itself remains pinned to Node.js 22. Use the run log to inspect the **new failure reason** before making further changes.
+
+If future jobs fail without running any steps, check the job annotation and repository Actions settings; only investigate billing if the annotation indicates it. Do not purchase runner capacity or change repository visibility without explicit approval.
 ## Boundaries
 
 The workflow verifies code loading and tool-protocol interoperability, not production model usage or autonomous coding quality. Provider-backed evaluations must run separately with explicit opt-in credentials, cost budgets and approval controls. Such provider evaluations, persistent optional agent adapters, OS-level worker sandboxing, and comprehensive parity with all 33 upstream sources are distinct future work.
