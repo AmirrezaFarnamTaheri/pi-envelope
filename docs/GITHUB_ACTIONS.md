@@ -26,3 +26,9 @@ If future jobs fail without running any steps, check the job annotation and repo
 ## Boundaries
 
 The workflow verifies code loading and tool-protocol interoperability, not production model usage or autonomous coding quality. Provider-backed evaluations must run separately with explicit opt-in credentials, cost budgets and approval controls. Such provider evaluations, persistent optional agent adapters, OS-level worker sandboxing, and comprehensive parity with all 33 upstream sources are distinct future work.
+
+### Tree-sitter runtime interoperability
+
+Hosted run 42465598056 reached the real WASM smoke and reported `Dynamic require of "fs/promises" is not supported` under the ESM entrypoint of `web-tree-sitter@0.25.3`. That package also publishes a CommonJS `require` entrypoint. The Node-only broker now selects it with `createRequire(import.meta.url)`; this change is subject to the next **real hosted WASM smoke**, not asserted as verified by injected-unit tests.
+
+The same run found the Pi subprocess emitted startup JSON without a command-discovery response. The smoke now records **event type names only** (bounded, without event payloads) to distinguish startup events from protocol replies. A zero exit code without `get_commands` remains a failed gate.
