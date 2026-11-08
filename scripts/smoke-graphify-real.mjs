@@ -25,7 +25,7 @@ export async function smokeRealGraphify(executable,{fixture=null}={}){
     assert.equal(before.artifactState,'missing','fixture should begin with no graph');
     const built=await cli.run(project,config,{action:'build'},undefined,{humanCommand:true});
     assert.equal(built.writeRequested,true);
-    assert.equal(built.artifactChanged,true,`Graphify build did not produce a valid changed graph (state ${built.artifactState}; files ${readdirSync(project).join(',')}; output ${built.output.slice(-180).replace(/[^\\x20-\\x7e]/g,' ')})`);
+    assert.equal(built.artifactChanged,true,`Graphify build did not produce a valid changed graph (state ${built.artifactState}; files ${readdirSync(project).join(',')}; output ${built.output.slice(-180).replace(/[^\x20-\x7e]/g,' ')})`);
     const graphPath=join(project,'graphify-out','graph.json');
     assert.ok(existsSync(graphPath),'Graphify CLI did not create graph.json');
     const graph=JSON.parse(readFileSync(graphPath,'utf8'));
