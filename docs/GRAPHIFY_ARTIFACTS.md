@@ -7,6 +7,8 @@
 Pinned external reference: [Graphify-Labs/graphify](https://github.com/Graphify-Labs/graphify), branch `v8`, commit `6c8002eca4acad58db6160eabcb466e61fc35afb`. This candidate understands the NetworkX `node_link_data` style **top-level** `nodes` and `links` / `edges` arrays, as well as a direct `{nodes,edges}` file. It accepts an optional nested graph only when it is itself a node-link collection; a NetworkX top-level `graph` metadata dictionary is not mistaken for the actual graph. The default local input path is fixed to `graphify-out/graph.json` relative to the current project root.
 
 - Nodes: stable string `id`, optional `label` / `name`, `type` / `file_type`, `source_file` (or `file`/`path`), and `source_location`. Paths must resolve **inside the active project**. Source bodies are never returned.
+- Graphify direction provenance: when a NetworkX export has both `_src` and `_tgt`, Envelope uses that retained arc direction instead of a potentially reordered undirected `source`/`target` pair. Partial, dangling or inconsistent markers invalidate the artifact. Reported edges include `directionEvidence: graphify-arc-markers` when the explicit markers are present.
+- `explain` is a bounded read-only node report containing its own metadata plus incoming and outgoing edge assertions, independent counts and truncation flags; all graph outputs remain explicitly unverified external evidence.
 - Edges: `source`, `target`, `relation` (or `type`), and optional `confidence` (`EXTRACTED`, `INFERRED`, `AMBIGUOUS`), `confidence_score` and `source_file`. Every edge is separately marked `external-graph-assertion`, **even when Graphify calls it `EXTRACTED`**. Envelope does not promote those assertions to verified native AST imports or calls.
 - Bounds: max graph JSON 2 MB, 2,000 nodes, 8,000 edges, max 25 returned nodes/neighbors, max 350 visited path nodes and max depth 8. JSON is parsed in memory only and never evaluated.
 
@@ -16,6 +18,7 @@ The tool is `envelope_code_external_graph`, registered once by the existing Code
 {"action":"status"}
 {"action":"nodes","query":"auth","limit":10}
 {"action":"neighbors","source":"n_auth","direction":"outgoing","limit":15}
+{"action":"explain","source":"n_auth","limit":10}
 {"action":"path","source":"n_auth","target":"n_storage","maxDepth":5}
 ```
 
