@@ -6,6 +6,7 @@
  * preserving tool-call pairing and the session transcript.
  */
 import { isAnchorSensitive } from './compactor.mjs';
+import { rawOutputId, callFingerprint } from './context-frontier.mjs';
 
 const SAFE_TOOL_NAMES = new Set(['bash', 'grep', 'glob', 'rg', 'find', 'fd', 'ls']);
 const RECALL_MARKER = /\benvelope_recall_output\s+id=[a-f0-9]{64}\b/;
@@ -46,12 +47,13 @@ const unchanged = (messages) => ({ changed:false, messages, compacted:0, rawByte
 
 /**
  * @param {unknown[]} messages Pi's deep-copied context messages (not persisted history).
- * @param {{anchorCallId:string,project:string,store:object,minBytes?:number,maxPreviewChars?:number,recentMessages?:number,minSavingsRatio?:number}} options
+ * @param {{anchorCallId:string,project:string,store:object,frontier?:object,sessionId?:string,minBytes?:number,maxPreviewChars?:number,recentMessages?:number,minSavingsRatio?:number}} options
  */
 export function projectContext(messages, options) {
   if (!Array.isArray(messages) || !options?.store || !options.anchorCallId || !options.project) {
     return unchanged(messages);
   }
+  if (options.frontier && !options.sessionId) return unchanged(messages);
   const anchorIndex = messages.findIndex((m) => m?.role === 'toolResult' && m.toolCallId === options.anchorCallId);
   if (anchorIndex < 0) return unchanged(messages); // No cross-branch leakage.
 
@@ -66,6 +68,8 @@ export function projectContext(messages, options) {
   let rendered = messages;
   let compacted = 0, rawBytes = 0, renderedBytes = 0;
   const calls = new Map();
+  const visited = new Set();
+  const newBlocks = [];
   for (let i = 0; i < cut; i++) {
     const message = messages[i];
     if (message?.role === 'assistant' && Array.isArray(message.content)) {
@@ -78,14 +82,37 @@ export function projectContext(messages, options) {
     const original = outputCandidate(message, minBytes);
     const call = calls.get(message.toolCallId);
     if (!original || !call || call.name !== message.toolName) continue;
-    // Check the bound before writing a raw artifact; huge outputs stay untouched.
+    // Keep every replay bound to a unique preceding tool call in this branch.
+    if (visited.has(message.toolCallId)) continue;
+    visited.add(message.toolCallId);
     const originalBytes = Buffer.byteLength(original);
     if (originalBytes < maxPreviewChars * 1.5) continue;
     try {
-      const { id } = options.store.save({ text:original, project:options.project, tool:message.toolName,
-        command:typeof call.arguments?.command === 'string' ? call.arguments.command : '' });
+      const id = rawOutputId(options.project, original);
+      const command = typeof call.arguments?.command === 'string' ? call.arguments.command : '';
+      const commandHash = callFingerprint(message.toolName, command);
       const result = preview(original, id, maxPreviewChars);
       if (!result || Buffer.byteLength(result) >= originalBytes * (1 - minSavingsRatio)) continue;
+      if (options.frontier) {
+        const prior = options.frontier.lookupBlock({project:options.project,sessionId:options.sessionId,
+          anchorCallId:options.anchorCallId,callId:message.toolCallId});
+        if (prior) {
+          // A deleted, corrupt, replaced or branch-conflicting raw result is NOT
+          // silently rearchived. Show the untouched transcript for that result.
+          if (prior.outputId !== id || prior.commandHash !== commandHash || prior.sourceBytes !== originalBytes) continue;
+          const recalled = options.store.retrieve(id);
+          if (!recalled || recalled.project !== options.project || recalled.text !== original) continue;
+        } else {
+          if (newBlocks.length >= 128) break; // Bounded, cache-friendly batch per invocation.
+          const saved = options.store.save({text:original,project:options.project,tool:message.toolName,command});
+          if (saved.id !== id) continue;
+          newBlocks.push({callId:message.toolCallId,outputId:id,commandHash,
+            sourceBytes:originalBytes,renderedBytes:Buffer.byteLength(result)});
+        }
+      } else {
+        // Backwards compatible stateless API for isolated projection consumers.
+        options.store.save({text:original,project:options.project,tool:message.toolName,command});
+      }
       if (rendered === messages) rendered = messages.slice();
       rendered[i] = { ...message, content:[{ ...message.content[0], text:result }] };
       compacted++;
@@ -94,6 +121,11 @@ export function projectContext(messages, options) {
     } catch {
       // Source transcript and model context remain unmodified on storage failure.
     }
+  }
+  if (newBlocks.length) {
+    try {options.frontier.recordBatch({project:options.project,sessionId:options.sessionId,
+      anchorCallId:options.anchorCallId,blocks:newBlocks});}
+    catch {return unchanged(messages);} // Never publish unjournaled previews.
   }
   return { changed:compacted > 0, messages:rendered, compacted, rawBytes, renderedBytes };
 }

@@ -361,8 +361,8 @@
       "default_branch": "master",
       "pinned_url": "https://github.com/ranxianglei/billion-context-pi/tree/f9dc71398100bf1a5b1eca45ec7b482dda47e16d",
       "coverage_status": "native-partial",
-      "coverage_evidence": "tests/context-projection.test.mjs; tests/context-ledger.test.mjs",
-      "remaining_gap": "Reversible deterministic projections and versioned sidecar exist; model-driven hierarchical blocks, search and replay are not."
+      "coverage_evidence": "extensions/envelope/context-frontier.mjs; tests/context-frontier.test.mjs; tests/context-replay-integration.test.mjs",
+      "remaining_gap": "v0.14.0 adds checkpoint-parented versioned exact-replay blocks and transaction recovery, not full multi-generation ACP summaries or independent ACP agents."
     },
     {
       "repo": "championswimmer/pi-context-prune",
@@ -376,8 +376,8 @@
       "default_branch": "main",
       "pinned_url": "https://github.com/championswimmer/pi-context-prune/tree/a29cf3eebc594d42ea197f9b7cd87530c24fd3bf",
       "coverage_status": "native-partial",
-      "coverage_evidence": "tests/context-projection.test.mjs; tests/context-integration.test.mjs",
-      "remaining_gap": "Checkpoint projection is recoverable; completed-turn summary batches and append-only crash-replayed prune frontier are missing."
+      "coverage_evidence": "extensions/envelope/context-frontier.mjs; tests/context-frontier.test.mjs",
+      "remaining_gap": "v0.14.0 adds atomic per-checkpoint block batches and restart replay; no LLM summarization calls, provider cache-causal proof, or autonomous frontier heuristics."
     },
     {
       "repo": "open-gsd/gsd-pi",

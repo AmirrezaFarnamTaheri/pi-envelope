@@ -1,6 +1,6 @@
 # Envelope
 
-**Envelope v0.13.0** is one Pi coding-agent package that combines pinned Tersio modes with native, project-scoped output recovery, context checkpoints, code intelligence, reviewed worktree tasks, and local numeric observability. It is a source distribution: **no installed Pi, Tersio, or Tree-sitter WASM runtime is included**.
+**Envelope v0.14.0 (candidate)** is one Pi coding-agent package that combines pinned Tersio modes with native, project-scoped output recovery, context checkpoints, code intelligence, reviewed worktree tasks, and local numeric observability. It is a source distribution: **no installed Pi, Tersio, or Tree-sitter WASM runtime is included**.
 
 The [33-source, commit-pinned audit](docs/ALL_33_SOURCE_AUDIT.md) and its [machine-readable coverage ledger](integrations/extraction-audit.json) distinguish partial native adaptations from external, unavailable, or intentionally excluded upstream features. This is **not** a claim that all 33 independent projects were fully ported.
 
@@ -27,7 +27,7 @@ pi install .
 | Status and policy | `/envelope status`, `/envelope stats`, `/envelope policy on|off` | Optional concise policy; no automatic prompt replacement |
 | Output | `/envelope output on|off`, `envelope_recall_output`, `envelope_search_output`, `envelope_search_fragments` | Conservative completed-bash compaction; exact project-scoped recovery or bounded section/line retrieval |
 | Retention | `/envelope output retention <0..365>`, `/envelope output prune <days>`, `/envelope output erase <64-hex-id>`, `envelope_output_retention` | Explicit user-controlled deletion and bounded opportunistic expiry; 0 disables automatic expiry |
-| Context | `/envelope context on|off|status|restore`, `envelope_context_checkpoint`, `envelope_context_timeline`, `envelope_context_prune`, `envelope_context_restore`, `envelope_context_footprint` | Session-aware checkpointed projection; original Pi session transcript remains intact |
+| Context | `/envelope context on|off|status|restore`, `envelope_context_checkpoint`, `envelope_context_timeline`, `envelope_context_prune`, `envelope_context_restore`, `envelope_context_footprint` | Session-aware checkpointed projection with versioned crash-recoverable replay blocks; original Pi session transcript remains intact |
 | Code | `/envelope code on|off|status`, `envelope_code_overview`, `envelope_code_lookup`, `envelope_code_impact`, `envelope_code_calls`, `envelope_code_verify` | Shared JS/TS AST index, static import graph and conservatively grounded call sites |
 | Changes | `envelope_code_change_impact` | Commit-pinned clean-checkout diff with changed-line evidence, static dependents, and candidate tests; not a complete semantic blast radius |
 | Other languages | `/envelope code languages on|off`, `envelope_code_languages` | Opt-in Python/Go stdlib AST through bounded subprocess parsing |
@@ -40,11 +40,11 @@ pi install .
 
 **Output privacy:** raw captured tool text can contain secrets. Envelope stores up to 2 MB per capture in local owner-restricted files and a project-scoped SQLite index; SHA-256 verification rejects corruption and symlink-swapped objects. By default, there is **no automatic raw-output expiry**; set a retention policy or explicitly erase/prune. Deletion cannot guarantee erasure from backups or storage media. The numeric-only metrics ledger is separate, with a bounded 30-day retention default.
 
-**Context safety:** projection is disabled until `/envelope context on` and requires explicit checkpoint/prune actions; the full Pi transcript remains available. `envelope_context_footprint` shows byte counts, not prompt bodies. Static call and import evidence may omit dynamic and ambiguous relations. LSP rename is JS/TS-only, off for application by default, and is not crash-atomic across multiple files.
+**Context safety:** projection is disabled until `/envelope context on` and requires explicit checkpoint/prune actions. A versioned, checkpoint-scoped SQLite replay ledger commits bounded output references atomically; replay verifies the stored original and fails open when missing, corrupt, or changed. The full Pi transcript remains available. `envelope_context_footprint` shows byte counts, not prompt bodies. Static call and import evidence may omit dynamic and ambiguous relations. LSP rename is JS/TS-only, off for application by default, and is not crash-atomic across multiple files.
 
 ## Local storage and settings
 
-Settings live under `envelope` in Tersio's `~/.tersio/settings.json`. `ENVELOPE_HOME` overrides the home directory for development or isolated profiles; `TERSIO_HOME` is respected otherwise. Numeric measurements, exact output objects, context checkpoint sidecars, and workflow logs live in separate `envelope-*` directories inside that home. See [output safety](docs/OUTPUT_SAFETY.md), [context](docs/CONTEXT_COORDINATOR.md), [workflows](docs/WORKFLOWS.md), and [observability](docs/OBSERVABILITY.md).
+Settings live under `envelope` in Tersio's `~/.tersio/settings.json`. `ENVELOPE_HOME` overrides the home directory for development or isolated profiles; `TERSIO_HOME` is respected otherwise. Numeric measurements, exact output objects, context checkpoint sidecars and hash-only replay metadata, and workflow logs live in separate `envelope-*` directories inside that home. See [output safety](docs/OUTPUT_SAFETY.md), [context](docs/CONTEXT_COORDINATOR.md), [workflows](docs/WORKFLOWS.md), and [observability](docs/OBSERVABILITY.md).
 
 ## Development and evidence
 
@@ -59,7 +59,7 @@ npm run smoke:runtime         # Real installed Pi/Tersio RPC, or BLOCKED
 npm run smoke:tree            # Real installed WASM grammar, or BLOCKED
 ```
 
-The offline suite includes mocked Pi/Tree-sitter protocol and workflow integration, actual local Git worktrees, real Python/Go AST runs when installed, and real clangd LSP when available. **Passing those tests does not establish complete Pi/Tersio live compatibility.** In this environment the pinned Tersio package, Pi CLI and Tree-sitter runtime are missing, and npm registry access is unavailable. The separate runtime and WASM smokes report **BLOCKED**, not PASS.
+The offline suite includes mocked Pi/Tree-sitter protocol and workflow integration, actual local Git worktrees, real Python/Go AST runs when installed, and real clangd LSP when available. **Passing those tests does not establish complete Pi/Tersio live compatibility.** The v0.13.0 predecessor passed [hosted real-runtime validation](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42476557073); this v0.14.0 candidate must pass its own hosted gates. This source archive alone does not prove a new bundled release.
 
 ## Scope and provenance
 

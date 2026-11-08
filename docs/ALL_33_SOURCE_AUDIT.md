@@ -83,3 +83,11 @@ Future prioritization should be based on measurable correctness and latency, not
 The previously pinned 33 repositories are unchanged. A new native, **opt-in** `python3 -I -S`/`ast` and `go run`/`go/parser` layer extends the existing shared TS/JS index with structural symbols, syntax verification and conservative local import evidence. This reflects analysis patterns from RepoPilot, Code Graph Pilot, Pi Tree-sitter and Pi Repomap, but is **not** an integration of those projects' native parsers or their advanced call graphs. Neither grammar/WASM Tree-sitter nor MRO-aware call inference is claimed. `envelope_code_rename` continues to reject Python and Go because its transaction validator is TS-specific.
 
 The host now offers `npm run smoke:runtime` to check pinned Tersio resources and Pi RPC command discovery without an LLM call, and `npm run smoke:lsp-real` for genuine clangd C diagnostics. The former is blocked by missing Pi and Tersio here; the latter passes. A C LSP smoke does not imply CodeIndex indexes C or that semantic rename is verified against a production server.
+
+## v0.14.0 context replay delta (new candidate)
+
+- `ranxianglei/billion-context-pi` (#24): now partially adapted as a versioned, checkpoint-parented, exact-output replay manifest in `extensions/envelope/context-frontier.mjs`. This is **one-level** replay, not full multi-generation ACP summaries or re-expansion of entire session histories.
+- `championswimmer/pi-context-prune` (#25): now partially adapted with SQLite WAL/FULL transactional batches of new result references and restart replay. No agent-directed frontier prediction, autonomous pruning or provider-cache cost proof is claimed.
+- Parent `context` hook ownership remains unchanged. For test evidence, see `tests/context-frontier.test.mjs` and `tests/context-replay-integration.test.mjs`. The corresponding machine-readable records are updated in `integrations/extraction-audit.json`.
+
+The original 33 pinned source commits are unchanged. The new code is an independently authored adaptation; it does not vendor upstream ACP or pruning engines.

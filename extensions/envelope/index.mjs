@@ -12,6 +12,7 @@ import { OutputStore } from './store.mjs';
 import { readConfig, saveConfig } from './config.mjs';
 import { composePolicy } from './policy.mjs';
 import { ContextLedger } from './context-ledger.mjs';
+import { ContextFrontier } from './context-frontier.mjs';
 import { registerContextFeature } from './context-api.mjs';
 import { registerCodeFeature } from './code-api.mjs';
 import { registerLspFeature } from './lsp-api.mjs';
@@ -65,6 +66,9 @@ export function registerEnvelope(pi, options = {}) {
   const lastOutputPrune = new Map();
   const metrics = { calls: 0, compacted: 0, rawBytes: 0, renderedBytes: 0, contextCalls: 0, contextCompacted: 0, contextRawBytes: 0, contextRenderedBytes: 0, workflowRuns: 0, workflowSubmitted: 0, workflowFailed: 0 };
   const ledger = new ContextLedger(join(home, 'envelope-context'));
+  let frontier;
+  try {frontier=new ContextFrontier(join(home,'envelope-context'));}
+  catch(err){frontier=null;pi.logger?.warn?.(`[envelope] context replay frontier unavailable; pruning stays disabled: ${err.message}`);}
   const project = (ctx) => ctx?.cwd || pi.cwd || process.cwd();
   let metricLedger;
   try { metricLedger = new MetricsLedger(join(home,'envelope-metrics'),{retentionDays:config.observability.retentionDays}); }
@@ -139,7 +143,7 @@ export function registerEnvelope(pi, options = {}) {
   });
 
   const contextApi = registerContextFeature(pi, {
-    ledger, getStore:()=>store, getConfig:()=>config, project, metrics, observe
+    ledger, frontier, getStore:()=>store, getConfig:()=>config, project, metrics, observe
   });
 
   const codeApi = registerCodeFeature(pi, {project, getConfig:()=>config, loadCompiler:options.loadCompiler, loadTreeRuntime:options.loadTreeRuntime, getTreeGrammarPath:options.getTreeGrammarPath, observe});
@@ -168,7 +172,7 @@ export function registerEnvelope(pi, options = {}) {
   });
 
   pi.on('before_agent_start', (event) => composePolicy(event?.systemPrompt, config.policy.enabled) || undefined);
-  pi.on('session_shutdown', () => { store?.close(); store = null; workflowLedger?.close(); metricLedger?.close(); metricLedger=null; });
+  pi.on('session_shutdown', () => { store?.close(); store = null; frontier?.close(); frontier=null; workflowLedger?.close(); metricLedger?.close(); metricLedger=null; });
 
   pi.registerTool?.({
     name: 'envelope_recall_output',
@@ -415,7 +419,7 @@ export function registerEnvelope(pi, options = {}) {
     }
   });
 
-  return { metrics, getConfig: () => config, close: () => {store?.close(); workflowLedger?.close(); metricLedger?.close();} };
+  return { metrics, getConfig: () => config, close: () => {store?.close(); frontier?.close(); workflowLedger?.close(); metricLedger?.close();} };
 }
 
 export default registerEnvelope;
