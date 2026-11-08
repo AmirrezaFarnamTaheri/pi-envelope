@@ -106,3 +106,7 @@ Only a human may run `/envelope code versions capture` or `prune 8`; the agent's
 ### User-supplied local embeddings
 
 Only use `envelope_code_vector({action:"search",queryVector:[...],query:"optional lexical task"})` when the human explicitly enabled `/envelope code vectors on` and supplied a trusted `.envelope/embeddings.json`. The tool does not produce embeddings: the query vector must come from the same model as the indexed vectors. Check `skippedStale`, `complete`, `version`, source hashes and numeric score provenance. Do not claim semantic relevance, correctness, precision/recall or cost savings from a high cosine score. Never auto-download a model, start a provider or disclose source bodies. See `docs/LOCAL_VECTOR_RETRIEVAL.md`.
+
+### Checkable import-graph invariants
+
+Use `envelope_code_invariant({action:"acyclic"})` or `reach`/`no-path` with exact indexed paths for **static file-import graph properties only**. Inspect `verdict`, `complete`, `certificate` and `reasons`; if incomplete, missing paths are not proved absent. Cycle/path/order witnesses can be checked against current version, but do **not** assert type safety, program correctness, runtime call graph properties, formal IR proof or dynamic dependency completeness. No raw source is returned. See `docs/STATIC_GRAPH_INVARIANTS.md`.
