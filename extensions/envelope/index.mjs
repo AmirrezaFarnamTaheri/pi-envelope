@@ -385,8 +385,9 @@ export function registerEnvelope(pi, options = {}) {
         }
         if ((value==='build'||value==='update') && !extra.length) {
           try {
-            const watching=graphifyCli.watchStatus(ctx).active;
-            if(watching)await graphifyCli.watch(ctx,{enabled:false}); // serialize manual writes with the watcher
+            // Always wait for a prior watch update, including a failed/halted one,
+            // to settle before another operation writes the same graph.
+            await graphifyCli.watch(ctx,{enabled:false});
             const report=await graphifyCli.run(ctx,{action:value},undefined,{humanCommand:true});
             notify(ctx,`Envelope Graphify ${value}: CLI exited successfully; artifact ${report.artifactState}; changed ${report.artifactChanged?'yes':'no'}; watcher stopped for manual rebuild. ${report.output.slice(0,300)}`);
           } catch(err){notify(ctx,`Envelope Graphify ${value} failed: ${err.message}`,'warning');}
