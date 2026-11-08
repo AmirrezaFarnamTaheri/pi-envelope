@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "auditDate": "2026-11-08",
   "baseCommit": "0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64",
-  "candidateVersion": "0.21.0",
+  "candidateVersion": "0.22.0",
   "licenseAssumption": "User assumes compatibility; independent legal review not performed",
-  "implementationScope": "Native graph projection plus bounded local external Graphify/NetworkX node-link artifact reader and opt-in invalidation-only watcher; opt-in project notes, bounded Claude JSONL fact import, Git co-change/churn, source context cards",
+  "implementationScope": "Native graph projection plus bounded local external Graphify/NetworkX node-link artifact reader and opt-in invalidation-only watcher; opt-in project notes, bounded Claude JSONL fact import, Git co-change/churn, source context cards; opt-in pinned Graphify Python CLI read-only query/path/explain plus human-only AST code build/update; optional graph orientation in existing Pi hook",
   "upstreams": [
     {
       "repo": "lucasrosati/claude-code-memory-setup",
@@ -24,28 +24,28 @@
       "repo": "juhas96/graphify-pi",
       "commit": "dd54ac9ae22bc48195fafd5b25ffe0c7ef09c4a9",
       "capabilities": "Pi graphify CLI wrapper, freshness prompts and wiki-first guidance",
-      "adoption": "Single native graph-query tool; future external artifact health adapter v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded.",
+      "adoption": "Single native graph-query tool; future external artifact health adapter v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded. v0.22 adds opt-in pinned Graphify CLI read actions, human-only AST build/update, fixed argv, and opt-in bounded Pi orientation. No full host extension or LLM provider.",
       "completePort": false
     },
     {
       "repo": "franklywatson/claude-rig",
       "commit": "54b4a5c79ebea0d81c576c449d1828c349f3e453",
       "capabilities": "Claude cockpit, dependency detection, tool routing, skill-chain and metrics",
-      "adoption": "v0.21 local capability cockpit, external binary presence detection and manual workflow route advice; no Claude host hooks or automatic tool dispatch",
+      "adoption": "v0.21 local capability cockpit, external binary presence detection and manual workflow route advice; no Claude host hooks or automatic tool dispatch v0.22 adds opt-in pinned Graphify CLI read actions, human-only AST build/update, fixed argv, and opt-in bounded Pi orientation. No full host extension or LLM provider.",
       "completePort": false
     },
     {
       "repo": "gaodes/pi-graphify",
       "commit": "4826f5eb351b72f49f44dc5ede24f3a886552b2d",
       "capabilities": "Pi graphify CLI query, paths, hubs, reports, watchers and exports",
-      "adoption": "Native path/neighbor/hub/export; no automatic CLI/LLM backend v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded.",
+      "adoption": "Native path/neighbor/hub/export; no automatic CLI/LLM backend v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded. v0.22 adds opt-in pinned Graphify CLI read actions, human-only AST build/update, fixed argv, and opt-in bounded Pi orientation. No full host extension or LLM provider.",
       "completePort": false
     },
     {
       "repo": "QuantumKuba/dsh-graphify-plugin",
       "commit": "74a2c72b31abef95adf7afa53ec45d7dcb0ba47e",
       "capabilities": "DSH graph adapter, project-root fencing, freshness/status and MCP lifecycle",
-      "adoption": "Reuse CodeIndex project isolation and refresh; optional external adapter later v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded.",
+      "adoption": "Reuse CodeIndex project isolation and refresh; optional external adapter later v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded. v0.22 adds opt-in pinned Graphify CLI read actions, human-only AST build/update, fixed argv, and opt-in bounded Pi orientation. No full host extension or LLM provider.",
       "completePort": false
     },
     {
@@ -73,7 +73,7 @@
       "repo": "m4t0t0/cmd-mod-graphify",
       "commit": "474ecaecbf181832572af9934dba99d1dddbf06b",
       "capabilities": "CommandCode Graphify adapter with architecture exploration and god nodes",
-      "adoption": "v0.21 native hubs/paths and deterministic static visual exports; no CommandCode host adapter",
+      "adoption": "v0.21 native hubs/paths and deterministic static visual exports; no CommandCode host adapter v0.22 adds opt-in pinned Graphify CLI read actions, human-only AST build/update, fixed argv, and opt-in bounded Pi orientation. No full host extension or LLM provider.",
       "completePort": false
     },
     {
