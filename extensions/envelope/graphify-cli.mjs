@@ -1,7 +1,9 @@
 /**
  * Explicit, offline-by-default bridge to a user-pinned Graphify CLI executable.
- * No installer, shell, hook, provider keys, automatic build or background watcher.
- * Human-only build/update; Pi agent tools may only read an existing graph.
+ * No installer, shell, hook, provider keys, or implicit background work.
+ * A human can explicitly authorize code-only auto-refresh with /envelope graphify watch on.
+ * Agent tools remain read-only; build/update require either a human command or
+ * that revocable, session-scoped watch authorization.
  * This is a subprocess adapter, never an Envelope native AST assertion.
  */
 import {spawn} from 'node:child_process';
