@@ -122,3 +122,7 @@ An external trusted client may manually spawn `scripts/envelope-mcp-stdio.mjs --
 ### TypeScript compiler facts
 
 Use `envelope_code_typecheck({action:"diagnostics",path:"src/file.ts"})` or `symbol` with one-based UTF-16 `line`/`column` for the real pinned TypeScript TypeChecker over current SHA-256-verified indexed JS/TS source. It returns bounded diagnostics or a type plus indexed declaration locations without source bodies. Do not treat a clean result as build/runtime correctness, and check `complete`, `reasons` and unresolved imports. Python/Go AST and external LSP data remain distinct evidence; there is no unified cross-language typed resolver. See `docs/TYPESCRIPT_COMPILER_EVIDENCE.md`.
+
+### Operator-approved GraphQL bridge
+
+The optional `scripts/envelope-graphql-local.mjs` starts **only** after the human configures a trusted local client, installs the reference `graphql` package, supplies a strong private `ENVELOPE_GRAPHQL_TOKEN`, and explicitly launches it for an absolute project/home. It binds `127.0.0.1` only and exposes `versions`, `snapshot` and `compare` against previously human-captured file-graph metadata. Never auto-start it from an agent prompt, forward its token, open public listeners, or represent it as a full OpenGraphify/NestJS server. File names, imported edges and declaration metadata remain sensitive even without source bodies. See `docs/GRAPHQL_HISTORY_BRIDGE.md`.
