@@ -161,7 +161,7 @@ export function registerEnvelope(pi, options = {}) {
     ledger, frontier, getStore:()=>store, getConfig:()=>config, project, metrics, observe
   });
 
-  const codeApi = registerCodeFeature(pi, {project, getConfig:()=>config, loadCompiler:options.loadCompiler, loadTreeRuntime:options.loadTreeRuntime, getTreeGrammarPath:options.getTreeGrammarPath, watchGraphFactory:options.watchGraphFactory, observe});
+  const codeApi = registerCodeFeature(pi, {project, getConfig:()=>config, loadCompiler:options.loadCompiler, loadTreeRuntime:options.loadTreeRuntime, getTreeGrammarPath:options.getTreeGrammarPath, watchGraphFactory:options.watchGraphFactory, home, observe});
   registerLspFeature(pi,{indexOf:codeApi.indexOf,getConfig:()=>config,home,observe});
   const graphifyCli = registerGraphifyCliFeature(pi,{project,getConfig:()=>config,observe,cli:options.graphifyCliBridge,watcher:options.graphifyWatcher});
 
@@ -431,6 +431,25 @@ export function registerEnvelope(pi, options = {}) {
         return;
       }
       if (verb === 'code') {
+        if(value==='versions') {
+          const mode=extra[0]||'status';
+          try {
+            if(mode==='status'&&extra.length<=1){
+              const s=await codeApi.versionStatus(ctx);
+              notify(ctx,`Envelope graph versions: ${s.count} private metadata snapshots; explicit capture only`);return;
+            }
+            if(mode==='capture'&&extra.length===1){
+              const s=await codeApi.captureVersion(ctx);
+              notify(ctx,`Envelope graph version captured: ${s.version} (${s.files} files, ${s.symbols} symbols; ${s.existing?'already existed':'new'})`);return;
+            }
+            if(mode==='prune'&&extra.length===2&&/^(?:[1-9]|1[0-6])$/.test(extra[1])){
+              const s=await codeApi.pruneVersions(ctx,Number(extra[1]));
+              notify(ctx,`Envelope graph versions: pruned ${s.removed} snapshots; ${s.remaining} remain in this project (backups may persist)`);return;
+            }
+            notify(ctx,'Usage: /envelope code versions [status|capture|prune <1..16>]','warning');return;
+          }catch(err){notify(ctx,`Envelope graph version operation failed: ${err.message}`,'warning');return;}
+        }
+
         if(value==='tree') {
           const mode=extra[0];
           if((!mode||mode==='status')&&extra.length<=1){
@@ -473,7 +492,7 @@ export function registerEnvelope(pi, options = {}) {
           return;
         }
         if (!['on', 'off'].includes(value) || extra.length) {
-          notify(ctx, 'Usage: /envelope code [status|on|off|languages on|languages off|tree on|tree off|tree status|guard on|guard off|rename on|rename off|lsp status]', 'warning');
+          notify(ctx, 'Usage: /envelope code [status|on|off|versions status|versions capture|versions prune <n>|languages on|languages off|tree on|tree off|tree status|guard on|guard off|rename on|rename off|lsp status]', 'warning');
           return;
         }
         try {
