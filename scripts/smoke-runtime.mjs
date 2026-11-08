@@ -10,6 +10,19 @@ const ROOT=dirname(dirname(SELF));
 const check=(name,ok,detail)=>({name,ok:!!ok,detail});
 const boundedTimeout=(ms)=>Number.isInteger(ms)&&ms>=100&&ms<=12000?ms:8000;
 
+// Do not put arbitrary extension stderr in logs: it may contain paths, env values or tokens.
+function rpcStartupHint(stderr) {
+  if (/failed to load extension|error loading extension|extension load failed/i.test(stderr))
+    return 'Pi reported extension load failure';
+  if (/unknown (?:argument|option)|unrecognized (?:argument|option)|invalid option/i.test(stderr))
+    return 'Pi rejected RPC command-line options';
+  if (/cannot find module|ERR_MODULE_NOT_FOUND|module not found/i.test(stderr))
+    return 'Pi reported a missing module';
+  if (/missing.*(?:model|provider)|no (?:models|providers) (?:available|configured)/i.test(stderr))
+    return 'Pi reported a model/provider configuration issue';
+  return stderr ? `Pi wrote ${Buffer.byteLength(stderr)} bytes on stderr (redacted)` : 'no stderr diagnostics';
+}
+
 /** A probe uses exactly the upstream resource list and Envelope's one native entrypoint. */
 export async function probePiRpc({root,piCommand='pi',piPrefixArgs=[],upstream,timeoutMs=8000}={}) {
   const project=resolve(root);
@@ -17,7 +30,7 @@ export async function probePiRpc({root,piCommand='pi',piPrefixArgs=[],upstream,t
   const flags=['--mode','rpc','--no-session','--no-extensions',...resources.flatMap(p=>['--extension',p]),'--extension',join(project,'extensions/envelope/index.js')];
   const args=[...piPrefixArgs,...flags];
   return new Promise(resolveResult=>{
-    let done=false,buffer=Buffer.alloc(0),child;
+    let done=false,buffer=Buffer.alloc(0),child,stderr='',stderrBytes=0,stdinError=false,stdoutBytes=0;
     const settle=(value)=>{
       if(done)return;
       done=true;clearTimeout(timeout);
@@ -29,11 +42,18 @@ export async function probePiRpc({root,piCommand='pi',piPrefixArgs=[],upstream,t
     try { child=spawn(piCommand,args,{cwd:project,stdio:['pipe','pipe','pipe'],shell:false,windowsHide:true}); }
     catch {settle({ok:false,reason:'Pi RPC could not start'});return;}
     child.on('error',()=>settle({ok:false,reason:'Pi executable unavailable'}));
-    child.on('exit',(status)=>{if(!done)settle({ok:false,reason:`Pi RPC exited before discovery (${status??'unknown'})`});});
-    child.stderr.on('data',()=>{}); // discard diagnostic and potential credentials
+    // Close, unlike exit, fires after stdout/stderr have been fully drained.
+    child.on('close',(status,signal)=>{
+      if(!done)settle({ok:false,reason:`Pi RPC closed before discovery (code ${status??'unknown'}${signal?`, signal ${signal}`:''}; stdout ${stdoutBytes} bytes; ${rpcStartupHint(stderr)}${stderrBytes>8192?`; stderr truncated at 8192 bytes`:''}${stdinError?'; stdin closed early':''})`});
+    });
+    child.stderr.on('data',chunk=>{
+      stderrBytes+=chunk.length;
+      if(stderr.length<8192)stderr+=chunk.toString('utf8',0,Math.min(chunk.length,8192-stderr.length));
+    });
     child.stdout.on('data',chunk=>{
       if(done)return;
       if(buffer.length+chunk.length>1_000_000){settle({ok:false,reason:'Pi RPC output exceeded 1MB'});return;}
+      stdoutBytes+=chunk.length;
       buffer=Buffer.concat([buffer,chunk]);
       for(;;){
         const n=buffer.indexOf(10);if(n<0)break;
@@ -57,7 +77,7 @@ export async function probePiRpc({root,piCommand='pi',piPrefixArgs=[],upstream,t
         settle({ok:true,reason:'Pi RPC loaded native Envelope and Tersio commands'});return;
       }
     });
-    child.stdin.on('error',()=>settle({ok:false,reason:'Pi RPC stdin closed unexpectedly'}));
+    child.stdin.on('error',()=>{stdinError=true;}); // Wait for close to capture diagnostic stderr
     child.stdin.write(JSON.stringify({id:'envelope-smoke-commands',type:'get_commands'})+'\n');
   });
 }
