@@ -1,13 +1,12 @@
 # Envelope — release progress
 
-**Current source candidate:** v0.17.0 (unmerged; prior validated release candidate v0.16.0). The initial v0.1–v0.12 development plans and duplicate upstream ledger were interim planning artifacts; they are removed from the deliverable. The 33 pinned source references live only in `integrations/extraction-audit.json` and `docs/ALL_33_SOURCE_AUDIT.md`.
+**Current source release:** v0.13.0. The initial v0.1–v0.12 development plans and duplicate upstream ledger were interim planning artifacts; they are removed from the deliverable. The 33 pinned source references live only in `integrations/extraction-audit.json` and `docs/ALL_33_SOURCE_AUDIT.md`.
 
 ## Integrated
 
 - Single Pi package with Tersio manifest entrypoints and one native `extensions/envelope` extension.
-- Conservative exact-recoverable output compression, anchored-line preservation, incrementally indexed, bounded chunk FTS5/BM25 and lexical-RRF retrieval, project-scoped capture erasure and optional 0–365 day retention.
-- Opt-in reversible context pruning using session checkpoints; v0.14 adds versioned, checkpoint-scoped SQLite replay blocks, atomic batch commits, verified restart reuse and fail-open handling of erased/corrupt originals; no second context owner.
-- v0.16 extends conservative opt-in Python call evidence to uniquely indexed module aliases, with explicit shadowed/ambiguous handling and no runtime/type claims.
+- Conservative exact-recoverable output compression, anchored-line preservation, bounded fragment search, project-scoped capture erasure and optional 0–365 day retention.
+- Opt-in reversible context pruning using session checkpoints; no second context owner.
 - Shared AST lookup/impact/call evidence (JS/TS, opt-in Python and Go), syntax preflight, optional Tree-sitter query adapter, LSP diagnostics and opt-in hash-bound rename.
 - Commit-pinned clean-checkout change impact; worktree-only child workflow with fingerprinted review and no shared-tree escape hatch.
 - Private numeric metrics, offline benchmark, extensive Node regression tests and real local clangd smoke when installed.
@@ -24,8 +23,4 @@
 
 ## Explicitly incomplete
 
-Hosted v0.16.0 real Pi/Tersio/WASM/clangd gates passed on [run 42479440053](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42479440053). The new v0.17.0 native graph candidate requires its own hosted gates before any release claim. The other partial integration items, rejected duplicates and external adapters remain recorded in the 33-source audit. No live provider-billed savings or complete 33-repository parity is claimed.
-
-## v0.17.0 native graph source-adoption slice
-
-Sixteen additional repositories are pinned and decomposed in `docs/GRAPH_SOURCE_AUDIT.md`. One read-only CodeIndex-backed graph tool adds status, typed shortest paths, neighbors, degree hubs, weak components, directory-boundary audit, and bounded JSON/Mermaid export. External graph engines, memory, watchers, provider/model work, and UI remain separate follow-on phases.
+The source alone does **not** prove an installable fully bundled release: Pi, Tersio, npm registry and WASM runtime are unavailable here. The other partial integration items, rejected duplicates and external adapters remain recorded in the 33-source audit. No live provider-billed savings or complete 33-repository parity is claimed.

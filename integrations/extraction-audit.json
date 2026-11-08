@@ -91,8 +91,8 @@
       "default_branch": "main",
       "pinned_url": "https://github.com/kuangxiaoc/code-graph-pilot/tree/ad284dc5ed346ab7aa82e33a525434e95f27fe67",
       "coverage_status": "native-partial",
-      "coverage_evidence": "tests/multilanguage-index.test.mjs; tests/code-call-graph.test.mjs; tests/python-module-calls.test.mjs; extensions/envelope/code-call-evidence.mjs",
-      "remaining_gap": "Python class hierarchy, Neo4j, LangGraph reviewer and evidence-based critic loop are not included. v0.16.0 adds uniquely indexed Python module-alias call links with conservative shadow/initializer ambiguity checks; receiver type inference, Python MRO and full runtime call resolution remain absent."
+      "coverage_evidence": "tests/multilanguage-index.test.mjs; tests/code-call-graph.test.mjs",
+      "remaining_gap": "Python class hierarchy, Neo4j, LangGraph reviewer and evidence-based critic loop are not included."
     },
     {
       "repo": "gzy987/RepoPilot",
@@ -106,8 +106,8 @@
       "default_branch": "main",
       "pinned_url": "https://github.com/gzy987/RepoPilot/tree/e922b761ff59d5b0db293a5573d6363afeeaca73",
       "coverage_status": "native-partial",
-      "coverage_evidence": "tests/multilanguage-index.test.mjs; tests/code-call-graph.test.mjs; tests/python-module-calls.test.mjs; extensions/envelope/code-call-evidence.mjs",
-      "remaining_gap": "Python MRO, receiver-type inference, builtin/stdlib/external classification and GitHub agent remain absent. v0.16.0 adds uniquely indexed Python module-alias call links with conservative shadow/initializer ambiguity checks; receiver type inference, Python MRO and full runtime call resolution remain absent."
+      "coverage_evidence": "tests/multilanguage-index.test.mjs; tests/code-call-graph.test.mjs",
+      "remaining_gap": "Python MRO, receiver-type inference, builtin/stdlib/external classification and GitHub agent remain absent."
     },
     {
       "repo": "markokocic/pi-tree-sitter",
@@ -331,8 +331,8 @@
       "default_branch": "main",
       "pinned_url": "https://github.com/mksglu/context-mode/tree/2aed57aeb12401600fbe9323ab9de74bff65e899",
       "coverage_status": "native-partial",
-      "coverage_evidence": "extensions/envelope/store.mjs; extensions/envelope/output-fragments.mjs; tests/output-chunk-index.test.mjs",
-      "remaining_gap": "v0.15.0 adds locally indexed bounded chunk FTS5/BM25 plus lexical RRF, verified recall, and incremental migration. Sandbox execution, embeddings and comprehensive Context Mode parity are not ported."
+      "coverage_evidence": "tests/store.test.mjs; tests/output-fragments.test.mjs",
+      "remaining_gap": "Local FTS5 and RRF excerpts exist; context-execute sandbox, batching, external tool-call routing and embeddings are absent."
     },
     {
       "repo": "ttttmr/pi-context",
@@ -361,8 +361,8 @@
       "default_branch": "master",
       "pinned_url": "https://github.com/ranxianglei/billion-context-pi/tree/f9dc71398100bf1a5b1eca45ec7b482dda47e16d",
       "coverage_status": "native-partial",
-      "coverage_evidence": "extensions/envelope/context-frontier.mjs; tests/context-frontier.test.mjs; tests/context-replay-integration.test.mjs",
-      "remaining_gap": "v0.14.0 adds checkpoint-parented versioned exact-replay blocks and transaction recovery, not full multi-generation ACP summaries or independent ACP agents."
+      "coverage_evidence": "tests/context-projection.test.mjs; tests/context-ledger.test.mjs",
+      "remaining_gap": "Reversible deterministic projections and versioned sidecar exist; model-driven hierarchical blocks, search and replay are not."
     },
     {
       "repo": "championswimmer/pi-context-prune",
@@ -376,8 +376,8 @@
       "default_branch": "main",
       "pinned_url": "https://github.com/championswimmer/pi-context-prune/tree/a29cf3eebc594d42ea197f9b7cd87530c24fd3bf",
       "coverage_status": "native-partial",
-      "coverage_evidence": "extensions/envelope/context-frontier.mjs; tests/context-frontier.test.mjs",
-      "remaining_gap": "v0.14.0 adds atomic per-checkpoint block batches and restart replay; no LLM summarization calls, provider cache-causal proof, or autonomous frontier heuristics."
+      "coverage_evidence": "tests/context-projection.test.mjs; tests/context-integration.test.mjs",
+      "remaining_gap": "Checkpoint projection is recoverable; completed-turn summary batches and append-only crash-replayed prune frontier are missing."
     },
     {
       "repo": "open-gsd/gsd-pi",

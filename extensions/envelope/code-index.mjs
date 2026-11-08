@@ -271,7 +271,6 @@ export class CodeIndex {
         next.set(file.path,{path:file.path,signature:file.signature,contentSha256:file.contentSha256,language,
           symbols:result.symbols,imports:result.imports,diagnostics:result.diagnostics,
           declarations:result.declarations||[],bindings:result.bindings||[],calls:result.calls||[],
-          moduleAssigned:result.moduleAssigned||[],moduleBindingsTruncated:result.moduleBindingsTruncated||false,
           package:result.package||null,omittedCalls:result.omittedCalls||0});
         reparsed++;
       }

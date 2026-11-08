@@ -6,7 +6,7 @@ const read=(p)=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const pkg=JSON.parse(read('package.json'));
 
 test('current release keeps one Pi code extension and syntax-checks the shared call evidence module',()=>{
- assert.equal(pkg.version,'0.17.0');
+ assert.equal(pkg.version,'0.13.0');
  assert.equal(pkg.pi.extensions.filter(x=>x==='./extensions/envelope/index.js').length,1);
  assert.equal(pkg.pi.extensions.length,9);
  assert.ok(listSyntaxFiles().includes('extensions/envelope/code-call-evidence.mjs'));

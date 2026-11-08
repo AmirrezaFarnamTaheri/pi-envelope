@@ -96,21 +96,6 @@ function chooseTarget(file,call,files,resolveImport,goModule,goPackageFunctions)
   if(call.form==='direct'&&call.shadowed)return {reason:'shadowed'};
   const record=files.get(file);
   const declarations=record.declarations||[];
-  // The same local name can be introduced by a declaration and an import.
-  // Python rebinding order can be dynamic; never guess which one is callable.
-  const candidates=(record.bindings||[]).filter(b=>{
-    if(call.form==='direct')return b.kind==='named'&&b.local===call.name;
-    return call.form==='member'&&(b.kind==='namespace'||b.kind==='package')&&b.local===call.receiver;
-  });
-  if(record.language==='python'&&call.form==='direct'&&candidates.length&&
-    declarations.some(decl=>decl.name===call.name))return {reason:'ambiguous-target'};
-  if(record.language==='python'&&call.form==='member'&&call.receiver){
-    // A named import can rebind a module alias even though it is not itself a
-    // namespace candidate. Likewise, module-level functions/classes bind names.
-    if((record.bindings||[]).filter(b=>b.local===call.receiver).length>1)return {reason:'ambiguous-import'};
-    if(declarations.some(decl=>decl.name===call.receiver)||
-      record.symbols?.some(s=>s.kind==='class'&&s.name===call.receiver))return {reason:'ambiguous-target'};
-  }
   let matches=[];
   if(call.form==='direct'){
     if(record.language==='go'){
@@ -122,23 +107,16 @@ function chooseTarget(file,call,files,resolveImport,goModule,goPackageFunctions)
     if(matches.length>1)return {reason:'ambiguous-target'};
     if(matches.length===1)return {target:matches[0],resolution:record.language==='go'?'same-package':'same-file'};
   }
-  // Named imports, Python modules, TS namespaces and Go package selectors.
+  // Named TS/JS and Python import or TS namespace / Go package selector.
+  const candidates=(record.bindings||[]).filter(b=>{
+    if(call.form==='direct')return b.kind==='named'&&b.local===call.name;
+    return call.form==='member'&&(b.kind==='namespace'||b.kind==='package')&&b.local===call.receiver;
+  });
   if(candidates.length>1)return {reason:'ambiguous-import'};
   const binding=atMostOne(candidates);
   if(binding&&call.shadowed)return {reason:'shadowed'};
   if(!binding)return {reason:call.form==='member'?'dynamic-member':'unknown-target'};
   if(call.form==='direct'&&binding.kind==='named'&&binding.imported==='*')return {reason:'ambiguous-import'};
-  if(record.language==='python'&&binding.fromPackage){
-    // "from . import module" can also resolve a same-named attribute in
-    // __init__. A statically declared competing name makes this ambiguous.
-    const parents=resolveImport(record,file,{spec:binding.fromPackage},goModule,files);
-    if(parents.some(parent=>{
-      const record=files.get(parent);
-      return record?.moduleBindingsTruncated || record?.moduleAssigned?.includes(binding.imported) ||
-        record?.bindings?.some(b=>b.local===binding.imported) ||
-        record?.symbols?.some(s=>s.name===binding.imported);
-    }))return {reason:'ambiguous-target'};
-  }
   const targets=resolveImport(record,file,binding,goModule,files);
   for(const targetFile of targets){
     const targetRecord=files.get(targetFile);
@@ -151,7 +129,7 @@ function chooseTarget(file,call,files,resolveImport,goModule,goPackageFunctions)
     }
   }
   // Ambiguous re-exports, namespace objects, and unavailable definitions do not yield edges.
-  if(matches.length===1)return {target:matches[0],resolution:record.language==='python'&&binding.kind==='namespace'?'python-module-import':'named-import'};
+  if(matches.length===1)return {target:matches[0],resolution:'named-import'};
   return {reason:matches.length>1?'ambiguous-target':'unknown-target'};
 }
 

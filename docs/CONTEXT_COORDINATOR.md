@@ -1,28 +1,29 @@
 # Native context coordinator
 
-## Scope and ownership
+## Purpose and upstream practices
 
-Envelope retains one Pi `context` hook, one non-destructive projection function, and the original Pi session transcript as the source of truth. `/envelope context on` enables the feature; `envelope_context_checkpoint(name)` anchors a point in the session; `envelope_context_prune(checkpoint)` activates reversible compaction before that anchor. Branches missing the checkpoint tool-result anchor are not projected. `/envelope context off` and `envelope_context_restore` deactivate compaction without rewriting Pi's transcript.
+Pi Context inspired named checkpoints and a view of the current session timeline. Context Prune motivated explicit batching and prompt-cache-friendly activation. Billion Context motivated one `context` hook owner, a protected recent zone, and versioned atomic sidecars. Context Mode's local FTS5 storage and exact-output retrieval are reused from Phase 1. This is a native implementation of a bounded subset; it is **not** a full port of any upstream context engine.
 
-Context Prune motivates batching and a durable frontier; Pi Context motivates named anchors; Billion Context motivates replayable, versioned blocks and protected recent messages. This adaptation is **not** a full port of those upstream engines. It neither starts a new context hook nor makes LLM summarization calls.
+## Hook ownership
 
-## v0.14.0 replay blocks
+`extensions/envelope/context-api.mjs` registers exactly one `context` event handler. All its source-of-truth state belongs to the same Envelope extension instance, not a separately installed context plugin. The handler receives Pi's copy of `event.messages`, checks the current session and project, and returns `{messages}` only when compaction succeeds. It does not use `context_with_system`, alter the system prompt, mutate user turns, remove assistant tool calls, or edit the Pi session log.
 
-`extensions/envelope/context-frontier.mjs` introduces a version 1 SQLite WAL ledger at `~/.tersio/envelope-context/frontier.sqlite` (owner-only directory and file permissions, synchronous FULL). Each checkpoint is the parent of zero or more replay blocks. A block stores **only** SHA-256 scope/checkpoint/tool-call keys, the content-addressed original-output ID, a command fingerprint, and measured byte counts. No user prompts, command bodies, model messages, filenames or output excerpts are in the frontier. The separate existing `envelope-output` store *does* retain exact raw outputs; those may contain secrets and follow the output retention policy.
+## Activation
 
-A bounded batch (at most 128 newly archived results per model projection) is committed in one SQLite transaction **after** original output objects have been written and verified. On a crashed write before the block transaction commits, the original Pi transcript is available; any orphaned store object has no active replay block and may be deduplicated by content ID on the next request. When a committed block exists, projection rechecks its source bytes, tool name/command fingerprint, and verified output bytes and **does not save that output a second time**. Changed, corrupt, or erased originals are never silently resurrected: that message stays unmodified. An unavailable or unwriteable frontier disables projection rather than pretending pruning is armed.
+`/envelope context on` persists a feature flag but does not transform history. Calling `envelope_context_checkpoint(name)` saves a versioned sidecar record keyed by the active Pi session ID and project path. Calling `envelope_context_prune(checkpoint)` chooses that checkpoint as a boundary. The corresponding tool-result anchor must exist on the current branch; otherwise the projection is a no-op. `/envelope context off` clears activation for the current session, while `envelope_context_restore` disables a projection without deleting checkpoints.
 
-`envelope_context_timeline` adds a bounded `replay` section for the active checkpoint (`version`, `total`, `hasMore`, at most 25 block IDs and byte counts). Exact text is still recovered through the project-scoped `envelope_recall_output id=...` tool. This is a **single-level checkpoint → output block** hierarchy. It does not offer model-generated summaries, multiple generations of ACP summaries, or arbitrary session-message reconstruction.
+## Projection rules
 
-## Projection protections
+Eligible messages are historical `toolResult` entries that precede the active checkpoint and lie outside the last 8 messages (configurable) and are not source reads, edit results, media or JSON. A matching preceding assistant tool call is required. Failures and nonzero exit-code results remain exact. Anchored output and previously compacted output are skipped to avoid corruption and double trimming. An eligible result is stored byte-exact through OutputStore before a preview and recall ID are inserted into Pi's outgoing model context. If storage or rendering fails, nothing is changed.
 
-Only sufficiently large, successful old `bash`/search tool-result text is eligible. Tool calls must precede their matching results and must have identical tool names. Old error diagnostics, anchored code/source lines, source reads, media, structured results and recent/user messages remain untouched. Only a copied model-context message is transformed; the session history remains verbatim. Projection handles restart and branch switching by requiring the checkpoint tool-result anchor in the current branch, while the replay metadata is scoped to the project, session, anchor and tool-call identity. Deletion can leave metadata referring to an erased object, but replay fails open and never re-captures it merely because context is requested again.
+## Persistence
 
-## Persistence, limits, and verification
+- `~/.tersio/settings.json`: `envelope.context.{enabled,minBytes,maxPreviewChars,recentMessages,minSavingsRatio}`
+- `~/.tersio/envelope-context/sessions/<sha256(project + sessionId)>.json`: checkpoint records, active checkpoint and v1 schema; atomic owner-only files
+- `~/.tersio/envelope-output/index.sqlite` and `objects/`: exact UTF-8 raw result bodies, locally indexed with SQLite FTS5
 
-- `~/.tersio/settings.json`: `envelope.context` activation and preview thresholds (off by default).
-- `~/.tersio/envelope-context/sessions/<SHA-256>.json`: existing v1 checkpoint and active pointer, atomic file replacement.
-- `~/.tersio/envelope-context/frontier.sqlite`: v1 per-checkpoint replay blocks; unsupported future DB schema versions fail closed and are not migrated implicitly.
-- `~/.tersio/envelope-output/index.sqlite` and `objects/`: exact original bodies and project-scoped recall; stored text can contain secrets.
+Checkpoint labels are strict identifiers and never become filesystem paths. Unknown sidecar schema versions fail closed, preserving the original file. State is session/project scoped, and branches lacking the named checkpoint receive no projection. The implementation uses no model calls, external services or network telemetry.
 
-New tests cover restart without extra writes, atomic rollback, corrupt/missing/deleted replay objects, changed source, project/session/branch isolation, metadata size and privacy, version rejection, symlink refusal, and single-hook integration. The local tests prove file- and process-level behavior only. Real Pi/Tersio runtime compatibility is gated separately by hosted CI; production cache-hit or token-billing improvements have not been measured. This is not an OS sandbox.
+## Limits
+
+The pruning currently offers deterministic head/tail previews rather than semantic model summaries. It does not implement Boomerang task execution, multi-generational hierarchical compression, Context Mode's sandboxed execution or Memex transcript indexing. Full Pi installation, provider-side cache behavior and native runtime test remain unverified without the pinned Tersio dependency and an actual Pi binary.
