@@ -58,7 +58,7 @@ npm run doctor:bundle
 npm run pack:check
 ```
 
-The focused integration tests use a controlled **fake executable** to verify the subprocess contract; they do **not** claim live Graphify Python/version compatibility. Hosted CI and a real installed Graphify smoke are separate release gates. Upstream syntax was inspected at pinned Graphify-Labs/graphify `6c8002eca4acad58db6160eabcb466e61fc35afb`, especially `graphify/cli.py` `query`, `path`, `explain`, `extract` and `update` command handlers. A Graphify update that changes these contracts requires new compatibility tests.
+The focused integration tests use a controlled **fake executable** to verify the subprocess contract. The release workflow separately installs pinned `graphifyy==0.9.100` in a disposable Python virtual environment and runs `scripts/smoke-graphify-real.mjs` to validate code-only build, graph artifacts, query, path, explain and update. Only a **successful linked hosted CI run** establishes real runtime compatibility; a failing or skipped smoke must block release. Upstream syntax was inspected at pinned Graphify-Labs/graphify `6c8002eca4acad58db6160eabcb466e61fc35afb`, especially `graphify/cli.py` `query`, `path`, `explain`, `extract` and `update` command handlers. A Graphify update that changes these contracts requires new compatibility tests.
 
 ## Upstream adoption scope
 
