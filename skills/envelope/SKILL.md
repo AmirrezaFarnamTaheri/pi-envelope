@@ -126,3 +126,7 @@ Use `envelope_code_typecheck({action:"diagnostics",path:"src/file.ts"})` or `sym
 ### Operator-approved GraphQL bridge
 
 The optional `scripts/envelope-graphql-local.mjs` starts **only** after the human configures a trusted local client, installs the reference `graphql` package, supplies a strong private `ENVELOPE_GRAPHQL_TOKEN`, and explicitly launches it for an absolute project/home. It binds `127.0.0.1` only and exposes `versions`, `snapshot` and `compare` against previously human-captured file-graph metadata. Never auto-start it from an agent prompt, forward its token, open public listeners, or represent it as a full OpenGraphify/NestJS server. File names, imported edges and declaration metadata remain sensitive even without source bodies. See `docs/GRAPHQL_HISTORY_BRIDGE.md`.
+
+### Offline Go compiler facts
+
+`envelope_code_go_types` provides only **read-only** Go standard `go/types` evidence for **indexed same-package** Go sources after a human enables `/envelope code languages on`. Use `diagnostics` with a path or `symbol` with one-based UTF-16 line/column. The tool SHA-verifies each indexed source and rejects stale/symlinked paths before invoking the checked-in Go helper offline. Check `complete`, `reasons`, `errors` and declaration locations. Do not represent missing external modules, third-party dependencies, test files, Go build success, cross-package references or cross-language types as proved. It does not run project programs. See `docs/GO_COMPILER_EVIDENCE.md`.
