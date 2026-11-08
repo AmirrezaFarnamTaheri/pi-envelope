@@ -1,0 +1,113 @@
+name: Envelope release gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: envelope-release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-runtime:
+    name: Real Pi, Tersio, WASM and packaged installation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: 'true'
+      NO_COLOR: '1'
+    steps:
+      - name: Initialize evidence before integration checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/envelope-dist"
+          printf 'run=%s\njob=%s\n' "$GITHUB_RUN_ID" "$GITHUB_JOB" > "$RUNNER_TEMP/envelope-dist/ci-context.txt"
+      - name: Check out candidate (no persisted token)
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6 (node24)
+        with:
+          persist-credentials: false
+      - name: Install Node.js 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6 (node24)
+        with:
+          node-version: '22'
+      - name: Verify required runner toolchains
+        run: |
+          node -e "const [major,minor]=process.versions.node.split('.').map(Number);if(major<22||(major===22&&minor<19))process.exit(1)"
+          python3 --version
+          go version
+      - name: Install pinned dependencies and optional WASM grammars
+        run: npm install --include=optional --no-audit --no-fund
+      - name: Prove actual versions and bundled resource paths
+        run: |
+          npm ls @krtclcdy/tersio@2.25.18 typescript@5.8.3 web-tree-sitter@0.25.3 tree-sitter-wasm@2.0.4 --depth=0
+          npm run doctor:bundle
+      - name: Warm local Go AST helper compilation (no project code)
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '{"files":[]}\n' | env GOPROXY=off GOSUMDB=off GOTOOLCHAIN=local GOWORK=off go run ./scripts/go-ast-helper.go > "$RUNNER_TEMP/envelope-go-helper-warmup.json"
+          node -e "const r=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));if(!Array.isArray(r.records)||r.records.length!==0)process.exit(1)" "$RUNNER_TEMP/envelope-go-helper-warmup.json"
+      - name: Full regression and offline invariants
+        run: |
+          npm run check
+          npm run benchmark
+          npm run pack:check
+      - name: Install actual Pi coding agent
+        run: |
+          npm install --global @earendil-works/pi-coding-agent@1.5.0 --no-audit --no-fund
+          pi --version
+      - name: Prove real Pi RPC command registration (no model calls)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The Tersio first-run Combo select runs before Pi attaches its RPC stdin reader.
+          # Seed defaults only in this job's disposable HOME, never in user settings.
+          mkdir -p "$RUNNER_TEMP/envelope-ci-home/.tersio"
+          printf '{"comboSetupComplete":true,"comboDefault":"off"}\n' > "$RUNNER_TEMP/envelope-ci-home/.tersio/settings.json"
+          HOME="$RUNNER_TEMP/envelope-ci-home" npm run smoke:runtime
+      - name: Prove real Tree-sitter WASM grammars
+        if: ${{ !cancelled() }}
+        run: npm run smoke:tree
+      - name: Ensure clangd exists
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          if ! command -v clangd >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends clangd
+          fi
+          clangd --version
+      - name: Prove real clangd diagnostics
+        if: ${{ !cancelled() }}
+        run: npm run smoke:lsp-real
+      - name: Build, inspect, and test the actual npm tarball
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/envelope-dist" "$RUNNER_TEMP/envelope-unpacked"
+          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP/envelope-dist" --json > "$RUNNER_TEMP/pack-metadata.json"
+          archive="$(node -e "const fs=require('node:fs');const a=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));if(a.length!==1||!a[0].filename)process.exit(1);process.stdout.write(a[0].filename)" "$RUNNER_TEMP/pack-metadata.json")"
+          tar -xzf "$RUNNER_TEMP/envelope-dist/$archive" -C "$RUNNER_TEMP/envelope-unpacked"
+          node "$RUNNER_TEMP/envelope-unpacked/package/scripts/verify-bundle.mjs"
+          # The packed-runtime step is independently runnable even if prior
+          # smoke gates failed: initialize only this job's disposable HOME.
+          mkdir -p "$RUNNER_TEMP/envelope-ci-home/.tersio"
+          printf '{"comboSetupComplete":true,"comboDefault":"off"}\n' > "$RUNNER_TEMP/envelope-ci-home/.tersio/settings.json"
+          HOME="$RUNNER_TEMP/envelope-ci-home" node "$RUNNER_TEMP/envelope-unpacked/package/scripts/smoke-runtime.mjs"
+          cp "$RUNNER_TEMP/pack-metadata.json" "$RUNNER_TEMP/envelope-dist/pack-metadata.json"
+          if [ -f package-lock.json ]; then cp package-lock.json "$RUNNER_TEMP/envelope-dist/package-lock.json"; fi
+      - name: Publish inspectable CI artifacts (not npm)
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6 (node24)
+        with:
+          name: envelope-candidate-${{ github.run_id }}
+          path: ${{ runner.temp }}/envelope-dist/
+          if-no-files-found: error
+          retention-days: 7

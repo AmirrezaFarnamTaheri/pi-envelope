@@ -14,6 +14,7 @@ A compacted result includes an `envelope_recall_output id=<64-hex-hash>` marker.
 - Read the compact result first. If it has everything needed, do not retrieve the original merely because it exists.
 - When an omitted detail matters, call `envelope_recall_output` with the exact ID. The returned text is the original output, not a reconstructed summary.
 - If you know an error phrase but not the ID, prefer `envelope_search_fragments` for bounded, line-numbered excerpts; use `envelope_search_output` for candidate IDs and recall the exact original only when needed.
+- Fragment search uses a local chunk index; after an upgrade it may index at most eight legacy captures per query. Check `details.chunkIndex.partial` and repeat as needed before treating a result as exhaustive. A `partial` result may also indicate a retrieval safety budget. It never runs embeddings or external searches.
 - Both tools default to the current project. The original data never leaves the local machine by these tools.
 
 ## Behavioral rules
@@ -35,9 +36,11 @@ A compacted result includes an `envelope_recall_output id=<64-hex-hash>` marker.
 ## Project-aware code tools (JS/TS; optional Python and Go)
 
 - Use `envelope_code_overview` for a bounded AST-based repository map when orienting in unfamiliar code. Do not call it repeatedly on every turn.
+- Use `envelope_code_graph` for source-grounded file relationships: `status`, `neighbors`, shortest `path`, inbound-degree `hubs`, weak `components`, advisory `boundaries`, or bounded JSON/Mermaid `export`. Choose `relation: "imports"|"calls"|"both"` and interpret `complete` / `reasons`: no path with incomplete evidence is not proof of absence. Never automatically run a Graphify CLI, import a provider, or execute external HTML.
+- Use `envelope_code_external_graph` only for a user-supplied local `graphify-out/graph.json`. First call `status`, treat relationships as untrusted external assertions (never native AST proof), and reject stale artifacts unless the user explicitly acknowledges staleness. `watch` is explicit opt-in and does not rebuild or call models. The optional `graphify-out/envelope-sources.json` SHA-256 manifest is self-declared byte-consistency evidence, not cryptographic authorship proof.
 - Use `envelope_code_lookup` for declarations and exact source locations, and targeted reads when the original source body matters.
 - Before changing an imported module, `envelope_code_impact` can show known direct and transitive *static relative importers*. Never claim this is a runtime call graph, full test impact or type-aware relationship proof.
-- Use `envelope_code_calls` to inspect bounded direct-call **syntactic evidence** and explicit unresolved candidates. Do not treat `complete:true` as full call-graph coverage, type accuracy or runtime verification. Inbound/outbound edges are project-scoped; optional Python/Go parsing still requires the language toggle.
+- Use `envelope_code_calls` to inspect bounded direct-call **syntactic evidence** and explicit unresolved candidates. Python module aliases (`import pkg.mod as x` / `from . import mod as x`) may link to uniquely indexed functions, but dynamic attribute chains, rebinding, MRO and type inference are not proved. Do not treat `complete:true` as full call-graph coverage, type accuracy or runtime verification. Inbound/outbound edges are project-scoped; optional Python/Go parsing still requires the language toggle.
 - Use `envelope_code_verify` to check existing or proposed JS/TS source, or opt-in Python/Go syntax, without writing files. It does not replace typechecking, tests, LSP or runtime verification.
 - Use `/envelope code languages on` to enable local Python/Go stdlib AST parsers and `envelope_code_languages` for status. They are not Tree-sitter, and the LSP rename transaction is strictly JS/TS-only. All code tools use one shared per-project index, can be disabled with `/envelope code off`, and do not rely on extra independently installed Pi code plugins.
 
@@ -56,6 +59,12 @@ The human must explicitly enable `/envelope code tree on` before Tree-sitter que
 - If a child fails or a lease expires, inspect the preserved worktree before using `envelope_workflow_retry`. No automatic retry, parallel writer, auto-commit, automatic merge, auto-cleanup or recursive subagent loop is permitted.
 - `envelope_workflow_events` returns the bounded ownership/audit timeline; no always-on OpenRig daemon or full GSD autonomous scheduler is installed.
 
+## Opt-in project memory, history and source cards
+
+- Human must enable `/envelope memory on` before `envelope_memory` saves, reads or imports. Do not auto-save chat transcripts, secrets, or output captures. Only `importMarkdown` / `importClaudeTranscript` with a user-directed local project path may import text; manually inspect for sensitivity. Off means no new memory database.
+- Use `envelope_code_context_card` for short, hash-verified AST evidence; raw source snippets require `includeSnippet:true`, not the default. A card cannot prove runtime dispatch or semantic correctness.
+- Use `envelope_code_history` for Git co-change/churn within bounded commits. Historical co-change is **not** a static import/call edge, ownership proof or causal relationship. Check `complete` and `reasons`.
+
 ## Local telemetry and evaluation
 
 `envelope_metrics_snapshot({})` and `envelope_metrics_events({"limit":10})` provide private project-scoped numeric metrics. Do not present byte reductions as provider-billed token savings. `/envelope observability off` disables new collection only; `/envelope metrics` reads current local totals. `npm run benchmark` provides a synthetic offline exact-recovery check, not real coding effectiveness.
@@ -65,3 +74,7 @@ The human must explicitly enable `/envelope code tree on` before Tree-sitter que
 - Raw output may contain secrets, and the default local capture policy has no expiry. `/envelope output retention <days>`, `/envelope output prune <days>` and `/envelope output erase <id>` are user-only operations; **the model must not claim deleted IDs are recoverable**. For status only, call `envelope_output_retention`.
 - `envelope_code_change_impact` takes a pinned base Git commit SHA and requires a clean checkout at the exact head. Its changed-line/import/test candidates are evidence, **not verified PR-review findings or test coverage**.
 - Never report full compatibility with the 33 original repositories: several are comparison-only, third-party apps or excluded grammars, and Pi/Tersio/Tree-sitter real runtimes must pass independent smokes before any such assertion.
+
+- Use `envelope_code_retrieve` for hash-verified lexical AST symbol/file retrieval; raw snippets require explicit `includeSnippet:true`. Use `envelope_code_policy` for advisory static architecture rules, and the optional `scripts/architecture-gate.mjs` only when the user deliberately configures an architecture CI gate. No automatic provider calls or CI enforcement.
+
+- Use `envelope_capabilities` for mode and optional executable presence with manual-only route suggestions; never treat detection as activation. Use native `envelope_code_graph export format:svg|obsidian` for static, safely escaped graph views. `envelope_code_external_graph action:communities` reports only external exporter-declared groups.

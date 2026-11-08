@@ -59,3 +59,33 @@ export function rankFragments(chunks,query,{limit=10,maxPreviewChars=320}={}) {
       previewTruncated:part.text.length>maxPreviewChars
     }));
 }
+
+/** Bounded indexing segments; long individual lines are split with overlap.
+ * Each segment carries a 1-based line span into the original, unmodified output.
+ * Unlike display snippets, these sections are also a durable search boundary. */
+export function splitIndexedChunks(text,{maxChars=1200,overlap=256}={}) {
+  if (!Number.isInteger(maxChars) || maxChars<300 || maxChars>1400 ||
+    !Number.isInteger(overlap) || overlap<0 || overlap>=maxChars/2) {
+    throw new RangeError('invalid chunk length/overlap');
+  }
+  const sections=splitOutputSections(text,{maxChars});
+  const chunks=[];
+  for(const part of sections){
+    const chars=Array.from(part.text);
+    if(chars.length<=maxChars){
+      chunks.push(part);
+      continue;
+    }
+    let line=part.lineStart,lastStart=0;
+    for(let start=0;start<chars.length;start+=maxChars-overlap){
+      for(let j=lastStart;j<start;j++)if(chars[j]==='\n')line++;
+      const end=Math.min(chars.length,start+maxChars);
+      let finalLine=line;
+      for(let j=start;j<end;j++)if(chars[j]==='\n')finalLine++;
+      chunks.push({lineStart:line,lineEnd:Math.min(part.lineEnd,finalLine),text:chars.slice(start,end).join('')});
+      lastStart=start;
+      if(end===chars.length)break;
+    }
+  }
+  return chunks;
+}

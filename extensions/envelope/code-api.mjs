@@ -1,6 +1,12 @@
 /** Pi-native code intelligence over one shared lazy TypeScript AST index per root. */
 import { CodeIndex } from './code-index.mjs';
 import { analyzeChangeImpact } from './change-evidence.mjs';
+import { inspectCodeGraph } from './graph-intelligence.mjs';
+import { ExternalGraphReader } from './graphify-adapter.mjs';
+import {inspectCodeHistory} from './code-history.mjs';
+import {projectContextCard} from './context-card.mjs';
+import {retrieveCodeEvidence} from './code-retrieval.mjs';
+import {evaluateArchitecturePolicy} from './architecture-policy.mjs';
 import { TreeSitterBroker, treeCaptureGroups } from './tree-sitter-broker.mjs';
 
 const result = (value,isError=false) => ({
@@ -9,9 +15,14 @@ const result = (value,isError=false) => ({
 const intProp = (description,min,max) => ({type:'integer',minimum:min,maximum:max,description});
 function schema(properties,required=[]) {return {type:'object',properties,required,additionalProperties:false};}
 
-export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>import('typescript'),observe,loadTreeRuntime,getTreeGrammarPath}={}) {
+export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>import('typescript'),observe,loadTreeRuntime,getTreeGrammarPath,watchGraphFactory}={}) {
   const indices=new Map();
   const treeBrokers=new Map();
+  const graphReaders=new Map();
+  function graphReader(index) {
+    if(!graphReaders.has(index.root))graphReaders.set(index.root,new ExternalGraphReader(index.root,{...(watchGraphFactory?{watchFactory:watchGraphFactory}:{})}));
+    return graphReaders.get(index.root);
+  }
   function treeBroker(index) {
     if(!treeBrokers.has(index.root)) treeBrokers.set(index.root,new TreeSitterBroker({
       ...(loadTreeRuntime?{loadRuntime:loadTreeRuntime}:{}),
@@ -54,6 +65,58 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
     'Inspect a small ranked repository map using AST symbols and relative import centrality; no embeddings or full runtime call graph.',
     schema({limit:intProp('Maximum ranked files, defaults to 12',1,15)}),
     (index,params)=>index.overview({limit:Math.min(params.limit||12,15)}));
+  tool('envelope_code_graph','Envelope: Native Graph Exploration',
+    'Read-only, deterministic file graph over the current indexed project. Supports status, imports/calls neighbors, shortest paths, hubs, weak components, architecture boundary auditing, and bounded JSON/Mermaid exports. Does not infer semantic/runtime relationships.',
+    schema({
+      action:{type:'string',enum:['status','neighbors','path','hubs','components','boundaries','export']},
+      source:{type:'string',description:'Indexed source file, required for neighbors or path'},
+      target:{type:'string',description:'Indexed destination file, required for path'},
+      relation:{type:'string',enum:['imports','calls','both']},
+      direction:{type:'string',enum:['incoming','outgoing','both']},
+      maxDepth:intProp('Shortest-path depth bound, 1-8',1,8),
+      limit:intProp('Maximum results or exported nodes, 1-100; action-specific smaller limits apply',1,100),
+      format:{type:'string',enum:['json','mermaid','obsidian','svg']},
+      rules:{type:'array',maxItems:12,items:{type:'object',properties:{from:{type:'string'},forbid:{type:'array',minItems:1,maxItems:12,items:{type:'string'}}},required:['from','forbid'],additionalProperties:false}}
+    }), (index,params)=>inspectCodeGraph(index,params));
+  tool('envelope_code_external_graph','Envelope: External Graphify Artifact',
+    'Explicitly inspect a local graphify-out/graph.json node-link graph as untrusted external assertions. Check hash-attested source freshness, bounded nodes/paths/edges, and opt-in debounce watcher. Never merges edges with native AST, runs Graphify or makes model calls.',
+    schema({action:{type:'string',enum:['status','nodes','neighbors','communities','path','watch']},
+      source:{type:'string',description:'External node ID for neighbors or path'},
+      target:{type:'string',description:'External destination node ID for path'},
+      query:{type:'string',description:'Optional node name/ID/type substring filter'},
+      direction:{type:'string',enum:['outgoing','incoming','both']},
+      limit:intProp('Maximum nodes or adjacent edges (1-25)',1,25),
+      maxDepth:intProp('Path search bound (1-8)',1,8),
+      allowStale:{type:'boolean',description:'Explicitly acknowledge that a known-stale graph may be used'},
+      enabled:{type:'boolean',description:'Explicit watch enable or disable (action: watch)'},
+      debounceMs:intProp('Debounce invalidations between 100 and 5000 ms (action: watch)',100,5000)}),
+    (index,params)=>graphReader(index).query(index,params));
+  tool('envelope_code_history','Envelope: Bounded Git Co-change Evidence',
+    'Read-only bounded Git commit co-occurrence, indexed-source churn and window completeness. Historical co-changes are NOT causal dependencies, authorship ownership or runtime call evidence.',
+    schema({action:{type:'string',enum:['status','cochange','churn']},
+      path:{type:'string',description:'Project-relative indexed source file for cochange'},
+      maxCommits:intProp('Maximum Git commits examined, 1-100',1,100),
+      limit:intProp('Maximum reported related/churn files, 1-20',1,20)}),
+    (index,params)=>inspectCodeHistory(index,params));
+  tool('envelope_code_context_card','Envelope: Bounded Source Context Card',
+    'One compact, hash-verified source symbol, imports, inbound/outbound syntactic call evidence and explicit uncertainty. Does not automatically expose source text or make model calls.',
+    schema({path:{type:'string',description:'Indexed project-relative source path'},symbol:{type:'string',description:'Optional exact declaration name'},
+      limit:intProp('Maximum items per evidence category (1-16)',1,16),includeSnippet:{type:'boolean',description:'Explicitly include <=450 source code points near indexed declaration'}} ,['path']),
+    (index,params)=>projectContextCard(index,params));
+  tool('envelope_code_retrieve','Envelope: Local Symbol and Path Retrieval',
+    'Rank bounded lexical matches from the existing AST symbol and path index, combine independent ranks and import evidence, and verify each original source SHA-256 before returning. No embeddings, network or source code execution.',
+    schema({query:{type:'string',description:'Local identifier or file/path terms, max 120 characters'},
+      limit:intProp('Maximum verified indexed file hits (1-25)',1,25),
+      includeSnippet:{type:'boolean',description:'Explicitly include at most 450 source code points around a candidate symbol'}},['query']),
+    (index,params)=>retrieveCodeEvidence(index,params));
+  tool('envelope_code_policy','Envelope: Static Architecture Policy Evaluation',
+    'Evaluate explicit directory dependency boundaries and bounded incoming file degree over current native AST evidence. Advisory by default; use scripts/architecture-gate.mjs explicitly for a CI exit status. No execution or policy writes.',
+    schema({rules:{type:'array',maxItems:12,items:{type:'object',properties:{from:{type:'string'},forbid:{type:'array',minItems:1,maxItems:12,items:{type:'string'}}},required:['from','forbid'],additionalProperties:false}},
+      relation:{type:'string',enum:['imports','calls','both']},
+      maxIncomingFiles:intProp('Maximum distinct importing/calling files (1-500)',1,500),
+      requireComplete:{type:'boolean',description:'Fail closed on incomplete static evidence (default true)'},
+      limit:intProp('Maximum violations to display (1-50)',1,50)}),
+    (index,params)=>evaluateArchitecturePolicy(index,params));
   tool('envelope_code_languages','Envelope: Structural Parser Status',
     'Display available indexed languages, skipped parser reasons, and whether optional local Python/Go AST parsing is enabled.',
     schema({}), (index)=>index.languageStatus());
@@ -109,5 +172,5 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
       const report=index.verify(params.path,{content:params.content});
       return {...report,diagnostics:report.diagnostics.slice(0,20).map(d=>({...d,message:d.message.slice(0,400)}))};
     });
-  return {loaded:()=>indices.size,indexOf};
+  return {loaded:()=>indices.size,indexOf,close:()=>{for(const reader of graphReaders.values())reader.close();graphReaders.clear();}};
 }

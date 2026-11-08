@@ -8,6 +8,7 @@
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const EXTENSIONS=new Map([
   ['.js','javascript'],['.jsx','javascript'],['.mjs','javascript'],['.cjs','javascript'],
@@ -57,8 +58,9 @@ export function namedTreeQuery(language,group){
 }
 export function treeCaptureGroups(language){return Object.keys(Object.hasOwn(GROUPS,language)?GROUPS[language]:{}).sort();}
 
-export async function loadTreeRuntime(){
-  try {return await import('web-tree-sitter');}
+const nodeRequire=createRequire(import.meta.url);
+export async function loadTreeRuntime({requireModule=nodeRequire}={}){
+  try {return requireModule('web-tree-sitter');}
   catch(err){throw new Error(`web-tree-sitter runtime unavailable (install optional packages with npm install --include=optional): ${err.message}`);}
 }
 

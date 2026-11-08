@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "auditDate": "2026-11-08",
+  "baseCommit": "0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64",
+  "candidateVersion": "0.21.0",
+  "licenseAssumption": "User assumes compatibility; independent legal review not performed",
+  "implementationScope": "Native graph projection plus bounded local external Graphify/NetworkX node-link artifact reader and opt-in invalidation-only watcher; opt-in project notes, bounded Claude JSONL fact import, Git co-change/churn, source context cards",
+  "upstreams": [
+    {
+      "repo": "lucasrosati/claude-code-memory-setup",
+      "commit": "4cd2e6bd4319fcb2e8d24c2407a864516e7c133a",
+      "capabilities": "Obsidian notes, chat import and session autosave",
+      "adoption": "Native explicit project memory, Markdown/Obsidian-compatible text export and bounded Claude JSONL fact import. No automatic transcript capture or vault walker.",
+      "completePort": false
+    },
+    {
+      "repo": "elbruno/graphify-dotnet",
+      "commit": "008477767c813f0cc48dda3644282330cc288c8b",
+      "capabilities": "File extraction > typed graph > communities > report/export; AST or optional AI",
+      "adoption": "v0.20 actual .NET graph.json compatibility, v0.21 exporter-declared communities; .NET Copilot and SDK runtime are not bundled",
+      "completePort": false
+    },
+    {
+      "repo": "juhas96/graphify-pi",
+      "commit": "dd54ac9ae22bc48195fafd5b25ffe0c7ef09c4a9",
+      "capabilities": "Pi graphify CLI wrapper, freshness prompts and wiki-first guidance",
+      "adoption": "Single native graph-query tool; future external artifact health adapter v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded.",
+      "completePort": false
+    },
+    {
+      "repo": "franklywatson/claude-rig",
+      "commit": "54b4a5c79ebea0d81c576c449d1828c349f3e453",
+      "capabilities": "Claude cockpit, dependency detection, tool routing, skill-chain and metrics",
+      "adoption": "v0.21 local capability cockpit, external binary presence detection and manual workflow route advice; no Claude host hooks or automatic tool dispatch",
+      "completePort": false
+    },
+    {
+      "repo": "gaodes/pi-graphify",
+      "commit": "4826f5eb351b72f49f44dc5ede24f3a886552b2d",
+      "capabilities": "Pi graphify CLI query, paths, hubs, reports, watchers and exports",
+      "adoption": "Native path/neighbor/hub/export; no automatic CLI/LLM backend v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded.",
+      "completePort": false
+    },
+    {
+      "repo": "QuantumKuba/dsh-graphify-plugin",
+      "commit": "74a2c72b31abef95adf7afa53ec45d7dcb0ba47e",
+      "capabilities": "DSH graph adapter, project-root fencing, freshness/status and MCP lifecycle",
+      "adoption": "Reuse CodeIndex project isolation and refresh; optional external adapter later v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded.",
+      "completePort": false
+    },
+    {
+      "repo": "nainglinnphyo/OpenGraphify",
+      "commit": "4732f159ffc74b7121fe671bd6dbeeffdfd51964",
+      "capabilities": "NestJS/GraphQL server with Apollo playground, unrelated to AST Graphify",
+      "adoption": "No native runtime role; optional GraphQL read-only projection later",
+      "completePort": false
+    },
+    {
+      "repo": "yetanotheraryan/graphify-chokidar",
+      "commit": "9c584df9ab087425fec3d030e3ef7d1a29431707",
+      "capabilities": "Debounced file watcher, code vs media classification, user-confirmed LLM rebuild",
+      "adoption": "Existing incremental refresh; explicit opt-in watcher later v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded.",
+      "completePort": false
+    },
+    {
+      "repo": "crafter-station/graphify-visualizer",
+      "commit": "15c67d7e5a3c717a3917f6af410e09bc0d9142ed",
+      "capabilities": "Obsidian bridge that embeds Graphify HTML, not a graph extractor",
+      "adoption": "v0.21 static XML-escaped SVG and Obsidian-safe Markdown Mermaid exports; no arbitrary graph.html or Obsidian plugin execution",
+      "completePort": false
+    },
+    {
+      "repo": "m4t0t0/cmd-mod-graphify",
+      "commit": "474ecaecbf181832572af9934dba99d1dddbf06b",
+      "capabilities": "CommandCode Graphify adapter with architecture exploration and god nodes",
+      "adoption": "v0.21 native hubs/paths and deterministic static visual exports; no CommandCode host adapter",
+      "completePort": false
+    },
+    {
+      "repo": "colbymchenry/codegraph",
+      "commit": "f72c9d2efb14454ff4f9fd7b8460abd82f19a287",
+      "capabilities": "Rust/TS codegraph kernel, typed traversal, auto-sync, impact and agent tools",
+      "adoption": "Native typed CodeIndex graph and bounded Git co-change/churn. No preindexed multi-agent graph daemon or full language matrix.",
+      "completePort": false
+    },
+    {
+      "repo": "AxiomCodeAI/axiomcodegraph",
+      "commit": "29f7ecf052973b4c79574cc54b61fcd9f55b3b9f",
+      "capabilities": "IR and formal-methods oriented call analysis with asserted links",
+      "adoption": "Explicit uncertainty; no false proof claim; optional IR link adapters later",
+      "completePort": false
+    },
+    {
+      "repo": "GlitterKill/sdl-mcp",
+      "commit": "2a20acbd283a5edf8290fb217eee0ecff86b31f5",
+      "capabilities": "Symbol delta ledger, compact context cards, graph slices, memory and policies",
+      "adoption": "Native graph/replay/FTS with v0.19 hash-verified symbol context cards and opt-in notes. No standalone SDL symbol delta engine.",
+      "completePort": false
+    },
+    {
+      "repo": "Ancienttwo/repo-harness",
+      "commit": "6b3c8def0a5b394087506d7ccc7ecae822306b8f",
+      "capabilities": "Repo-local task state, review proof, Pi hook bridge and capability contracts",
+      "adoption": "Existing reviewed workflow ledger plus manual project memory; no secondary autonomous task scheduler.",
+      "completePort": false
+    },
+    {
+      "repo": "optave/ops-codegraph-tool",
+      "commit": "427c96f6da08fed88559075ef3c3c9eaa2122319",
+      "capabilities": "Dependency/impact graph, weak/semantic communities, boundaries, CI and co-change",
+      "adoption": "v0.20 opt-in static boundary/fan-in policy with standalone manually invoked CI gate; bounded Git co-change since v0.19; no full 34-language engine",
+      "completePort": false
+    },
+    {
+      "repo": "artk0de/TeaRAGs-MCP",
+      "commit": "5ba0ac24a02d1b4daf3b4ca1027b13974a66b184",
+      "capabilities": "Semantic retrieval, call graph, Git trajectory, architecture and naming lexicon",
+      "adoption": "v0.20 local hash-verified AST symbol/path rank fusion and bounded graph navigation; no embedding engine or provider calls",
+      "completePort": false
+    }
+  ],
+  "graphifyEngineReference": {
+    "repo": "Graphify-Labs/graphify",
+    "commit": "6c8002eca4acad58db6160eabcb466e61fc35afb",
+    "basis": "graphify-out/graph.json NetworkX node_link_data, docs/how-it-works.md, tests/fixtures/extraction.json",
+    "importPolicy": "untrusted external assertions; no model/backend execution"
+  }
+}

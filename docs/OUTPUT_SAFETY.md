@@ -29,3 +29,22 @@ When a shortened result qualifies, Envelope **first persists** the complete inco
 `node --test tests/compactor.test.mjs tests/extension.test.mjs` covers a red/green regression for mixed Pi anchors, the upstream numeric/hashline formats, source text with embedded success symbols, CRLF/ANSI/Unicode, Git messages interspersed with file entries, stringent byte caps, interrupted results and project-scoped exact recall. `npm run benchmark` emits `envelope-synthetic-v2`, including a mixed anchored fixture with `anchorsPreserved` and `diagnosticsPreserved`. Its bytes and local elapsed timings are empirical; the token proxy is deliberately labelled a heuristic, and no provider calls are made.
 
 Pattern references: [MasuRii/pi-rtk-optimizer pinned revision](https://github.com/MasuRii/pi-rtk-optimizer/tree/d155d253cb2f1358e34e717d47a82ebccb08cb8e) and [JayPokale/Chisle pinned revision](https://github.com/JayPokale/Chisle/tree/8851f7a17b6b20975e1c40a7de5c7e8523832658). No upstream implementation files were copied into this module.
+
+## v0.15.0 indexed fragment search
+
+`envelope_search_fragments` now performs project-scoped FTS5 matches over bounded stored sections rather than first selecting only 25 whole outputs. It combines FTS/BM25 ranks with lexical rank via reciprocal-rank fusion and returns UTF-8-safe previews around matching terms. Every hit is checked against the content-hashed raw object before display, and deletion/pruning removes chunk-index rows transactionally. Older existing outputs are lazily indexed in batches of at most eight per query. Tool response `details.chunkIndex` reports `partial`, `pending`, `candidateLimited` and `verificationLimited` so incomplete results are not presented as exhaustive. The fragment tool can write to the **local index** during migration, never to raw objects or remote systems. The extra full-text index may retain recoverable text in local database/WAL pages or filesystem backups even after deletion; do not treat this as cryptographic secure erasure. See `docs/CHUNK_RETRIEVAL.md`.
+
+## v0.17.0 whole-output search integrity hardening
+
+The legacy `envelope_search_output` search index is treated as **candidate discovery only**, just as the newer chunk index is. Results are returned only when the project scope agrees in both FTS and raw metadata, the content-addressed object passes exact SHA-256/byte validation, and the query terms exist in the verified original. Preview text is created exclusively from that original, never from a possibly stale or poisoned FTS snippet. Missing or corrupt raw objects are skipped rather than leaked through the index. Search is bounded to at most 100 candidates and 8 MB of verified original text per request; its `details.searchCoverage` reports skipped/unverified candidates, candidate-budget limits, and an explicit `partial` flag. A partial no-match response does **not** prove no evidence exists. Tests: `tests/output-search-integrity.test.mjs`.
+
+## 2026-11-08 review hardening
+
+Erasure creates a hash-only, project-scoped tombstone, preventing context
+projection under another checkpoint from re-creating a deleted historical
+object. Fresh tool execution may create a matching object again. Optional
+chunk-index initialization failures do not prevent exact recall, and owner-
+authorized deletion removes derived chunks by output ID even if FTS project
+metadata was tampered with. Search indexes are untrusted; integrity failures,
+resource budgets, and interrupted migration are reported as incomplete, both
+in tool details and a separate model-visible text block.

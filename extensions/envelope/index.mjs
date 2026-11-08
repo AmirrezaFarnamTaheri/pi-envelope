@@ -12,6 +12,7 @@ import { OutputStore } from './store.mjs';
 import { readConfig, saveConfig } from './config.mjs';
 import { composePolicy } from './policy.mjs';
 import { ContextLedger } from './context-ledger.mjs';
+import { ContextFrontier } from './context-frontier.mjs';
 import { registerContextFeature } from './context-api.mjs';
 import { registerCodeFeature } from './code-api.mjs';
 import { registerLspFeature } from './lsp-api.mjs';
@@ -19,6 +20,8 @@ import { guardMutation } from './mutation-guard.mjs';
 import { WorkflowLedger } from './workflow-ledger.mjs';
 import { registerWorkflowFeature } from './workflow-api.mjs';
 import { MetricsLedger } from './metrics-ledger.mjs';
+import {ProjectMemory, registerProjectMemoryFeature} from './project-memory.mjs';
+import {registerCapabilityCockpit} from './capability-cockpit.mjs';
 import { registerMetricsFeature } from './metrics-api.mjs';
 
 function homePath() {
@@ -62,9 +65,22 @@ export function registerEnvelope(pi, options = {}) {
     store = null;
     pi.logger?.warn?.(`[envelope] local store unavailable; output compaction disabled: ${err.message}`);
   }
+  // Memory is OFF by default and MUST NOT create a database before explicit opt-in.
+  let projectMemory=null;
+  const getMemory=()=>{
+    if(!config.memory.enabled)return null;
+    if(!projectMemory){
+      try{projectMemory=new ProjectMemory(join(home,'envelope-memory'));}
+      catch(err){pi.logger?.warn?.(`[envelope] optional project memory unavailable: ${err.message}`);}
+    }
+    return projectMemory;
+  };
   const lastOutputPrune = new Map();
   const metrics = { calls: 0, compacted: 0, rawBytes: 0, renderedBytes: 0, contextCalls: 0, contextCompacted: 0, contextRawBytes: 0, contextRenderedBytes: 0, workflowRuns: 0, workflowSubmitted: 0, workflowFailed: 0 };
   const ledger = new ContextLedger(join(home, 'envelope-context'));
+  let frontier;
+  try {frontier=new ContextFrontier(join(home,'envelope-context'));}
+  catch(err){frontier=null;pi.logger?.warn?.(`[envelope] context replay frontier unavailable; pruning stays disabled: ${err.message}`);}
   const project = (ctx) => ctx?.cwd || pi.cwd || process.cwd();
   let metricLedger;
   try { metricLedger = new MetricsLedger(join(home,'envelope-metrics'),{retentionDays:config.observability.retentionDays}); }
@@ -75,6 +91,8 @@ export function registerEnvelope(pi, options = {}) {
     catch(err) { pi.logger?.warn?.(`[envelope] metrics write failed (ignored): ${err.message}`); }
   };
   registerMetricsFeature(pi,{getLedger:()=>metricLedger,project});
+  registerCapabilityCockpit(pi,{getConfig:()=>config});
+  registerProjectMemoryFeature(pi,{getMemory,project,getConfig:()=>config});
   pi.on('message_end',(event,ctx)=>{
     const message=event?.message;
     if(message?.role!=='assistant'||!message.usage) return;
@@ -139,10 +157,10 @@ export function registerEnvelope(pi, options = {}) {
   });
 
   const contextApi = registerContextFeature(pi, {
-    ledger, getStore:()=>store, getConfig:()=>config, project, metrics, observe
+    ledger, frontier, getStore:()=>store, getConfig:()=>config, project, metrics, observe
   });
 
-  const codeApi = registerCodeFeature(pi, {project, getConfig:()=>config, loadCompiler:options.loadCompiler, loadTreeRuntime:options.loadTreeRuntime, getTreeGrammarPath:options.getTreeGrammarPath, observe});
+  const codeApi = registerCodeFeature(pi, {project, getConfig:()=>config, loadCompiler:options.loadCompiler, loadTreeRuntime:options.loadTreeRuntime, getTreeGrammarPath:options.getTreeGrammarPath, watchGraphFactory:options.watchGraphFactory, observe});
   registerLspFeature(pi,{indexOf:codeApi.indexOf,getConfig:()=>config,home,observe});
 
   // One read-only preflight stage for write/edit; Tersio only rewrites bash.
@@ -168,7 +186,7 @@ export function registerEnvelope(pi, options = {}) {
   });
 
   pi.on('before_agent_start', (event) => composePolicy(event?.systemPrompt, config.policy.enabled) || undefined);
-  pi.on('session_shutdown', () => { store?.close(); store = null; workflowLedger?.close(); metricLedger?.close(); metricLedger=null; });
+  pi.on('session_shutdown', () => { codeApi.close?.(); store?.close(); store = null; frontier?.close(); frontier=null; workflowLedger?.close(); metricLedger?.close(); metricLedger=null; });
 
   pi.registerTool?.({
     name: 'envelope_recall_output',
@@ -192,11 +210,16 @@ export function registerEnvelope(pi, options = {}) {
   pi.registerTool?.({
     name: 'envelope_search_fragments',
     label: 'Envelope: Search Output Fragments',
-    description: 'Read-only project-scoped search of stored output sections, bounded line numbers and excerpts; exact original remains available by ID.',
+    description: 'Project-scoped search of bounded, verified output chunks. May incrementally index up to eight older local captures per call; raw outputs remain unchanged and recoverable by ID.',
     parameters:{type:'object',properties:{query:{type:'string',description:'Terms in historical output'},limit:{type:'integer',minimum:1,maximum:25}},required:['query'],additionalProperties:false},
     async execute(_id,p,_signal,_update,ctx){
       if(!store)return textReply('Local output store unavailable.',true);
-      try{return textReply(JSON.stringify(store.searchFragments(p?.query,{project:project(ctx),limit:p?.limit??10}),null,2));}
+      try {
+        const report=store.searchFragmentsReport(p?.query,{project:project(ctx),limit:p?.limit??10});
+        const result=textReply(JSON.stringify(report.hits,null,2),false,{chunkIndex:report.index});
+        if(report.index.partial)result.content.push({type:'text',text:`Search incomplete; index coverage: ${JSON.stringify(report.index)}`});
+        return result;
+      }
       catch(err){return textReply(`Could not search fragments: ${err.message}`,true);}
     }
   });
@@ -233,8 +256,12 @@ export function registerEnvelope(pi, options = {}) {
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       if (!store) return textReply('Local output store unavailable.', true);
       try {
-        const hits = store.search(params?.query, {project: project(ctx), limit: params?.limit});
-        return textReply(hits.length ? JSON.stringify(hits, null, 2) : 'No captured output matched this query.');
+        const {hits,coverage} = store.searchReport(params?.query, {project: project(ctx), limit: params?.limit});
+        const message=hits.length?JSON.stringify(hits,null,2):coverage.partial
+          ?'No verified captured output matched this query (search incomplete).':'No captured output matched this query.';
+        const result=textReply(message,false,{searchCoverage:coverage});
+        if(coverage.partial)result.content.push({type:'text',text:`Search incomplete; coverage: ${JSON.stringify(coverage)}`});
+        return result;
       } catch (err) { return textReply(`Could not search output: ${err.message}`, true); }
     }
   });
@@ -270,6 +297,16 @@ export function registerEnvelope(pi, options = {}) {
       if (verb === 'stats') {
         const local = store?.stats();
         notify(ctx, `Envelope: ${metrics.compacted}/${metrics.calls} results compacted; original ${metrics.rawBytes} B -> model ${metrics.renderedBytes} B; context ${metrics.contextCompacted} results compacted (${metrics.contextRawBytes} B -> ${metrics.contextRenderedBytes} B); ${local?.items ?? 0} stored outputs; workflows ${metrics.workflowRuns} spawned, ${metrics.workflowSubmitted} submitted, ${metrics.workflowFailed} failed`);
+        return;
+      }
+      if (verb === 'memory') {
+        if ((!value||value==='status')&&!extra.length) {
+          notify(ctx,`Envelope project memory ${config.memory.enabled?'on':'off'} (explicit notes/Markdown import only; no transcript capture)`);
+          return;
+        }
+        if(!['on','off'].includes(value)||extra.length){notify(ctx,'Usage: /envelope memory [status|on|off]','warning');return;}
+        try{config=saveConfig(settingsPath,{...config,memory:{enabled:value==='on'}});notify(ctx,`Envelope project memory ${value}`);}
+        catch(err){notify(ctx,`Envelope memory settings failed: ${err.message}`,'warning');}
         return;
       }
       if (verb === 'context') {
@@ -347,6 +384,7 @@ export function registerEnvelope(pi, options = {}) {
         }
         try {
           config = saveConfig(settingsPath, { ...config, code:{...config.code,enabled:value === 'on'} });
+          if(value==='off')codeApi.close?.(); // An explicitly disabled code feature must not retain opt-in graph watches.
           notify(ctx, `Envelope code ${value}`);
         } catch(err) {notify(ctx, `Envelope code settings failed: ${err.message}`, 'warning');}
         return;
@@ -415,7 +453,7 @@ export function registerEnvelope(pi, options = {}) {
     }
   });
 
-  return { metrics, getConfig: () => config, close: () => {store?.close(); workflowLedger?.close(); metricLedger?.close();} };
+  return { metrics, getConfig: () => config, close: () => {codeApi.close?.(); store?.close(); frontier?.close(); projectMemory?.close(); workflowLedger?.close(); metricLedger?.close();} };
 }
 
 export default registerEnvelope;

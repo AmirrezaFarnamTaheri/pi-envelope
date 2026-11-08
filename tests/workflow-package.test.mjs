@@ -7,7 +7,7 @@ const packageJson=JSON.parse(readFileSync(new URL('../package.json',import.meta.
 const read=(path)=>readFileSync(new URL(path,import.meta.url),'utf8');
 
 test('current package checks and ships native workflow engine as part of one Pi extension',()=>{
-  assert.equal(packageJson.version,'0.13.0');
+  assert.equal(packageJson.version,'0.21.0');
   assert.equal(packageJson.pi.extensions.filter(x=>x.endsWith('extensions/envelope/index.js')).length,1);
   for(const path of ['extensions/envelope/workflow-ledger.mjs','extensions/envelope/workflow-api.mjs','extensions/envelope/worktree-adapter.mjs']) {
     assert.ok(listSyntaxFiles().includes(path),`missing syntax check for ${path}`);

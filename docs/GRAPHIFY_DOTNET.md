@@ -1,0 +1,11 @@
+# Graphify .NET JSON interoperability (v0.20.0 candidate)
+
+The [Graphify .NET JSON exporter](https://github.com/elbruno/graphify-dotnet/blob/main/src/Graphify/Export/JsonExporter.cs) writes `graphify-out/graph.json` with `nodes`, `edges`, and `metadata`. Node records may contain `file_path`, `confidence`, `metadata.source_location`, and `community`; edges use `relationship`, `confidence`, `weight`, and `metadata.source_file` / `metadata.source_location`. This differs from NetworkX Python exports that often use `links` and `relation`.
+
+Envelope's existing `envelope_code_external_graph` (v0.18) now accepts **both** actual output formats, retains typed edge relationships and confidence, and never automatically installs or runs the .NET SDK, Graphify CLI, Copilot SDK or any model. Local source evidence still requires an *explicit* separately prepared `graphify-out/envelope-sources.json` SHA-256 manifest. Other nodes/edges stay tagged `external-graph-assertion`, not native AST proof.
+
+Exporters can embed source paths from *another checkout*, especially `C:\src\...` or UNC paths. Such metadata cannot be anchored to a portable project-relative file. Envelope **redacts**, never dereferences or prints those paths; it exposes `externalSourcePathsRedacted` counts and `external-source-path-redacted` status reasons. The same generated graph is usable for node/relationship navigation, but absolute paths are not accepted as source-attested evidence. Parent traversal in explicit `source_file` paths remains an invalid graph rather than being treated as local evidence.
+
+`tests/graphify-dotnet.test.mjs` verifies actual exporter field names, relative source hashes, Windows absolute path redaction, and unsafe relative traversal rejection. This is **JSON artifact compatibility**, not a .NET runtime port, formal proof backend, or automatic source extractor.
+
+Graphify.NET integer `community` labels are also exposed via `envelope_code_external_graph` action `communities` (v0.21), grouped deterministically, with at most 25 groups and 8 sample node IDs per group. These are exporter-declared labels, never inferred by Envelope.
