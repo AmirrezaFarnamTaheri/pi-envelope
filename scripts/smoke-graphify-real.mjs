@@ -2,7 +2,7 @@
  * This is distinct from fake-executable subprocess tests. Never contacts an LLM.
  */
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,readFileSync,rmSync,writeFileSync,existsSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,readdirSync,readFileSync,rmSync,writeFileSync,existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,isAbsolute,relative} from 'node:path';
 import {GraphifyCliBridge} from '../extensions/envelope/graphify-cli.mjs';
@@ -25,7 +25,7 @@ export async function smokeRealGraphify(executable,{fixture=null}={}){
     assert.equal(before.artifactState,'missing','fixture should begin with no graph');
     const built=await cli.run(project,config,{action:'build'},undefined,{humanCommand:true});
     assert.equal(built.writeRequested,true);
-    assert.equal(built.artifactChanged,true,'Graphify build should materialize new graph.json');
+    assert.equal(built.artifactChanged,true,`Graphify build did not produce a valid changed graph (state ${built.artifactState}; files ${readdirSync(project).join(',')}; output ${built.output.slice(-180).replace(/[^\\x20-\\x7e]/g,' ')})`);
     const graphPath=join(project,'graphify-out','graph.json');
     assert.ok(existsSync(graphPath),'Graphify CLI did not create graph.json');
     const graph=JSON.parse(readFileSync(graphPath,'utf8'));
