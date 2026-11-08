@@ -39,6 +39,7 @@ pi install .
 | Co-change review (advisory) | `envelope_code_coupling` | Bounded Git co-edit candidates compared with direct static file imports, source-hash verified, no causal or numeric risk claim |
 | Persistent graph versions (explicit) | `envelope_code_versions` | Private, content-addressed file-hash + static-import snapshots; human-only capture/prune, metadata-only historical diffs |
 | Local vectors (explicit opt-in) | `envelope_code_vector` | Source-hash verified cosine/hybrid ranking over user-provided numeric embeddings, no encoder or provider calls |
+| Local encoder (human-only) | `/envelope code vectors encoder/build/replace/find` | Operator-pinned trusted executable generates verified embeddings and text-query vectors on explicit commands; no bundled model, auto-download or semantic-quality claim |
 | Static graph invariant checks | `envelope_code_invariant` | Verified import cycles, reachability and no-path closures with checkable witnesses; no program-correctness proof |
 | TypeScript compiler evidence | `envelope_code_typecheck` | Real pinned TypeScript 5.8.3 typechecker diagnostics and cross-module declaration/type facts over verified indexed JS/TS |
 | Go compiler evidence | `envelope_code_go_types` | Actual offline Go `go/types` package-local typed declarations/diagnostics from source-hash-verified Go index; no project builds or cross-language proof |
@@ -107,3 +108,5 @@ For explicit durable static graph history, see [persistent graph version command
 **Optional local GraphQL:** an operator-started [GraphQL.js history bridge](docs/GRAPHQL_HISTORY_BRIDGE.md) offers authenticated **loopback-only, read-only** queries over previously captured graph metadata. It does not start a public server, scan code, or install GraphQL.js automatically.
 
 [Go compiler evidence](docs/GO_COMPILER_EVIDENCE.md) documents the scoped offline go/types adapter, trust boundaries and unsupported external imports.
+
+[Human-only local embedding encoder](docs/LOCAL_EMBEDDING_RUNTIME.md) documents the no-shell subprocess JSON protocol, private manifest, model consistency and lack of a guaranteed network sandbox.
