@@ -59,7 +59,7 @@ test('tampering with a stored snapshot fails closed, never trusting a file name 
  assert.throws(()=>f.ledger.list(f.index),/integrity|tamper|corrupt|hash/i);
 });
 test('prune is an explicit operation, bounded retention and project isolated',t=>{
- const f=setup(t);for(let i=1;i<=4;i++){f.put('b.ts',\`export function b(){return \${i};}\n\`);f.index.refresh();f.ledger.capture(f.index);}
+ const f=setup(t);for(let i=1;i<=4;i++){f.put('b.ts','export function b(){return '+i+';}\n');f.index.refresh();f.ledger.capture(f.index);}
  assert.equal(f.ledger.status(f.index).count,4);
  const old=f.ledger.list(f.index).versions.at(-1).version;
  assert.equal(f.ledger.prune(f.index,{keep:2}).removed,2);
