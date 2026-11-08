@@ -30,3 +30,34 @@ test('CI docs specify no model calls and separate provider evaluations',()=>{
   assert.match(docs,/provider-backed evaluations/i);
   assert.match(docs,/pull requests/i);
 });
+
+test('hosted release checks use Node 24 actions and preserve evidence on failure',()=>{
+  const yaml=read('.github/workflows/release-gates.yml');
+  for(const sha of [
+    'd23441a48e516b6c34aea4fa41551a30e30af803', // checkout v6
+    '249970729cb0ef3589644e2896645e5dc5ba9c38', // setup-node v6
+    'b7c566a772e6b6bfb58ed0dc250532a479d7789f', // upload-artifact v6
+  ]) assert.ok(yaml.includes(sha), sha);
+  assert.match(yaml,/runs-on:\s*ubuntu-24\.04/);
+  assert.match(yaml,/mkdir -p "\$RUNNER_TEMP\/envelope-dist"/);
+  assert.match(yaml,/if-no-files-found:\s*error/);
+  assert.doesNotMatch(yaml,/ubuntu-slim/);
+});
+
+test('WASM, clangd and tarball checks still run after Pi RPC failure',()=>{
+  const yaml=read('.github/workflows/release-gates.yml');
+  for(const name of ['Prove real Tree-sitter WASM grammars','Ensure clangd exists',
+    'Prove real clangd diagnostics','Build, inspect, and test the actual npm tarball']) {
+    const offset=yaml.indexOf('- name: '+name);
+    assert.ok(offset>0, name);
+    assert.match(yaml.slice(offset, offset+200),/if:\s*\$\{\{ !cancelled\(\) \}\}/);
+  }
+  assert.doesNotMatch(yaml,/continue-on-error:\s*true/);
+});
+
+test('CI docs distinguish real Pi discovery failure from runner allocation',()=>{
+  const docs=read('docs/GITHUB_ACTIONS.md');
+  assert.match(docs,/Pi RPC closed before discovery|Pi RPC exited before discovery/i);
+  assert.match(docs,/no executed steps/i);
+  assert.match(docs,/hosted runner/i);
+});
