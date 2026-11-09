@@ -40,33 +40,39 @@ function ignoredDirectories(root) {
   return ignored;
 }
 
-function discoverByWalking(root, maxFiles) {
-  const skip=ignoredDirectories(root);
-  const found=[];
-  const stack=[{dir:root, rel:''}];
-  while (stack.length && found.length < maxFiles) {
+/** Discover candidates and report a potentially truncated source universe BEFORE
+ * unsupported-language and file-size filters can shrink the parsed file count.
+ */
+function discoverByWalking(root,maxFiles) {
+  const skip=ignoredDirectories(root),found=[],stack=[{dir:root,rel:''}];
+  let readErrors=0;
+  while(stack.length&&found.length<maxFiles){
     const {dir,rel}=stack.pop();
-    let entries=[];
-    try { entries=readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name)); }
-    catch {continue;}
+    let entries;
+    try{entries=readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name));}
+    catch{readErrors++;continue;}
     for(const entry of entries){
-      const key=rel ? `${rel}/${entry.name}`:entry.name;
-      if (entry.isSymbolicLink()) continue;
+      const key=rel?`${rel}/${entry.name}`:entry.name;
+      if(entry.isSymbolicLink())continue;
       if(entry.isDirectory()){
-        if (!skip.has(entry.name) && !skip.has(key)) stack.push({dir:join(dir,entry.name),rel:key});
-      } else if(entry.isFile() && isSource(key)) found.push(key);
+        if(!skip.has(entry.name)&&!skip.has(key))stack.push({dir:join(dir,entry.name),rel:key});
+      }else if(entry.isFile()&&isSource(key))found.push(key);
       if(found.length>=maxFiles)break;
     }
   }
-  return found.sort();
+  return {paths:found.sort(),truncated:found.length>=maxFiles,readErrors};
 }
 
-function discoverFromGit(root,maxFiles) {
+/** Git supplies the complete candidate count before applying the public limit.
+ * When a fallback walk is necessary, inaccessible directories are reported.
+ */
+function discoverFromGit(root,maxFiles){
   const result=spawnSync('git',['ls-files','-z','--cached','--others','--exclude-standard'],{
     cwd:root,encoding:'utf8',timeout:5000,maxBuffer:8*1024*1024
   });
-  if (result.status!==0) return null;
-  return [...new Set(result.stdout.split('\0').filter(isSource))].sort().slice(0,maxFiles);
+  if(result.status!==0)return null;
+  const candidates=[...new Set(result.stdout.split('\0').filter(isSource))].sort();
+  return {paths:candidates.slice(0,maxFiles),truncated:candidates.length>=maxFiles,readErrors:0};
 }
 
 function scanSymbols(ts,sf,path) {
@@ -233,7 +239,8 @@ export class CodeIndex {
     const revision=revisionCommand.status===0?revisionCommand.stdout.trim():null;
     // Preserve parsed records across Git revisions only when their actual bytes match.
     this.lastRevision=revision;
-    const discovered=discoverFromGit(this.root,this.maxFiles)??discoverByWalking(this.root,this.maxFiles);
+    const discovery=discoverFromGit(this.root,this.maxFiles)??discoverByWalking(this.root,this.maxFiles);
+    const discovered=discovery.paths;
     const next=new Map();
     const pending={python:[],go:[]};
     const unavailable=[];
@@ -322,7 +329,9 @@ export class CodeIndex {
     const languages={};
     for(const record of this.files.values())languages[record.language]=(languages[record.language]||0)+1;
     this.lastRefresh={revision:this.lastRevision,files:this.files.size,symbols:[...this.files.values()].reduce((n,r)=>n+r.symbols.length,0),
-      reparsed,reused,removed,languages,unavailable,callSites:this.callGraph.callSites,
+      reparsed,reused,removed,languages,unavailable,
+      discoveryTruncated:discovery.truncated,discoveryReadErrors:discovery.readErrors,
+      callSites:this.callGraph.callSites,
       linkedCalls:this.callGraph.linkedCalls,unresolvedCalls:this.callGraph.unresolvedCalls,omittedCalls:this.callGraph.omittedCalls};
     return this.lastRefresh;
   }

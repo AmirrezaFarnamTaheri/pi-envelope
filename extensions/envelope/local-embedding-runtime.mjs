@@ -2,7 +2,8 @@
 import {spawn} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {O_WRONLY,O_CREAT,O_EXCL,O_NOFOLLOW} from 'node:constants';
-import {lstatSync,realpathSync,readFileSync,mkdirSync,mkdtempSync,rmSync,writeSync,openSync,closeSync,renameSync,unlinkSync,accessSync,constants,existsSync} from 'node:fs';
+import {lstatSync,realpathSync,readFileSync,mkdirSync,mkdtempSync,rmSync,writeSync,fsyncSync,openSync,closeSync,renameSync,unlinkSync,accessSync,constants,existsSync} from 'node:fs';
+import {treeSpawnOptions,terminateTree} from './process-tree.mjs';
 import {tmpdir} from 'node:os';
 import {dirname,join,resolve,isAbsolute,sep} from 'node:path';
 
@@ -36,6 +37,8 @@ function checkedIndexScope(index){
  const state=index.lastRefresh;
  if(!state||!Array.isArray(state.unavailable)||state.unavailable.length)
    throw new Error('incomplete embedding index: refresh/parser unavailable; do not prune vectors');
+ if(state.discoveryTruncated||state.discoveryReadErrors>0)
+   throw new Error('incomplete embedding index: source discovery is truncated or unreadable; do not prune vectors');
  if(!Number.isInteger(index.maxFiles)||index.maxFiles<1||index.files.size>=index.maxFiles)
    throw new Error('incomplete embedding index: discovery may have reached the file cap');
  if(!Number.isInteger(index.maxBytesPerFile)||index.maxBytesPerFile<1)
@@ -107,6 +110,56 @@ function privateManifestPath(root,{create=false}={}){
  }
  return target;
 }
+/** Synchronize directory entry changes on supported POSIX filesystems. */
+function syncDirectory(directory){
+  if(process.platform==='win32')return;
+  const fd=openSync(directory,constants.O_RDONLY|(O_NOFOLLOW||0));
+  try{fsyncSync(fd);}finally{closeSync(fd);}
+}
+/** Only one writer per repository may build, replace or synchronize embeddings.
+ * A crashed process can leave a stale lock; operators must inspect it manually.
+ */
+async function withManifestWriter(root,action){
+  const target=privateManifestPath(root,{create:true});
+  const dir=dirname(target),lock=join(dir,'.embeddings-writer.lock');
+  let fd;
+  try{fd=openSync(lock,O_WRONLY|O_CREAT|O_EXCL|(O_NOFOLLOW||0),0o600);}
+  catch(err){
+    if(err?.code==='EEXIST')throw new Error('embedding writer busy; inspect a stale lock after process crash');
+    throw err;
+  }
+  try{
+    writeSync(fd,Buffer.from(String(process.pid)));
+    fsyncSync(fd);syncDirectory(dir);
+    return await action();
+  }finally{
+    closeSync(fd);
+    unlinkSync(lock);syncDirectory(dir);
+  }
+}
+/** Ensure a manifest discarded row corresponds to an actually absent source. */
+function verifiedDeletions(root,index,entries){
+  let removed=0;
+  for(const item of entries){
+    if(index.files.has(item.path))continue;
+    const path=resolve(root,item.path);
+    if(!inside(root,path))throw new Error('unsafe embedding deletion path');
+    try{
+      lstatSync(path);
+    }catch(err){
+      if(err?.code==='ENOENT'){removed++;continue;}
+      throw new Error('cannot verify old embedding source deletion');
+    }
+    throw new Error('embedding source still exists but was excluded from index; refuse destructive sync');
+  }
+  return removed;
+}
+function existingManifestHash(target){
+  const st=lstatSync(target);
+  if(!st.isFile()||st.isSymbolicLink()||st.size>MAX_MANIFEST_BYTES)
+    throw new Error('unsafe or oversized previous embedding manifest');
+  return hash(readFileSync(target));
+}
 function readManifest(root){
  const target=privateManifestPath(root,{create:false});
  let raw,stat,manifest;
@@ -151,15 +204,17 @@ function writeManifest(root,payload,{replace=false,expectedManifestHash}={}){
  try{
   fd=openSync(tmp,O_WRONLY|O_CREAT|O_EXCL|(O_NOFOLLOW||0),0o600);
   const bytes=Buffer.from(serialized,'utf8');let at=0;
-  while(at<bytes.length)at+=writeSync(fd,bytes,at,bytes.length-at);
-  closeSync(fd);fd=undefined;
+  while(at<bytes.length){const n=writeSync(fd,bytes,at,bytes.length-at);if(n<=0)throw new Error('embedding manifest write made no progress');at+=n;}
+  fsyncSync(fd);closeSync(fd);fd=undefined;
   if(existsSync(target)&&!replace)throw new Error('embeddings manifest already exists; explicit replace required');
   privateManifestPath(root,{create:false});
-  if(expectedManifestHash!==undefined){
-    if(!SHA.test(expectedManifestHash)||!existsSync(target)||hash(readFileSync(target))!==expectedManifestHash)
-      throw new Error('embeddings manifest changed during sync; retry with current manifest');
+  if(expectedManifestHash===null){
+    if(existsSync(target))throw new Error('embeddings manifest changed during build; retry');
+  }else if(expectedManifestHash!==undefined){
+    if(!SHA.test(expectedManifestHash)||!existsSync(target)||existingManifestHash(target)!==expectedManifestHash)
+      throw new Error('embeddings manifest changed during sync or replace; retry with current manifest');
   }
-  renameSync(tmp,target);
+  renameSync(tmp,target);syncDirectory(dirname(target));
  }catch(error){if(fd!==undefined)closeSync(fd);try{unlinkSync(tmp);}catch{}throw error;}
  return {manifestHash:hash(serialized)};
 }
@@ -174,10 +229,11 @@ async function callEncoder(binary,root,input,{timeoutMs,signal,spawnProcess,cont
  try{return await new Promise((resolvePromise,rejectPromise)=>{
    if(signal?.aborted){rejectPromise(new Error('embedding operation cancelled'));return;}
    let child;
-   try{child=spawnProcess(binary,[],{cwd:root,env,shell:false,stdio:['pipe','pipe','pipe'],windowsHide:true});}
+   try{child=spawnProcess(binary,[],{cwd:root,env,shell:false,stdio:['pipe','pipe','pipe'],windowsHide:true,...treeSpawnOptions(spawnProcess)});}
    catch{rejectPromise(new Error('encoder launch failed'));return;}
-   let stdout=[],length=0,done=false,timeout=false,cancelled=false,oversized=false,killTimer;
-   const kill=()=>{try{child.kill('SIGTERM');}catch{}killTimer=setTimeout(()=>{try{child.kill('SIGKILL');}catch{}},250);killTimer.unref?.();};
+   let stdout=[],length=0,done=false,timeout=false,cancelled=false,oversized=false,killTimer,stopping=false;
+   const kill=()=>{if(stopping)return;stopping=true;terminateTree(child,'SIGTERM',{spawnProcess});
+     killTimer=setTimeout(()=>terminateTree(child,'SIGKILL',{spawnProcess}),250);killTimer.unref?.();};
    const timer=setTimeout(()=>{timeout=true;kill();},timeoutMs);timer.unref?.();
    const cancel=()=>{cancelled=true;kill();};
    signal?.addEventListener('abort',cancel,{once:true});controller.signal.addEventListener('abort',cancel,{once:true});
@@ -211,25 +267,28 @@ export class LocalEmbeddingRuntime {
   if(existsSync(target)&&!replace)throw new Error('embeddings manifest already exists; explicit replace required');
   if(this.activeRoots.has(root))throw new Error('embedding build already running for project');
   this.activeRoots.add(root);
-  try{
+  try{return await withManifestWriter(root,async()=>{
+   const oldExists=existsSync(target);
+   if(oldExists&&!replace)throw new Error('embeddings manifest already exists; explicit replace required');
+   const expectedManifestHash=oldExists?existingManifestHash(target):null;
    const scope=checkedIndexScope(index);
    const {request,provenance,verifiedBytes,truncatedTexts}=readSource(index,root);
    const response=await callEncoder(binary,root,request,{timeoutMs,signal,spawnProcess:this.spawnProcess,controllers:this.controllers});
    const payload={...outputResponse(response,provenance),indexScope:scope};
    checkUnchanged(index,root,provenance);
    checkScopeEqual(scope,checkedIndexScope(index));
-   const oldExists=existsSync(target),result=writeManifest(root,payload,{replace});
+   const result=writeManifest(root,payload,{replace,expectedManifestHash});
    return {created:true,replaced:oldExists,files:provenance.length,model:payload.model,dimensions:payload.dimensions,
     manifestHash:result.manifestHash,verifiedSourceBytes:verifiedBytes,truncatedTexts,
     notes:'Vectors originate from the operator-pinned executable. Offline settings do not sandbox the trusted encoder; retrieval quality is unmeasured.'};
-  }finally{this.activeRoots.delete(root);}
+  });}finally{this.activeRoots.delete(root);}
  }
  async sync(index,{executable,timeoutMs=30000,signal}={}){
   const root=rootOf(index),binary=checkedEncoder(executable,root);
   if(!Number.isInteger(timeoutMs)||timeoutMs<50||timeoutMs>120000)throw new RangeError('invalid encoder timeout');
   if(this.activeRoots.has(root))throw new Error('embedding operation already running for project');
   this.activeRoots.add(root);
-  try{
+  try{return await withManifestWriter(root,async()=>{
    const scope=checkedIndexScope(index);
    const {data:previous,manifestHash:expectedManifestHash}=readManifest(root);
    checkScopeEqual(previous.indexScope,scope);
@@ -241,7 +300,7 @@ export class LocalEmbeddingRuntime {
    });
    const changed=new Set(request.documents.map(row=>row.path));
    const changedProvenance=provenance.filter(row=>changed.has(row.path));
-   const removed=previous.entries.filter(row=>!index.files.has(row.path)).length;
+   const removed=verifiedDeletions(root,index,previous.entries);
    const reused=provenance.length-changedProvenance.length;
    if(!changedProvenance.length&&!removed){
      checkUnchanged(index,root,provenance);
@@ -269,7 +328,7 @@ export class LocalEmbeddingRuntime {
      model:payload.model,dimensions:payload.dimensions,manifestHash:written.manifestHash,
      verifiedSourceBytes:verifiedBytes,truncatedTexts,
      notes:'Explicit incremental sync only: reuses matching source-hash vectors, never auto-runs encoders; model metadata is not attested.'};
-  }finally{this.activeRoots.delete(root);}
+  });}finally{this.activeRoots.delete(root);}
  }
  /** Human-only benchmark mode reuses one query vector for vector-only and hybrid rankings. */
  async find(index,{executable,query,timeoutMs=30000,signal,compare=false}={}){
