@@ -149,3 +149,22 @@ test('final graph diff page fits its exact byte budget without imaginary continu
  assert.equal(packed.truncated,false);
  assert.equal(Buffer.byteLength(JSON.stringify(packed),'utf8'),exact);
 });
+
+test('graph diff pages respect a real UTF-8 byte budget through the final page',t=>{
+ const f=setup(t),first=f.ledger.capture(f.index);
+ for(let i=0;i<35;i++)f.put('diffbudget_'+i+'.ts','export const marker'+i+' = '+i+';');
+ f.index.refresh();const second=f.ledger.capture(f.index);
+ let offset=0,cursor,round=0,total=0,finished=false;
+ while(!finished){
+   const page=f.ledger.compare(f.index,{from:first.version,to:second.version,limit:25,
+     maxChars:950,offset,...(cursor?{ifVersion:cursor}:{})});
+   assert.ok(Buffer.byteLength(JSON.stringify(page),'utf8')<=950);
+   assert.ok(page.returned>0);
+   total+=page.returned;
+   if(!page.truncated){assert.equal(Object.hasOwn(page,'nextOffset'),false);finished=true;}
+   else {assert.ok(page.nextOffset>offset);offset=page.nextOffset;cursor=page.version;}
+   assert.ok(++round<60,'pagination failed to advance');
+ }
+ assert.equal(total,35);
+ assert.ok(round>2,'byte limit should require more than the 25-entry item limit');
+});

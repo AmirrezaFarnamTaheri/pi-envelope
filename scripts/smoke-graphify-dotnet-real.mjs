@@ -24,6 +24,12 @@ export async function smokeRealGraphifyDotnet(executable){
    const raw=JSON.parse(readFileSync(join(project,'.envelope','graphify-dotnet-out','graph.json'),'utf8'));
    assert.ok(Array.isArray(raw.nodes),'graph nodes missing');
    assert.ok(Array.isArray(raw.edges)||Array.isArray(raw.links),'graph edges missing');
+   const declarations=raw.nodes.filter(node=>{
+     const text=JSON.stringify(node);
+     return text.includes('Customer')&&
+       /(class|method|property|type|member|declaration)/i.test(String(node.type||node.kind||node.node_type||node.label||node.name||''));
+   });
+   assert.ok(declarations.length>0,'C# Customer declaration evidence missing from Graphify.NET AST graph');
    const after=await cli.run(project,config,{action:'status'});
    assert.equal(after.graphHash,done.graphHash,'status graph checksum changed unexpectedly');
    return {ok:true,provider:'None',nodes:done.nodes,edges:done.edges,isolatedOutput:true,engine:'graphify-dotnet',externalGraphProven:false};

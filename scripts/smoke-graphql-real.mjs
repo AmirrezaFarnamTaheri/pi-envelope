@@ -26,6 +26,7 @@ export async function smokeRealGraphql(){
    const snapshot=await req('{ snapshot(version:"'+version+'") { totalFiles files { path imports } } }');
    assert.equal(snapshot.status,200);
    const data=await snapshot.json();assert.equal(data.data.snapshot.files[0].path,'demo.ts');
+   assert.doesNotMatch(JSON.stringify(data),/export function demo\(\)\{return 12;\}/);
    const diff=await req('{ compare(from:"'+version+'",to:"'+version+'") { filesChanged } }');
    assert.equal((await diff.json()).data.compare.filesChanged,0);
    const mutation=await req('mutation { versions { version } }');assert.equal(mutation.status,400);

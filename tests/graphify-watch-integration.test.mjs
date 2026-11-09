@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import registerEnvelope from '../extensions/envelope/index.mjs';
 import {GraphifyWatchCoordinator} from '../extensions/envelope/graphify-watch.mjs';
 
-function fixture(t){
+function fixture(t,{artifactState='unverified'}={}){
  const base=mkdtempSync(join(tmpdir(),'envelope-pi-watch-'));t.after(()=>rmSync(base,{recursive:true,force:true}));
  const root=join(base,'repo');mkdirSync(root);mkdirSync(join(root,'src'));mkdirSync(join(root,'graphify-out'));
  writeFileSync(join(root,'src','main.js'),'export function main(){return 1}');
@@ -15,7 +15,7 @@ function fixture(t){
  const watcher=new GraphifyWatchCoordinator({watchFactory});
  const cli={async run(_root,_settings,args,signal,opts){
    operations.push({action:args.action,signal,human:opts?.humanCommand===true});
-   if(args.action==='status')return {available:true,enabled:true,artifactState:'unverified',action:'status'};
+   if(args.action==='status')return {available:true,enabled:true,artifactState,action:'status'};
    return {action:args.action,output:'offline',artifactState:'unverified',artifactChanged:true};
  },close(){}};
  const pi={cwd:root,logger:{warn(){}},on(name,handler){hooks.set(name,[...(hooks.get(name)||[]),handler]);},
@@ -97,4 +97,14 @@ test('ambiguous manual-rebuild state blocks both direct graph and CLI edge reads
  const acknowledged=await f.call({action:'query',question:'inspect graph',allowStale:true});
  assert.equal(acknowledged.isError,false,acknowledged.content[0].text);
  assert.ok(JSON.parse(acknowledged.content[0].text).reasons.includes('watcher-manual-rebuild-required'));
+});
+
+test('watch activation refuses stale, invalid and missing graphs despite a configured CLI',async t=>{
+ for(const artifactState of ['stale','invalid','missing']){
+   const f=fixture(t,{artifactState});
+   await f.command('graphify on');
+   await f.command('graphify watch on');
+   assert.equal(f.watcher.status(f.root).active,false,artifactState);
+   assert.ok(f.notices.some(x=>/watch not enabled/.test(x)),artifactState);
+ }
 });
