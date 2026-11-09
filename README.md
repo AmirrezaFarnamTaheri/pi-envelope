@@ -114,3 +114,7 @@ For explicit durable static graph history, see [persistent graph version command
 ## Optional persistent symbol history
 
 The distinct, operator-triggered durable history feature from PR #7 is exposed as `envelope_code_symbol_history` alongside the default session-only `envelope_code_delta`. Both share the existing CodeIndex; no background capture or second parser is installed. Durable history stores private, project-scoped SQLite metadata across sessions, not source bodies. See [persistent history controls](docs/PERSISTENT_SYMBOL_HISTORY.md) and [session-local symbol deltas](docs/SYMBOL_DELTA.md).
+
+## Model-quality verification (operator-only)
+
+`npm run benchmark:semantic -- --dataset /absolute/corpus.json --encoder /absolute/trusted-encoder --k 5` runs source-hash-verified vector-only, hybrid and lexical comparisons on a bounded, labeled temporary fixture. The tests use a synthetic protocol encoder, **not** a real semantic model. See [benchmark requirements](docs/SEMANTIC_MODEL_BENCHMARK.md); actual-model quality and provider token savings remain unmeasured.

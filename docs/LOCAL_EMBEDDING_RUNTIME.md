@@ -54,3 +54,6 @@ For `find`, stdin is `{"schema":1,"task":"embed-query","text":"auth retry"}`. A 
 `tests/local-embedding-runtime.test.mjs` covers operator-triggered incremental sync (changed-only requests, unchanged vector reuse, deletions, no-op calls, model drift), real subprocess invocation using a controlled encoder, source hashes, private manifest permissions, model-consistent query ranking, malicious output, existing-manifest protection, symlinks, source changes during encoding, timeout/cancellation, output caps and Pi human-only commands. The full hosted workflow independently checks this against packaged Pi/Tersio and the previously verified Graphify, Graphify.NET, Tree-sitter, clangd, GraphQL and Go toolchains.
 
 This is a **local encoding interface**, not a bundled/benchmark-validated semantic encoder, vector database, automatic content watcher, ANN index, full compiler-backed cross-language graph or formal program proof. The remaining 16-source gaps are tracked in [issue #10](https://github.com/AmirrezaFarnamTaheri/pi-envelope/issues/10).
+
+
+See [operator-supplied semantic model benchmarking](SEMANTIC_MODEL_BENCHMARK.md) for a reproducible local model comparison harness; no benchmark results from actual models are asserted here.
