@@ -238,3 +238,49 @@ test('incremental sync requires an existing validated manifest and never implici
  await assert.rejects(runtime.sync(f.index,{executable:f.encoder}),/missing or invalid|build explicitly/i);
  assert.throws(()=>lstatSync(f.manifest),/ENOENT/);
 });
+
+
+test('manual embedding build fails closed when indexing may be truncated or parser evidence is unavailable',async t=>{
+ const f=fixture(t),runtime=new LocalEmbeddingRuntime();
+ f.index.maxFiles=2;f.index.refresh();
+ await assert.rejects(runtime.build(f.index,{executable:f.encoder}),/incomplete|index|cap|scope/i);
+ assert.throws(()=>lstatSync(f.manifest),/ENOENT/);
+ f.index.maxFiles=20;f.index.refresh();
+ f.index.lastRefresh.unavailable=[{language:'python',reason:'parser unavailable'}];
+ await assert.rejects(runtime.build(f.index,{executable:f.encoder}),/incomplete|unavailable|parser/i);
+ assert.throws(()=>lstatSync(f.manifest),/ENOENT/);
+});
+
+test('manual sync refuses incomplete or changed indexing scope without deleting retained vectors',async t=>{
+ const f=fixture(t),runtime=new LocalEmbeddingRuntime();
+ await runtime.build(f.index,{executable:f.encoder});
+ const original=readFileSync(f.manifest,'utf8');
+ unlinkSync(join(f.root,'src','second.ts'));
+ f.index.maxFiles=1;f.index.refresh();
+ await assert.rejects(runtime.sync(f.index,{executable:f.encoder}),/incomplete|index|cap|scope/i);
+ assert.equal(readFileSync(f.manifest,'utf8'),original);
+ f.index.maxFiles=20;f.index.refresh();
+ f.index.languagesEnabled=true;f.index.refresh();
+ await assert.rejects(runtime.sync(f.index,{executable:f.encoder}),/indexing scope|scope mismatch/i);
+ assert.equal(readFileSync(f.manifest,'utf8'),original);
+});
+
+test('legacy embedding manifests without an index-scope marker cannot be destructively synchronized',async t=>{
+ const f=fixture(t),runtime=new LocalEmbeddingRuntime();
+ await runtime.build(f.index,{executable:f.encoder});
+ const old=JSON.parse(readFileSync(f.manifest,'utf8'));
+ delete old.indexScope;
+ writeFileSync(f.manifest,JSON.stringify(old));
+ await assert.rejects(runtime.sync(f.index,{executable:f.encoder}),/missing index scope|explicit replace|legacy/i);
+ assert.deepEqual(JSON.parse(readFileSync(f.manifest,'utf8')),old);
+});
+
+test('manual sync checks verified index scope before deleting every previous row',async t=>{
+ const f=fixture(t),runtime=new LocalEmbeddingRuntime();
+ await runtime.build(f.index,{executable:f.encoder});
+ const original=readFileSync(f.manifest,'utf8');
+ unlinkSync(join(f.root,'src','first.ts'));
+ unlinkSync(join(f.root,'src','second.ts'));f.index.refresh();
+ await assert.rejects(runtime.sync(f.index,{executable:f.encoder}),/empty|incomplete|refuse|index/i);
+ assert.equal(readFileSync(f.manifest,'utf8'),original);
+});
