@@ -61,7 +61,7 @@ test('benchmark refuses unknown relevance labels, unsafe paths, symlinks and inv
  writeFileSync(f.dataset,JSON.stringify(bad));
  await assert.rejects(runSemanticBenchmark({datasetPath:f.dataset,encoderPath:f.encoder}),/relevant|unknown|indexed/i);
  bad.queries=[sample.queries[0]];
- bad.documents=[{path:'../secret.ts',content:'export const x=1;'}];
+ bad.documents=[{path:'../secret.ts',content:'export const x=1;'},sample.documents[1]];
  writeFileSync(f.dataset,JSON.stringify(bad));
  await assert.rejects(runSemanticBenchmark({datasetPath:f.dataset,encoderPath:f.encoder}),/path|unsafe|relative/i);
  writeFileSync(f.dataset,JSON.stringify(sample));
