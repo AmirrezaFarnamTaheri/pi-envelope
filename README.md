@@ -110,3 +110,7 @@ For explicit durable static graph history, see [persistent graph version command
 [Go compiler evidence](docs/GO_COMPILER_EVIDENCE.md) documents the scoped offline go/types adapter, trust boundaries and unsupported external imports.
 
 [Human-only local embedding encoder](docs/LOCAL_EMBEDDING_RUNTIME.md) documents the no-shell subprocess JSON protocol, private manifest, model consistency and lack of a guaranteed network sandbox.
+
+## Optional persistent symbol history
+
+The distinct, operator-triggered durable history feature from PR #7 is exposed as `envelope_code_symbol_history` alongside the default session-only `envelope_code_delta`. Both share the existing CodeIndex; no background capture or second parser is installed. Durable history stores private, project-scoped SQLite metadata across sessions, not source bodies. See [persistent history controls](docs/PERSISTENT_SYMBOL_HISTORY.md) and [session-local symbol deltas](docs/SYMBOL_DELTA.md).
