@@ -284,3 +284,43 @@ test('manual sync checks verified index scope before deleting every previous row
  await assert.rejects(runtime.sync(f.index,{executable:f.encoder}),/empty|incomplete|refuse|index/i);
  assert.equal(readFileSync(f.manifest,'utf8'),original);
 });
+
+
+test('incremental sync cannot prune a file excluded by capped discovery before language filtering',async t=>{
+ const f=fixture(t),runtime=new LocalEmbeddingRuntime();
+ f.index.maxFiles=4;f.index.refresh();
+ await runtime.build(f.index,{executable:f.encoder});
+ const before=readFileSync(f.manifest,'utf8');
+ for(let i=0;i<3;i++)f.put('a'+i+'.py','def excluded(): pass\n');
+ f.index.refresh();
+ assert.ok(f.index.files.size<f.index.maxFiles,'the parser-filtered count stays under cap');
+ await assert.rejects(runtime.sync(f.index,{executable:f.encoder}),/incomplete|discovery|truncat|cap/i);
+ assert.equal(readFileSync(f.manifest,'utf8'),before,'a missing indexed path must not be mistaken for deletion');
+});
+
+test('incremental sync refuses to prune an existing file merely because it grew above the source cap',async t=>{
+ const f=fixture(t),runtime=new LocalEmbeddingRuntime();
+ await runtime.build(f.index,{executable:f.encoder});
+ const before=readFileSync(f.manifest,'utf8');
+ f.put('second.ts','export const large = '+JSON.stringify('x'.repeat(100200)));
+ f.index.refresh();
+ assert.equal(f.index.files.has('src/second.ts'),false);
+ await assert.rejects(runtime.sync(f.index,{executable:f.encoder}),/missing|non-deleted|unindexed|unsafe|incomplete|source/i);
+ assert.equal(readFileSync(f.manifest,'utf8'),before);
+});
+
+test('human full replacement refuses a manifest modified concurrently by its encoder',async t=>{
+ const f=fixture(t),runtime=new LocalEmbeddingRuntime();
+ await runtime.build(f.index,{executable:f.encoder});
+ const old=JSON.parse(readFileSync(f.manifest,'utf8'));
+ const writer=join(f.trusted,'replace-concurrent-writer');
+ writeFileSync(writer,'#!/usr/bin/env node\n'+
+   'const fs=require("node:fs");const input=JSON.parse(fs.readFileSync(0,"utf8"));\n'+
+   'const path='+JSON.stringify(f.manifest)+';\n'+
+   'const prior=JSON.parse(fs.readFileSync(path,"utf8"));prior.externalModification="keep";fs.writeFileSync(path,JSON.stringify(prior));\n'+
+   'process.stdout.write(JSON.stringify({schema:1,model:"trusted-local-fixture-encoder",dimensions:8,entries:input.documents.map(d=>({path:d.path,vector:[1,0,0,0,0,0,0,0]}))}));\n',{mode:0o700});
+ await assert.rejects(runtime.build(f.index,{executable:writer,replace:true}),/manifest changed|concurrent|retry/i);
+ const current=JSON.parse(readFileSync(f.manifest,'utf8'));
+ assert.equal(current.externalModification,'keep','the runtime must not clobber the concurrently updated manifest');
+ assert.deepEqual(current.entries,old.entries);
+});
