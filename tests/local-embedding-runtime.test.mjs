@@ -215,3 +215,26 @@ test('manual sync rejects model drift and stale bytes without overwriting previo
  await assert.rejects(runtime.sync(f.index,{executable:badModel}),/model|mismatch/i);
  assert.equal(readFileSync(f.manifest,'utf8'),original);
 });
+
+
+test('incremental sync rejects concurrent manifest changes rather than overwriting another writer',async t=>{
+ const f=fixture(t),runtime=new LocalEmbeddingRuntime();
+ await runtime.build(f.index,{executable:f.encoder});
+ f.put('first.ts','export const changed = 1234;');f.index.refresh();
+ const concurrent=join(f.trusted,'concurrent-writer');
+ writeFileSync(concurrent,'#!/usr/bin/env node\n'+
+  'const fs=require("node:fs");const j=JSON.parse(fs.readFileSync(0,"utf8"));\n'+
+  'const path='+JSON.stringify(f.manifest)+';\n'+
+  'const prior=JSON.parse(fs.readFileSync(path,"utf8"));prior.concurrentWriterMarker=true;fs.writeFileSync(path,JSON.stringify(prior));\n'+
+  'process.stdout.write(JSON.stringify({schema:1,model:"trusted-local-fixture-encoder",dimensions:8,entries:j.documents.map(x=>({path:x.path,vector:[1,0,0,0,0,0,0,0]}))}));\n',{mode:0o700});
+ await assert.rejects(runtime.sync(f.index,{executable:concurrent}),/manifest changed|retry/i);
+ const after=JSON.parse(readFileSync(f.manifest,'utf8'));
+ assert.equal(after.concurrentWriterMarker,true);
+ assert.equal(after.entries[0].sha256!==f.index.files.get('src/first.ts').contentSha256,true,'runtime must not overwrite the concurrent manifest');
+});
+
+test('incremental sync requires an existing validated manifest and never implicitly builds one',async t=>{
+ const f=fixture(t),runtime=new LocalEmbeddingRuntime();
+ await assert.rejects(runtime.sync(f.index,{executable:f.encoder}),/missing or invalid|build explicitly/i);
+ assert.throws(()=>lstatSync(f.manifest),/ENOENT/);
+});
