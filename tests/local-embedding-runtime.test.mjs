@@ -152,3 +152,63 @@ test('human-only Pi commands pin encoder and build/find; agent-facing vector too
  assert.equal(hooks.get('tool_result').length,1);
  assert.equal(hooks.get('session_shutdown').length,1);
 });
+
+
+test('manual sync embeds only changed/new sources and keeps verified unchanged vectors',async t=>{
+ const f=fixture(t),runtime=new LocalEmbeddingRuntime();
+ await runtime.build(f.index,{executable:f.encoder});
+ const old=JSON.parse(readFileSync(f.manifest,'utf8'));
+ f.put('first.ts','export function documentOne(){ return "changed auth retry"; }');
+ f.index.refresh();
+ const onlyChanged=join(f.trusted,'only-changed');
+ writeFileSync(onlyChanged,'#!/usr/bin/env node\n'+
+  'const j=JSON.parse(require("fs").readFileSync(0,"utf8"));\n'+
+  'if(j.task!=="embed-documents"||j.documents.length!==1||j.documents[0].path!=="src/first.ts")process.exit(41);\n'+
+  'process.stdout.write(JSON.stringify({schema:1,model:"trusted-local-fixture-encoder",dimensions:8,entries:[{path:"src/first.ts",vector:[0,1,0,0,0,0,0,0]}]}));\n',{mode:0o700});
+ const result=await runtime.sync(f.index,{executable:onlyChanged});
+ assert.equal(result.embedded,1);assert.equal(result.reused,1);assert.equal(result.removed,0);
+ const next=JSON.parse(readFileSync(f.manifest,'utf8'));
+ assert.equal(next.entries.length,2);
+ assert.deepEqual(next.entries[1],old.entries[1],'unchanged verified vector must be retained');
+ assert.notDeepEqual(next.entries[0].vector,old.entries[0].vector);
+ assert.equal(next.entries[0].sha256,f.index.files.get('src/first.ts').contentSha256);
+});
+
+test('manual sync with no source changes is a true no-op and never invokes encoder',async t=>{
+ const f=fixture(t),runtime=new LocalEmbeddingRuntime();
+ await runtime.build(f.index,{executable:f.encoder});
+ const before=readFileSync(f.manifest,'utf8');
+ const failIfCalled=join(f.trusted,'should-not-run');
+ writeFileSync(failIfCalled,'#!/usr/bin/env node\nprocess.exit(97);\n',{mode:0o700});
+ const report=await runtime.sync(f.index,{executable:failIfCalled});
+ assert.equal(report.unchanged,true);assert.equal(report.embedded,0);assert.equal(report.reused,2);
+ assert.equal(readFileSync(f.manifest,'utf8'),before);
+});
+
+test('manual sync removes only deleted indexed files without launching an encoder',async t=>{
+ const f=fixture(t),runtime=new LocalEmbeddingRuntime();
+ await runtime.build(f.index,{executable:f.encoder});
+ unlinkSync(join(f.root,'src','second.ts'));f.index.refresh();
+ const failIfCalled=join(f.trusted,'should-not-run');
+ writeFileSync(failIfCalled,'#!/usr/bin/env node\nprocess.exit(97);\n',{mode:0o700});
+ const report=await runtime.sync(f.index,{executable:failIfCalled});
+ assert.equal(report.embedded,0);assert.equal(report.reused,1);assert.equal(report.removed,1);
+ const rows=JSON.parse(readFileSync(f.manifest,'utf8')).entries;
+ assert.deepEqual(rows.map(x=>x.path),['src/first.ts']);
+});
+
+test('manual sync rejects model drift and stale bytes without overwriting previous vectors',async t=>{
+ const f=fixture(t),runtime=new LocalEmbeddingRuntime();
+ await runtime.build(f.index,{executable:f.encoder});
+ const original=readFileSync(f.manifest,'utf8');
+ f.put('first.ts','export const changed = true;');
+ await assert.rejects(runtime.sync(f.index,{executable:f.encoder}),/stale|changed|refresh/i);
+ assert.equal(readFileSync(f.manifest,'utf8'),original);
+ f.index.refresh();
+ const badModel=join(f.trusted,'bad-model');
+ writeFileSync(badModel,'#!/usr/bin/env node\n'+
+ 'const j=JSON.parse(require("fs").readFileSync(0,"utf8"));\n'+
+ 'process.stdout.write(JSON.stringify({schema:1,model:"unexpected-model",dimensions:8,entries:j.documents.map(x=>({path:x.path,vector:[1,0,0,0,0,0,0,0]}))}));\n',{mode:0o700});
+ await assert.rejects(runtime.sync(f.index,{executable:badModel}),/model|mismatch/i);
+ assert.equal(readFileSync(f.manifest,'utf8'),original);
+});
