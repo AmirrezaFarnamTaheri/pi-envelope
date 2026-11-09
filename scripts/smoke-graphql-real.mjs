@@ -1,6 +1,6 @@
 /** Genuine GraphQL.js parser/executor smoke on isolated loopback, no provider. */
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,writeFileSync,rmSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,rmSync,realpathSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {randomBytes} from 'node:crypto';
@@ -9,7 +9,7 @@ import {CodeIndex} from '../extensions/envelope/code-index.mjs';
 import {GraphVersionStore} from '../extensions/envelope/graph-versions.mjs';
 import {createGraphqlServer} from './envelope-graphql-local.mjs';
 export async function smokeRealGraphql(){
- const gql=await import('graphql'),top=mkdtempSync(join(tmpdir(),'envelope-gql-real-'));
+ const gql=await import('graphql'),top=realpathSync(mkdtempSync(join(tmpdir(),'envelope-gql-real-')));
  const root=join(top,'project'),home=join(top,'home');mkdirSync(root);mkdirSync(home);
  let server;
  try{

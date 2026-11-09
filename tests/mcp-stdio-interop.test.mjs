@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,rmSync,mkdirSync,writeFileSync} from 'node:fs';
+import {mkdtempSync,rmSync,mkdirSync,writeFileSync,realpathSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawn} from 'node:child_process';
@@ -9,7 +9,7 @@ import {CodeIndex} from '../extensions/envelope/code-index.mjs';
 import {GraphVersionStore} from '../extensions/envelope/graph-versions.mjs';
 import {createMcpHandler} from '../scripts/envelope-mcp-stdio.mjs';
 function fixture(t){
- const root=mkdtempSync(join(tmpdir(),'env-mcp-repo-')),home=mkdtempSync(join(tmpdir(),'env-mcp-home-'));
+ const root=realpathSync(mkdtempSync(join(tmpdir(),'env-mcp-repo-'))),home=realpathSync(mkdtempSync(join(tmpdir(),'env-mcp-home-')));
  t.after(()=>{rmSync(root,{recursive:true,force:true});rmSync(home,{recursive:true,force:true});});
  mkdirSync(join(root,'src'));writeFileSync(join(root,'src','a.ts'),'export const a=1;');
  const index=new CodeIndex(root,{ts});index.refresh();

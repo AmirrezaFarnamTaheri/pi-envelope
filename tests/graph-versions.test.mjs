@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,lstatSync,rmSync,symlinkSync,unlinkSync,openSync,closeSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,realpathSync,lstatSync,rmSync,symlinkSync,unlinkSync,openSync,closeSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import ts from 'typescript';
@@ -8,7 +8,7 @@ import {CodeIndex} from '../extensions/envelope/code-index.mjs';
 import {GraphVersionStore} from '../extensions/envelope/graph-versions.mjs';
 import registerEnvelope from '../extensions/envelope/index.mjs';
 function setup(t){
- const home=mkdtempSync(join(tmpdir(),'graph-ledger-state-')),root=mkdtempSync(join(tmpdir(),'graph-ledger-repo-'));
+ const home=realpathSync(mkdtempSync(join(tmpdir(),'graph-ledger-state-'))),root=realpathSync(mkdtempSync(join(tmpdir(),'graph-ledger-repo-')));
  t.after(()=>{rmSync(home,{recursive:true,force:true});rmSync(root,{recursive:true,force:true});});
  mkdirSync(join(root,'src'));
  const put=(p,content)=>writeFileSync(join(root,'src',p),content);
@@ -65,12 +65,12 @@ test('prune is an explicit operation, bounded retention and project isolated',t=
  assert.equal(f.ledger.prune(f.index,{keep:2}).removed,2);
  assert.equal(f.ledger.list(f.index).versions.length,2);
  assert.throws(()=>f.ledger.compare(f.index,{from:old,to:f.ledger.list(f.index).versions[0].version}),/not found|missing/i);
- const other=mkdtempSync(join(tmpdir(),'graph-ledger-other-'));t.after(()=>rmSync(other,{recursive:true,force:true}));
+ const other=realpathSync(mkdtempSync(join(tmpdir(),'graph-ledger-other-')));t.after(()=>rmSync(other,{recursive:true,force:true}));
  writeFileSync(join(other,'q.ts'),'export const q=1;');const idx=new CodeIndex(other,{ts});idx.refresh();
  assert.equal(new GraphVersionStore(f.storage).status(idx).count,0);
 });
 test('rejects symlinked snapshot storage and symlinked source files',t=>{
- const f=setup(t),outside=mkdtempSync(join(tmpdir(),'graph-ledger-external-'));
+ const f=setup(t),outside=realpathSync(mkdtempSync(join(tmpdir(),'graph-ledger-external-')));
  t.after(()=>rmSync(outside,{recursive:true,force:true}));
  symlinkSync(outside,f.storage);
  assert.throws(()=>f.ledger.capture(f.index),/symlink|unsafe/i);

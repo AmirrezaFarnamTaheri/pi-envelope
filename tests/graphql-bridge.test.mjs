@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,writeFileSync,rmSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,rmSync,realpathSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import ts from 'typescript';
@@ -11,7 +11,7 @@ const selection=selections=>({kind:'SelectionSet',selections});
 const field=(name,children)=>({kind:'Field',name:{value:name},...(children?{selectionSet:selection(children)}:{})});
 const doc=selections=>({kind:'Document',definitions:[{kind:'OperationDefinition',operation:'query',selectionSet:selection(selections)}]});
 function fixture(t){
- const root=mkdtempSync(join(tmpdir(),'env-gql-repo-')),home=mkdtempSync(join(tmpdir(),'env-gql-home-'));
+ const root=realpathSync(mkdtempSync(join(tmpdir(),'env-gql-repo-'))),home=realpathSync(mkdtempSync(join(tmpdir(),'env-gql-home-')));
  t.after(()=>{rmSync(root,{recursive:true,force:true});rmSync(home,{recursive:true,force:true});});
  mkdirSync(join(root,'src'));writeFileSync(join(root,'src','a.ts'),'export const a=1;');
  const index=new CodeIndex(root,{ts});index.refresh();
