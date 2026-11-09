@@ -472,7 +472,7 @@ export function registerEnvelope(pi, options = {}) {
         if(value==='vectors'){
           const mode=extra[0]||'status';
           if(mode==='status'&&extra.length<=1){
-            notify(ctx,`Envelope vectors ${config.code.vectorEnabled?'on':'off'}; encoder ${config.code.vectorExecutable?'pinned':'not configured'}; manual build/find only, no automatic models`);return;
+            notify(ctx,`Envelope vectors ${config.code.vectorEnabled?'on':'off'}; encoder ${config.code.vectorExecutable?'pinned':'not configured'}; manual build/sync/find only, no automatic models`);return;
           }
           if(mode==='encoder'){
             const selected=rawArgs.replace(/^code\s+vectors\s+encoder\s*/i,'').trim();
@@ -486,13 +486,17 @@ export function registerEnvelope(pi, options = {}) {
             }catch(err){notify(ctx,`Envelope encoder path rejected: ${err.message}`,'warning');}
             return;
           }
-          if(mode==='build'||mode==='replace'){
-            if(extra.length!==1){notify(ctx,'Usage: /envelope code vectors [build|replace]','warning');return;}
+          if(mode==='build'||mode==='replace'||mode==='sync'){
+            if(extra.length!==1){notify(ctx,'Usage: /envelope code vectors [build|replace|sync]','warning');return;}
             try {
               if(!config.code.enabled||!config.code.vectorEnabled)throw new Error('code vectors disabled; enable explicitly');
               const index=await codeApi.indexOf(ctx);
-              const result=await localEmbeddingRuntime.build(index,{executable:config.code.vectorExecutable,replace:mode==='replace'});
-              notify(ctx,`Envelope local vector ${mode}: ${result.files} verified files, model ${result.model}, ${result.dimensions} dimensions; text windows truncated in ${result.truncatedTexts} files. No semantic-quality claim.`);
+              const result=mode==='sync'?
+                await localEmbeddingRuntime.sync(index,{executable:config.code.vectorExecutable}):
+                await localEmbeddingRuntime.build(index,{executable:config.code.vectorExecutable,replace:mode==='replace'});
+              const incremental=mode==='sync'?
+                `embedded ${result.embedded}, reused ${result.reused}, removed ${result.removed}; ${result.unchanged?'no encoder run; ':''}`:'';
+              notify(ctx,`Envelope local vector ${mode}: ${incremental}${result.files} verified files, model ${result.model}, ${result.dimensions} dimensions; text windows truncated in ${result.truncatedTexts} files. No semantic-quality claim.`);
             }catch(err){notify(ctx,`Envelope local embedding ${mode} failed: ${err.message}`,'warning');}
             return;
           }
@@ -506,7 +510,7 @@ export function registerEnvelope(pi, options = {}) {
             }catch(err){notify(ctx,`Envelope local vector search failed: ${err.message}`,'warning');}
             return;
           }
-          if(!['on','off'].includes(mode)||extra.length!==1){notify(ctx,'Usage: /envelope code vectors [status|on|off|encoder <absolute path>|encoder none|build|replace|find <text>]','warning');return;}
+          if(!['on','off'].includes(mode)||extra.length!==1){notify(ctx,'Usage: /envelope code vectors [status|on|off|encoder <absolute path>|encoder none|build|replace|sync|find <text>]','warning');return;}
           try{config=saveConfig(settingsPath,{...config,code:{...config.code,vectorEnabled:mode==='on'}});
             if(mode==='off')localEmbeddingRuntime.close?.();
             notify(ctx,`Envelope local vector retrieval ${mode}; encoder use requires an explicit human build/find command`);}
@@ -575,7 +579,7 @@ export function registerEnvelope(pi, options = {}) {
           return;
         }
         if (!['on', 'off'].includes(value) || extra.length) {
-          notify(ctx, 'Usage: /envelope code [status|on|off|vectors on|vectors off|vectors encoder <path>|vectors build|vectors replace|vectors find <text>|versions status|versions capture|versions prune <n>|languages on|languages off|tree on|tree off|tree status|guard on|guard off|rename on|rename off|lsp status]', 'warning');
+          notify(ctx, 'Usage: /envelope code [status|on|off|vectors on|vectors off|vectors encoder <path>|vectors build|vectors replace|vectors sync|vectors find <text>|versions status|versions capture|versions prune <n>|languages on|languages off|tree on|tree off|tree status|guard on|guard off|rename on|rename off|lsp status]', 'warning');
           return;
         }
         try {
