@@ -3,7 +3,8 @@
  * CLI update. Docs/media/unknown files are marked for manual rebuild.
  * Never reads source bodies, walks symlinks, starts a server or registers hooks.
  */
-import {lstatSync,readdirSync,realpathSync,watch as fsWatch} from 'node:fs';
+import {lstatSync,readdirSync,realpathSync,openSync,closeSync,writeSync,watch as fsWatch} from 'node:fs';
+import {constants} from 'node:fs';
 import {extname,join,resolve} from 'node:path';
 
 const SKIP_DIRS=new Set(['.git','node_modules','graphify-out','dist','build','coverage','.cache','.next','.turbo','vendor','__pycache__','.venv','.tox','.pnpm-store']);
@@ -18,6 +19,35 @@ function normalizeRoot(root){
   const canonical=realpathSync(resolve(root));
   if(!lstatSync(canonical).isDirectory())throw new TypeError('project root is not a directory');
   return canonical;
+}
+function storedKey(sessions,root){
+ try{return normalizeRoot(root);}
+ catch{
+   // The already-authorized canonical path survives a rename/deletion even if
+   // realpathSync no longer succeeds. Never resolve a new, untracked project.
+   if(typeof root!=='string'||!root.trim())return null;
+   const previous=resolve(root);
+   return sessions.has(previous)?previous:null;
+ }
+}
+function markGraphStale(root){
+ // Graphify's existing needs_update marker is honored by *both* read adapters
+ // and survives the current Pi session. Watcher consent authorizes this
+ // metadata invalidation, never code/model execution.
+ const dir=join(root,'graphify-out');let st;
+ try{st=lstatSync(dir);}catch(err){if(err.code==='ENOENT')return;throw err;}
+ if(st.isSymbolicLink()||!st.isDirectory())throw new Error('unsafe graph output directory');
+ const path=join(dir,'needs_update');let fd;
+ try{fd=openSync(path,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|(constants.O_NOFOLLOW||0),0o600);}
+ catch(err){
+   if(err.code==='EEXIST'){
+     const existing=lstatSync(path);
+     if(existing.isFile()&&!existing.isSymbolicLink())return;
+   }
+   throw err;
+ }
+ try{writeSync(fd,Buffer.from('manual-rebuild-required'));}
+ finally{closeSync(fd);}
 }
 function sourceDirectories(root){
   const dirs=[],queue=[root];
@@ -63,9 +93,12 @@ export class GraphifyWatchCoordinator {
     this.sessions=new Map();
   }
   status(root){
-    let key;
-    try{key=normalizeRoot(root);}catch{return {...EMPTY};}
-    return watchSnapshot(this.sessions.get(key));
+    const key=storedKey(this.sessions,root);
+    return watchSnapshot(key?this.sessions.get(key):null);
+  }
+  flagManual(session){
+    session.manual=true;
+    try{markGraphStale(session.root);}catch{session.lastOutcome='failed';}
   }
   start(root,{runUpdate,debounceMs=1200}={}){
     if(typeof runUpdate!=='function')throw new TypeError('Graphify watch requires an authorized code update runner');
@@ -86,7 +119,7 @@ export class GraphifyWatchCoordinator {
         // Node would terminate the entire Pi process. Fail closed instead.
         handle.on?.('error',()=>{
           if(session.closed)return;
-          session.manual=true;session.lastOutcome='failed';
+          this.flagManual(session);session.lastOutcome='failed';
           this.halt(session);
         });
       }
@@ -100,20 +133,20 @@ export class GraphifyWatchCoordinator {
   change(session,dir,rawName){
     if(session.closed)return;
     const name=safeFilename(rawName);
-    if(!name){session.manual=true;return;}
+    if(!name){this.flagManual(session);return;}
     if(SKIP_DIRS.has(name)||isTemporary(name))return;
     let st;
     try{st=lstatSync(join(dir,name));}catch{/* Source can be deleted; Graphify update handles removal. */}
-    if(st?.isDirectory()||st?.isSymbolicLink()){session.manual=true;return;}
-    if(st&&!st.isFile()){session.manual=true;return;}
+    if(st?.isDirectory()||st?.isSymbolicLink()){this.flagManual(session);return;}
+    if(st&&!st.isFile()){this.flagManual(session);return;}
     const suffix=extname(name).toLowerCase();
     if(!CODE_SUFFIXES.has(suffix)){
-      if(MANUAL_SUFFIXES.has(suffix)||suffix||name)session.manual=true;
+      if(MANUAL_SUFFIXES.has(suffix)||suffix||name)this.flagManual(session);
       return;
     }
     if(session.overflow)return;
     if(!session.pending.has(join(dir,name))&&session.pending.size>=MAX_PENDING){
-      session.pending.clear();session.overflow=true;session.manual=true;
+      session.pending.clear();session.overflow=true;this.flagManual(session);
       if(session.timer){clearTimeout(session.timer);session.timer=null;}
       return;
     }
@@ -121,19 +154,18 @@ export class GraphifyWatchCoordinator {
     this.schedule(session);
   }
   schedule(session){
-    if(session.closed||session.overflow||session.pending.size===0)return;
+    if(session.closed||session.manual||session.overflow||session.pending.size===0)return;
     if(session.timer)clearTimeout(session.timer);
     session.timer=setTimeout(()=>{session.timer=null;void this.flush(session.root);},session.debounceMs);
     session.timer.unref?.();
   }
   async flush(root){
-    let key;
-    try{key=normalizeRoot(root);}catch{return {...EMPTY};}
-    const session=this.sessions.get(key);
+    const key=storedKey(this.sessions,root);
+    const session=key?this.sessions.get(key):null;
     if(!session||session.closed)return {...EMPTY};
     if(session.timer){clearTimeout(session.timer);session.timer=null;}
     if(session.running)return session.running;
-    if(session.overflow||!session.pending.size)return watchSnapshot(session);
+    if(session.manual||session.overflow||!session.pending.size)return watchSnapshot(session);
     session.pending.clear();
     const controller=new AbortController();
     session.controller=controller;
@@ -144,7 +176,7 @@ export class GraphifyWatchCoordinator {
         if(!session.closed){session.batches++;session.lastOutcome='ok';}
       }catch{
         if(!session.closed){
-          session.lastOutcome='failed';session.manual=true;
+          session.lastOutcome='failed';this.flagManual(session);
           this.halt(session); // no uncontrolled retry after a failed update
         }
       }finally{
@@ -166,18 +198,16 @@ export class GraphifyWatchCoordinator {
   }
   /** Cancel now, but wait for in-flight writes to settle before manual writes. */
   async stopAndWait(root){
-    let key;
-    try{key=normalizeRoot(root);}catch{return {...EMPTY};}
-    const running=this.sessions.get(key)?.running;
-    this.stop(key);
+    const key=storedKey(this.sessions,root);
+    const running=key?this.sessions.get(key)?.running:null;
+    if(key)this.stop(key);
     if(running)await running;
     return {...EMPTY};
   }
   stop(root){
     if(root===undefined){for(const key of [...this.sessions.keys()])this.stop(key);return;}
-    let key;
-    try{key=normalizeRoot(root);}catch{return;}
-    const session=this.sessions.get(key);if(!session)return;
+    const key=storedKey(this.sessions,root);
+    const session=key?this.sessions.get(key):null;if(!session)return;
     this.halt(session);
     this.sessions.delete(key);
   }

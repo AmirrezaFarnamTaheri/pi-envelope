@@ -23,6 +23,7 @@ import { MetricsLedger } from './metrics-ledger.mjs';
 import {ProjectMemory, registerProjectMemoryFeature} from './project-memory.mjs';
 import {registerCapabilityCockpit} from './capability-cockpit.mjs';
 import { registerGraphifyCliFeature, normalizeGraphifyExecutable, composeGraphifyOrientation } from './graphify-cli.mjs';
+import {GraphifyWatchCoordinator} from './graphify-watch.mjs';
 import { registerGraphifyDotnetFeature, normalizeGraphifyDotnetExecutable } from './graphify-dotnet-runtime.mjs';
 import { registerMetricsFeature } from './metrics-api.mjs';
 import {LocalEmbeddingRuntime} from './local-embedding-runtime.mjs';
@@ -164,9 +165,10 @@ export function registerEnvelope(pi, options = {}) {
   });
 
   const localEmbeddingRuntime = options.localEmbeddingRuntime || new LocalEmbeddingRuntime();
-  const codeApi = registerCodeFeature(pi, {project, getConfig:()=>config, loadCompiler:options.loadCompiler, loadTreeRuntime:options.loadTreeRuntime, getTreeGrammarPath:options.getTreeGrammarPath, watchGraphFactory:options.watchGraphFactory, home, observe});
+  const graphifyWatcher=options.graphifyWatcher || new GraphifyWatchCoordinator();
+  const codeApi = registerCodeFeature(pi, {project, getConfig:()=>config, loadCompiler:options.loadCompiler, loadTreeRuntime:options.loadTreeRuntime, getTreeGrammarPath:options.getTreeGrammarPath, watchGraphFactory:options.watchGraphFactory, watchGraphStatus:root=>graphifyWatcher.status(root), home, observe});
   registerLspFeature(pi,{indexOf:codeApi.indexOf,getConfig:()=>config,home,observe});
-  const graphifyCli = registerGraphifyCliFeature(pi,{project,getConfig:()=>config,observe,cli:options.graphifyCliBridge,watcher:options.graphifyWatcher});
+  const graphifyCli = registerGraphifyCliFeature(pi,{project,getConfig:()=>config,observe,cli:options.graphifyCliBridge,watcher:graphifyWatcher});
   const graphifyDotnet = registerGraphifyDotnetFeature(pi,{project,getConfig:()=>config,bridge:options.graphifyDotnetBridge});
 
   // One read-only preflight stage for write/edit; Tersio only rewrites bash.

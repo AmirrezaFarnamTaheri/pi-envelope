@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,rmSync,writeFileSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,rmSync,writeFileSync,existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import registerEnvelope from '../extensions/envelope/index.mjs';
@@ -80,4 +80,21 @@ test('off-by-default watch refuses stale or missing external graph and disabled 
  await f.command('graphify watch on 2');
  assert.equal(f.watcher.status(f.root).active,false);
  assert.ok(f.notices.some(s=>/debounce/i.test(s)));
+});
+
+test('ambiguous manual-rebuild state blocks both direct graph and CLI edge reads',async t=>{
+ const f=fixture(t);
+ writeFileSync(join(f.root,'graphify-out','graph.json'),JSON.stringify({nodes:[{id:'a'},{id:'b'}],links:[{source:'a',target:'b'}]}));
+ await f.command('graphify on');await f.command('graphify watch on 250');
+ const handle=f.handles.find(x=>x.dir===join(f.root,'src'));
+ assert.ok(handle);handle.callback('rename',null);
+ assert.equal(f.watcher.status(f.root).manualRebuildRequired,true);
+ assert.equal(existsSync(join(f.root,'graphify-out','needs_update')),true);
+ const blocked=await f.tools.get('envelope_code_external_graph').execute('read',{action:'nodes'},undefined,undefined,f.ctx);
+ assert.equal(blocked.isError,true);
+ const blockedCli=await f.call({action:'query',question:'inspect graph'});
+ assert.equal(blockedCli.isError,true);
+ const acknowledged=await f.call({action:'query',question:'inspect graph',allowStale:true});
+ assert.equal(acknowledged.isError,false,acknowledged.content[0].text);
+ assert.ok(JSON.parse(acknowledged.content[0].text).reasons.includes('watcher-manual-rebuild-required'));
 });

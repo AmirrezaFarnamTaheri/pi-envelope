@@ -26,7 +26,7 @@ const result = (value,isError=false) => ({
 const intProp = (description,min,max) => ({type:'integer',minimum:min,maximum:max,description});
 function schema(properties,required=[]) {return {type:'object',properties,required,additionalProperties:false};}
 
-export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>import('typescript'),observe,home,loadTreeRuntime,getTreeGrammarPath,watchGraphFactory}={}) {
+export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>import('typescript'),observe,home,loadTreeRuntime,getTreeGrammarPath,watchGraphFactory,watchGraphStatus}={}) {
   const indices=new Map();
   const treeBrokers=new Map();
   const graphReaders=new Map();
@@ -109,7 +109,16 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
       allowStale:{type:'boolean',description:'Explicitly acknowledge that a known-stale graph may be used'},
       enabled:{type:'boolean',description:'Explicit watch enable or disable (action: watch)'},
       debounceMs:intProp('Debounce invalidations between 100 and 5000 ms (action: watch)',100,5000)}),
-    (index,params)=>graphReader(index).query(index,params));
+    (index,params)=>{
+      const state=watchGraphStatus?.(index.root);
+      const action=params.action??'status';
+      if(state?.manualRebuildRequired&&!['status','watch'].includes(action)&&params.allowStale!==true)
+        throw new Error('Graphify watcher requires manual rebuild; allowStale:true acknowledges stale reads');
+      const result=graphReader(index).query(index,params);
+      if(!state?.manualRebuildRequired)return result;
+      return {...result,complete:false,reasons:[...new Set([...(result.reasons||[]),'watcher-manual-rebuild-required'])],
+        watch:{...result.watch,manualRebuildRequired:true,queueOverflow:state.queueOverflow}};
+    });
   tool('envelope_code_history','Envelope: Bounded Git Co-change Evidence',
     'Read-only bounded Git commit co-occurrence, indexed-source churn and window completeness. Historical co-changes are NOT causal dependencies, authorship ownership or runtime call evidence.',
     schema({action:{type:'string',enum:['status','cochange','churn']},

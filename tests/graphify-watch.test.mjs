@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,rmSync,symlinkSync,writeFileSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,rmSync,symlinkSync,writeFileSync,existsSync,renameSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {GraphifyWatchCoordinator} from '../extensions/envelope/graphify-watch.mjs';
@@ -105,4 +105,32 @@ test('invalid configuration and oversized directory fanout fail closed',t=>{
   for(let i=0;i<70;i++)mkdirSync(join(f.repo,'module-'+i));
   assert.throws(()=>f.coordinator.start(f.repo,{runUpdate:f.runUpdate,debounceMs:250}),/budget|directory|limit/i);
   assert.equal(f.coordinator.status(f.repo).active,false);
+});
+
+test('ambiguous and directory events invalidate graph persistently and stop further automatic updates',async t=>{
+ const f=fixture(t);
+ f.coordinator.start(f.repo,{runUpdate:f.runUpdate,debounceMs:250});
+ mkdirSync(join(f.repo,'src','newdir'));
+ f.emit('src','newdir');
+ assert.equal(f.coordinator.status(f.repo).manualRebuildRequired,true);
+ assert.equal(existsSync(join(f.repo,'graphify-out','needs_update')),true);
+ f.emit('src','base.ts');await f.coordinator.flush(f.repo);
+ assert.equal(f.updates.length,0,'manual recovery must block code auto-updates');
+ f.coordinator.close();
+ assert.equal(existsSync(join(f.repo,'graphify-out','needs_update')),true);
+});
+
+test('stopAndWait finds and cancels authorized session after project root is renamed',async t=>{
+ const f=fixture(t);let resolveUpdate,signal;
+ f.coordinator.start(f.repo,{runUpdate:(_root,s)=>{signal=s;return new Promise(res=>{resolveUpdate=res;});}});
+ f.emit('src','base.ts');const running=f.coordinator.flush(f.repo);
+ const moved=join(f.top,'renamed');renameSync(f.repo,moved);
+ assert.equal(f.coordinator.status(f.repo).updating,true);
+ let finished=false;
+ const stopped=f.coordinator.stopAndWait(f.repo).then(()=>{finished=true;});
+ assert.equal(signal.aborted,true);
+ assert.equal(finished,false);
+ resolveUpdate();await running;await stopped;
+ assert.equal(f.coordinator.status(f.repo).active,false);
+ assert.ok(f.handles.every(h=>h.closed));
 });

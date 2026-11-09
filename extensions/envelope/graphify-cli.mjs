@@ -215,7 +215,13 @@ export function registerGraphifyCliFeature(pi,{project,getConfig,observe,cli=new
     const started=performance.now(),action=params.action??'status';
     try{
       if(!getConfig().code.enabled&&action!=='status')throw new Error('Code intelligence disabled; use /envelope code on');
+      const status=watcher.status(project(ctx));
+      if(['query','path','explain'].includes(action)&&status.manualRebuildRequired&&params.allowStale!==true)
+        throw new Error('Graphify watcher requires manual rebuild; allowStale:true acknowledges stale reads');
       const outcome=await cli.run(project(ctx),getConfig().graphify,params,signal,{humanCommand});
+      if(['query','path','explain'].includes(action)&&status.manualRebuildRequired)
+        return {...outcome,complete:false,reasons:[...new Set([...(outcome.reasons||[]),'watcher-manual-rebuild-required'])]};
+
       observe?.(ctx,'graphify_cli',{action,outcome:'ok',durationMs:performance.now()-started});
       return outcome;
     }catch(err){
