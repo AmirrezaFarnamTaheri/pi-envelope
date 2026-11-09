@@ -14,6 +14,7 @@ import {homedir} from 'node:os';
 import {join} from 'node:path';
 import {projectContextCard} from './context-card.mjs';
 import {SymbolDeltaLedger} from './symbol-delta.mjs';
+import {SymbolDeltaLedger as PersistentSymbolHistoryLedger} from './persistent-symbol-history.mjs';
 import {retrieveCodeEvidence} from './code-retrieval.mjs';
 import {buildContextSlice} from './context-slice.mjs';
 import {evaluateArchitecturePolicy} from './architecture-policy.mjs';
@@ -30,6 +31,12 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
   const treeBrokers=new Map();
   const graphReaders=new Map();
   const symbolDelta=new SymbolDeltaLedger();
+  let persistentSymbolHistory=null;
+  function historyLedger(){
+    if(!home)throw new Error('persistent symbol history home unavailable');
+    persistentSymbolHistory??=new PersistentSymbolHistoryLedger(join(home,'envelope-symbol-history'));
+    return persistentSymbolHistory;
+  }
   const versions=new GraphVersionStore(join(home||join(homedir(),'.pi'),'envelope-graph-versions'));
   function graphReader(index) {
     if(!graphReaders.has(index.root))graphReaders.set(index.root,new ExternalGraphReader(index.root,{...(watchGraphFactory?{watchFactory:watchGraphFactory}:{})}));
@@ -216,6 +223,16 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
       if(action==='compare')return symbolDelta.compare(index,params);
       throw new TypeError('unsupported symbol delta action');
     });
+  tool('envelope_code_symbol_history','Envelope: Explicit Persistent Symbol History',
+    'Operator-triggered, project-scoped, durable SQLite symbol metadata snapshots and file/symbol diffs. Unlike session-local envelope_code_delta, records persist across sessions but not source bodies. No implicit capture or model execution.',
+    schema({
+      action:{type:'string',enum:['status','capture','diff','erase']},
+      id:{type:'string',description:'Exact snapshot UUID to erase'},
+      from:{type:'string',description:'Existing snapshot UUID for diff'},
+      to:{type:'string',description:'Target snapshot UUID or current (default)'},
+      limit:intProp('Maximum entries per category (1-50)',1,50),
+      allowIncomplete:{type:'boolean',description:'Explicit acknowledgement when indexed evidence is incomplete'}
+    }), (index,params)=>historyLedger().query(index,params));
   tool('envelope_code_retrieve','Envelope: Local Symbol and Path Retrieval',
     'Rank bounded lexical matches from the existing AST symbol and path index, combine independent ranks and import evidence, and verify each original source SHA-256 before returning. No embeddings, network or source code execution.',
     schema({query:{type:'string',description:'Local identifier or file/path terms, max 120 characters'},
@@ -289,5 +306,5 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
     captureVersion:async(ctx)=>versions.capture(await indexOf(ctx)),
     pruneVersions:async(ctx,keep)=>versions.prune(await indexOf(ctx),{keep}),
     versionStatus:async(ctx)=>versions.status(await indexOf(ctx)),
-    close:()=>{symbolDelta.close();for(const reader of graphReaders.values())reader.close();graphReaders.clear();}};
+    close:()=>{symbolDelta.close();persistentSymbolHistory?.close();persistentSymbolHistory=null;for(const reader of graphReaders.values())reader.close();graphReaders.clear();}};
 }
