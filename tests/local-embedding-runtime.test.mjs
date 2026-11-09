@@ -143,6 +143,9 @@ test('human-only Pi commands pin encoder and build/find; agent-facing vector too
  await call('code vectors on');
  await call('code vectors build');
  assert.equal(lstatSync(f.manifest).mode&0o777,0o600);
+ await call('code vectors sync');
+ assert.ok(notices.some(x=>/local vector sync: embedded 0, reused 2, removed 0/.test(x)),notices.join('\n'));
+
  await call('code vectors find auth retry');
  assert.ok(notices.some(x=>/src\/first\.ts/.test(x)),notices.join('\n'));
  const tool=tools.get('envelope_code_vector');assert.ok(tool);
