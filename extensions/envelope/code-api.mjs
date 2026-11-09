@@ -170,7 +170,7 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
       from:{type:'string',description:'64-hex earlier graph version'},
       to:{type:'string',description:'64-hex newer graph version'},
       limit:intProp('Maximum changed file entries 1-25',1,25),
-      offset:intProp('Changed-file offset 0-512',0,512),
+      offset:intProp('Changed-file offset 0-1024',0,1024),
       ifVersion:{type:'string',description:'Comparison version from previous page'},
       maxChars:intProp('Maximum JSON response bytes 900-16000',900,16000)}),
     (index,params)=>{

@@ -35,3 +35,8 @@ Capture accepts at most **512 files**, **12,000 declaration records**, **16 MiB 
 **Verification:** `tests/graph-versions.test.mjs` exercises real index captures across edits, integrity tampering, symlink attacks, raw source exclusion, source-staleness rejection, project isolation, explicit pruning, exact output bounds and single-hook Pi registration. The review branch also requires hosted npm regression, real Pi runtime and packaging gates.
 
 **Remaining work:** SDL-MCP's full multi-version *symbol* graph, stable cross-language symbol IDs, typed calls, graph leases and spillover; CodeGraph's native multi-language graph kernel and automated incremental sync; semantic/vector retrieval, formal proof and external MCP/GraphQL transport. These are not provided by a private metadata snapshot. See [the 16-source audit](GRAPH_SOURCE_AUDIT.md) and [acceptance tracker #10](https://github.com/AmirrezaFarnamTaheri/pi-envelope/issues/10).
+
+
+## Integrity and concurrency limits
+
+Captured timestamp metadata now includes a checksum bound to the content version, so accidental timestamp modification is detected before list/prune. This is **not authenticated provenance** against an attacker who can rewrite all local files. Each project uses an exclusive short-lived writer lock for capture/prune; a crashed process may leave a stale lock that needs deliberate local administrator inspection and cleanup. File and directory entries are synchronized on supported POSIX filesystems before reporting a successful capture, subject to filesystem/hardware guarantees. Version comparison can paginate up to the full 1,024-file union.

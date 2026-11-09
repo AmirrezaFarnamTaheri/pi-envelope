@@ -33,7 +33,7 @@ function rootResolvers(store,source){
   versions:()=>store.list(source).versions,
   snapshot:({version,limit=20,offset=0})=>{
     const data=store.snapshot(source,{version,limit,offset});
-    return {...data,files:data.files.map(x=>({...x,symbolCount:x.symbols.length}))};
+    return {...data,files:data.files.map(x=>({...x,symbolCount:x.symbolCount}))};
   },
   compare:({from,to,limit=10,offset=0,ifVersion})=>store.compare(source,{from,to,limit,offset,ifVersion,maxChars:15000})
  };

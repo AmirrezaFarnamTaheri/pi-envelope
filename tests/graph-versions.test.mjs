@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,lstatSync,rmSync,symlinkSync,unlinkSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,lstatSync,rmSync,symlinkSync,unlinkSync,openSync,closeSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import ts from 'typescript';
@@ -101,4 +101,51 @@ test('Pi exposes only read operations; persistent captures require explicit huma
  assert.equal(hooks.get('before_agent_start').length,1);
  assert.equal(hooks.get('tool_result').length,1);
  assert.equal(hooks.get('session_shutdown').length,1);
+});
+
+test('capturedAt tampering is detected before timestamp-based prune selects versions',t=>{
+ const f=setup(t),s=f.ledger.capture(f.index),file=join(f.storage,s.projectKey,s.version+'.json');
+ const original=JSON.parse(readFileSync(file,'utf8'));
+ original.capturedAt='2000-01-01T00:00:00.000Z';
+ writeFileSync(file,JSON.stringify(original));
+ assert.throws(()=>f.ledger.list(f.index),/timestamp integrity/i);
+ assert.throws(()=>f.ledger.prune(f.index,{keep:1}),/timestamp integrity/i);
+});
+
+test('capture/prune reject an existing cross-process writer lock without changing snapshots',t=>{
+ const f=setup(t),first=f.ledger.capture(f.index);
+ const lock=join(f.storage,first.projectKey,'.snapshot-writer.lock');
+ const held=openSync(lock,'wx',0o600);
+ t.after(()=>{try{closeSync(held);}catch{}try{unlinkSync(lock);}catch{}});
+ f.put('b.ts','export const b=222;');f.index.refresh();
+ assert.throws(()=>f.ledger.capture(f.index),/busy|writer/i);
+ assert.throws(()=>f.ledger.prune(f.index,{keep:1}),/busy|writer/i);
+ assert.equal(f.ledger.list(f.index).count,1);
+ closeSync(held);unlinkSync(lock);
+ assert.equal(f.ledger.capture(f.index).existing,false);
+});
+
+test('compare accepts pages above 512 for disjoint maximum-size snapshots',t=>{
+ const f=setup(t);f.index.maxFiles=600;
+ for(let i=0;i<510;i++)f.put('old_'+i+'.ts','export const value'+i+'=1;');
+ f.index.refresh();const first=f.ledger.capture(f.index);
+ for(let i=0;i<510;i++){unlinkSync(join(f.root,'src','old_'+i+'.ts'));f.put('new_'+i+'.ts','export const value'+i+'=2;');}
+ f.index.refresh();const second=f.ledger.capture(f.index);
+ const firstPage=f.ledger.compare(f.index,{from:first.version,to:second.version,limit:1,maxChars:4000});
+ assert.equal(firstPage.totalChanges,1020);
+ const later=f.ledger.compare(f.index,{from:first.version,to:second.version,offset:700,ifVersion:firstPage.version,limit:2,maxChars:4000});
+ assert.equal(later.returned,2);assert.equal(later.offset,700);
+});
+
+test('final graph diff page fits its exact byte budget without imaginary continuation',t=>{
+ const f=setup(t),a=f.ledger.capture(f.index);
+ for(let i=0;i<12;i++)f.put('name_'+i+'.ts','export const v'+i+'=1;');
+ f.index.refresh();const b=f.ledger.capture(f.index);
+ const full=f.ledger.compare(f.index,{from:a.version,to:b.version,limit:25,maxChars:16000});
+ const exact=Buffer.byteLength(JSON.stringify(full),'utf8');
+ assert.ok(exact>=900);
+ const packed=f.ledger.compare(f.index,{from:a.version,to:b.version,limit:25,maxChars:exact});
+ assert.equal(packed.returned,full.returned);
+ assert.equal(packed.truncated,false);
+ assert.equal(Buffer.byteLength(JSON.stringify(packed),'utf8'),exact);
 });

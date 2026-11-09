@@ -52,3 +52,20 @@ test('server returns only captured metadata and bounds oversized queries',async 
  const oversized=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({query:'x'.repeat(10000)})});
  assert.ok([400,413].includes(oversized.status));
 });
+
+test('GraphQL snapshot exposes full count of 35 declarations while keeping the compact cap of 30',async t=>{
+ const f=fixture(t),token='my-super-secret-32-char-token-1234';
+ writeFileSync(join(f.root,'src','a.ts'),Array.from({length:35},(_,i)=>'export const symbol'+i+'='+i+';').join('\n'));
+ f.index.refresh();const saved=f.store.capture(f.index).version;
+ const snapshot=f.store.snapshot(f.index,{version:saved});
+ assert.equal(snapshot.files[0].symbolCount,35);
+ assert.equal(snapshot.files[0].symbols.length,30);
+ const fakeGql={buildSchema:s=>s,parse:()=>doc([field('snapshot',[field('files',[field('symbolCount')])])]),
+  graphql:async({rootValue})=>({data:{snapshot:rootValue.snapshot({version:saved})}})};
+ const server=await createGraphqlServer({store:f.store,source:f.index,gql:fakeGql,token,port:0});
+ t.after(()=>server.close());
+ const res=await fetch('http://127.0.0.1:'+server.address().port+'/graphql',{method:'POST',
+   headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({query:'{ snapshot { files { symbolCount } } }'})});
+ assert.equal(res.status,200);
+ const body=await res.json();assert.equal(body.data.snapshot.files[0].symbolCount,35);
+});
