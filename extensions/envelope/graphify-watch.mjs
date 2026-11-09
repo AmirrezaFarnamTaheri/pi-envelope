@@ -181,9 +181,12 @@ export class GraphifyWatchCoordinator {
     const controller=new AbortController();
     session.controller=controller;
     session.lastOutcome='running';
-    // Defer invoking the operator-approved runner until after the promise has
-    // been assigned. Synchronous throws cannot resurrect a settled "running".
-    const executing=Promise.resolve().then(()=>session.runUpdate(key,controller.signal));
+    // Invoke the approved runner immediately (existing synchronous contract),
+    // but defer both success and failure cleanup to promise microtasks, after
+    // session.running has been assigned. A synchronous throw is normalized.
+    let executing;
+    try{executing=Promise.resolve(session.runUpdate(key,controller.signal));}
+    catch(error){executing=Promise.reject(error);}
     const settled=executing.then(()=>{
       if(!session.closed){session.batches++;session.lastOutcome='ok';}
     },()=>{
