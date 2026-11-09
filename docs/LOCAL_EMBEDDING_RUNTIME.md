@@ -10,11 +10,16 @@ Human Pi commands, with code intelligence enabled:
 /envelope code vectors encoder /absolute/path/to/trusted-encoder
 /envelope code vectors on
 /envelope code vectors build
+/envelope code vectors sync
 /envelope code vectors find auth retry backoff
 /envelope code vectors replace
 /envelope code vectors off
 /envelope code vectors encoder none
 ```
+
+**`sync` is an operator-only, on-demand incremental update** of an existing manifest. It verifies every currently indexed source hash, reuses vectors only when their recorded SHA-256 equals the current verified bytes, encodes only new/modified files, and drops records for files no longer indexed. If no changes exist, it does not launch the encoder or rewrite the manifest. Deletion-only sync likewise avoids a subprocess. Newly encoded vectors must match the existing model identifier and dimension, or sync refuses the update and leaves the existing manifest untouched. Changes to model weights, identity or vector dimensions require an explicit full `replace`. It is not a background watcher and does not claim perfect semantic quality; unchanged source hashes do not attest to the correctness of a vector.
+
+`sync` refuses missing, malformed, oversized or duplicate-row manifests. It verifies the original manifest hash again before atomic replacement so a concurrently modified manifest cannot be silently overwritten; this remains best-effort protection against another privileged local process, not a cross-process lock or OS sandbox. Embedded source requests remain bounded, and unchanged source excerpts are **not** passed back to the executable during sync. A removed source file is not interpreted as a semantic deletion proof if the index is incomplete.
 
 `build` reads up to 64 indexed source files with exact SHA-256 verification, invokes the trusted executable and creates a private `0600` `.envelope/embeddings.json`. It **never overwrites** a preexisting manifest. `replace` requires an explicit separate human command. No automatic model runs occur when indexing, enabling vectors, or using the read-only agent tool. `find <text>` explicitly encodes a user query with the **same model** as the manifest and performs existing offline cosine + lexical-hybrid retrieval; it returns bounded paths/scores, not raw source text or query vectors. The existing agent-facing `envelope_code_vector` remains status / numeric-vector search only and cannot launch the encoder.
 
@@ -46,6 +51,6 @@ For `find`, stdin is `{"schema":1,"task":"embed-query","text":"auth retry"}`. A 
 
 ## Verification and limits
 
-`tests/local-embedding-runtime.test.mjs` covers real subprocess invocation using a controlled encoder, source hashes, private manifest permissions, model-consistent query ranking, malicious output, existing-manifest protection, symlinks, source changes during encoding, timeout/cancellation, output caps and Pi human-only commands. The full hosted workflow independently checks this against packaged Pi/Tersio and the previously verified Graphify, Graphify.NET, Tree-sitter, clangd, GraphQL and Go toolchains.
+`tests/local-embedding-runtime.test.mjs` covers operator-triggered incremental sync (changed-only requests, unchanged vector reuse, deletions, no-op calls, model drift), real subprocess invocation using a controlled encoder, source hashes, private manifest permissions, model-consistent query ranking, malicious output, existing-manifest protection, symlinks, source changes during encoding, timeout/cancellation, output caps and Pi human-only commands. The full hosted workflow independently checks this against packaged Pi/Tersio and the previously verified Graphify, Graphify.NET, Tree-sitter, clangd, GraphQL and Go toolchains.
 
 This is a **local encoding interface**, not a bundled/benchmark-validated semantic encoder, vector database, automatic content watcher, ANN index, full compiler-backed cross-language graph or formal program proof. The remaining 16-source gaps are tracked in [issue #10](https://github.com/AmirrezaFarnamTaheri/pi-envelope/issues/10).
