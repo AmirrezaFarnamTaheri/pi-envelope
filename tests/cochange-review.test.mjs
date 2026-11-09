@@ -114,3 +114,13 @@ test('registers exactly one read-only Pi code-review tool without a second agent
  assert.deepEqual(JSON.parse(result.content[0].text).items.map(x=>x.path),['src/b.ts']);
  assert.deepEqual(events,[]);
 });
+
+test('cochange checks indexable 500001..512000-byte sources without suppressing eligible candidates',t=>{
+ const f=fixture(t);
+ f.put('b.ts','export const b=7;'+(' '.repeat(509980)));
+ f.commit('large indexed cochange source');
+ f.index.maxBytesPerFile=512_000;f.index.refresh();
+ assert.ok(f.index.files.has('src/b.ts'));
+ const report=inspectCochangeCoupling(f.index,{path:'src/a.ts',minShared:2,maxCommits:30,limit:10});
+ assert.ok(report.items.some(x=>x.path==='src/b.ts'),JSON.stringify(report));
+});

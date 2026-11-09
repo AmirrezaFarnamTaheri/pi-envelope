@@ -8,6 +8,7 @@ import ts from 'typescript';
 import {CodeIndex} from '../extensions/envelope/code-index.mjs';
 import {SymbolDeltaLedger} from '../extensions/envelope/persistent-symbol-history.mjs';
 import {registerCodeFeature} from '../extensions/envelope/code-api.mjs';
+import registerEnvelope from '../extensions/envelope/index.mjs';
 
 function setup(t,sourceFiles={'src/a.ts':'export function alpha(){ return 1; }\n'}) {
   const home=mkdtempSync(join(tmpdir(),'envelope-symbol-delta-'));
@@ -177,9 +178,15 @@ test('Pi registers one scoped symbol-delta tool with no event hooks or implicit 
   const list=await tool.execute('list',{action:'status'},null,null,ctx);
   assert.equal(list.isError,false);
   assert.equal(JSON.parse(list.content[0].text).total,0);
-  const captured=await tool.execute('cap',{action:'capture'},null,null,ctx);
-  assert.equal(captured.isError,false,captured.content[0].text);
-  assert.ok(JSON.parse(captured.content[0].text).id);
+  const denied=await tool.execute('cap',{action:'capture'},null,null,ctx);
+  assert.equal(denied.isError,true);
+  assert.match(denied.content[0].text,/human/i);
+  const persisted=await feature.captureSymbolHistory(ctx);
+  assert.ok(persisted.id);
+  const deniedErase=await tool.execute('erase',{action:'erase',id:persisted.id},null,null,ctx);
+  assert.equal(deniedErase.isError,true);
+  assert.equal((await tool.execute('status',{action:'status'},null,null,ctx)).isError,false);
+  assert.equal((await tool.execute('diff',{action:'diff',from:persisted.id},null,null,ctx)).isError,false);
   assert.deepEqual(events,[]);
 });
 
@@ -201,3 +208,22 @@ test('symlink source ancestors are refused even when they resolve inside the pro
 });
 
 
+
+test('human /envelope code history capture and erase are the only persistent write entrypoints',async t=>{
+  const {root,home}=setup(t),tools=new Map(),commands=new Map(),handlers=new Map(),notes=[];
+  registerEnvelope({cwd:root,on:(name,fn)=>handlers.set(name,fn),registerTool:item=>tools.set(item.name,item),
+    registerCommand:(name,c)=>commands.set(name,c),logger:{warn(){}}},{home:join(home,'pi-home'),loadCompiler:()=>ts});
+  const ctx={cwd:root,sessionManager:{getSessionId:()=> 'history-human'},ui:{notify:s=>notes.push(s)}};
+  const run=text=>commands.get('envelope').handler(text,ctx);
+  await run('code on');
+  await run('code history capture');
+  const notice=notes.find(s=>s.includes('symbol history captured:'));
+  assert.ok(notice,notes.join('\n'));
+  const uuid=notice.match(/[0-9a-f]{8}-[0-9a-f-]{27}/)?.[0];assert.ok(uuid);
+  const ro=tools.get('envelope_code_symbol_history');
+  const erase=await ro.execute('denied',{action:'erase',id:uuid},null,null,ctx);assert.equal(erase.isError,true);
+  await run('code history erase '+uuid);
+  assert.ok(notes.some(s=>/entry erased/.test(s)),notes.join('\n'));
+  assert.equal(JSON.parse((await ro.execute('status',{action:'status'},null,null,ctx)).content[0].text).total,0);
+  await handlers.get('session_shutdown')?.({},ctx);
+});

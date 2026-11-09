@@ -226,13 +226,17 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
   tool('envelope_code_symbol_history','Envelope: Explicit Persistent Symbol History',
     'Operator-triggered, project-scoped, durable SQLite symbol metadata snapshots and file/symbol diffs. Unlike session-local envelope_code_delta, records persist across sessions but not source bodies. No implicit capture or model execution.',
     schema({
-      action:{type:'string',enum:['status','capture','diff','erase']},
+      action:{type:'string',enum:['status','diff']},
       id:{type:'string',description:'Exact snapshot UUID to erase'},
       from:{type:'string',description:'Existing snapshot UUID for diff'},
       to:{type:'string',description:'Target snapshot UUID or current (default)'},
       limit:intProp('Maximum entries per category (1-50)',1,50),
       allowIncomplete:{type:'boolean',description:'Explicit acknowledgement when indexed evidence is incomplete'}
-    }), (index,params)=>historyLedger().query(index,params));
+    }), (index,params)=>{
+      const action=params.action??'status';
+      if(action!=='status'&&action!=='diff')throw new Error('Persistent history capture/erase require an explicit human /envelope code history command');
+      return historyLedger().query(index,{...params,action});
+    });
   tool('envelope_code_retrieve','Envelope: Local Symbol and Path Retrieval',
     'Rank bounded lexical matches from the existing AST symbol and path index, combine independent ranks and import evidence, and verify each original source SHA-256 before returning. No embeddings, network or source code execution.',
     schema({query:{type:'string',description:'Local identifier or file/path terms, max 120 characters'},
@@ -303,6 +307,9 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
       return {...report,diagnostics:report.diagnostics.slice(0,20).map(d=>({...d,message:d.message.slice(0,400)}))};
     });
   return {loaded:()=>indices.size,indexOf,
+    captureSymbolHistory:async(ctx,allowIncomplete=false)=>historyLedger().query(await indexOf(ctx),{action:'capture',allowIncomplete}),
+    eraseSymbolHistory:async(ctx,id)=>historyLedger().query(await indexOf(ctx),{action:'erase',id}),
+    symbolHistoryStatus:async(ctx)=>historyLedger().query(await indexOf(ctx),{action:'status'}),
     captureVersion:async(ctx)=>versions.capture(await indexOf(ctx)),
     pruneVersions:async(ctx,keep)=>versions.prune(await indexOf(ctx),{keep}),
     versionStatus:async(ctx)=>versions.status(await indexOf(ctx)),

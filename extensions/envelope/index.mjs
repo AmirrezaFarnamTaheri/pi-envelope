@@ -518,6 +518,29 @@ export function registerEnvelope(pi, options = {}) {
           return;
         }
 
+        if(value==='history') {
+          const mode=extra[0]||'status';
+          try{
+            if(mode==='status'&&extra.length<=1){
+              const s=await codeApi.symbolHistoryStatus(ctx);
+              notify(ctx,`Envelope persistent symbol history: ${s.total} snapshots; capture and erase require human commands`);
+              return;
+            }
+            if(mode==='capture'&&(extra.length===1||(extra.length===2&&extra[1]==='incomplete'))){
+              const s=await codeApi.captureSymbolHistory(ctx,extra[1]==='incomplete');
+              notify(ctx,`Envelope symbol history captured: ${s.id} (${s.files} files; explicit private retention)`);
+              return;
+            }
+            if(mode==='erase'&&extra.length===2){
+              const s=await codeApi.eraseSymbolHistory(ctx,extra[1]);
+              notify(ctx,`Envelope symbol history ${s.deleted?'entry erased':'entry not found'}; SQLite backups/WAL may retain data`);
+              return;
+            }
+            notify(ctx,'Usage: /envelope code history [status|capture [incomplete]|erase <snapshot UUID>]','warning');
+          }catch(err){notify(ctx,`Envelope symbol history operation failed: ${err.message}`,'warning');}
+          return;
+        }
+
         if(value==='versions') {
           const mode=extra[0]||'status';
           try {
@@ -579,7 +602,7 @@ export function registerEnvelope(pi, options = {}) {
           return;
         }
         if (!['on', 'off'].includes(value) || extra.length) {
-          notify(ctx, 'Usage: /envelope code [status|on|off|vectors on|vectors off|vectors encoder <path>|vectors build|vectors replace|vectors sync|vectors find <text>|versions status|versions capture|versions prune <n>|languages on|languages off|tree on|tree off|tree status|guard on|guard off|rename on|rename off|lsp status]', 'warning');
+          notify(ctx, 'Usage: /envelope code [status|on|off|vectors on|vectors off|vectors encoder <path>|vectors build|vectors replace|vectors sync|vectors find <text>|history status|history capture|history erase <id>|versions status|versions capture|versions prune <n>|languages on|languages off|tree on|tree off|tree status|guard on|guard off|rename on|rename off|lsp status]', 'warning');
           return;
         }
         try {

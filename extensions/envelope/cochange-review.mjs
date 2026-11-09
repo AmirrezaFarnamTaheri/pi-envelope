@@ -23,7 +23,7 @@ function verify(index,root,path){
  if(!inside(root,target))throw new Error('unsafe source outside project');
  const stat=lstatSync(target),resolved=realpathSync(target);
  if(!stat.isFile()||stat.isSymbolicLink()||!inside(root,resolved))throw new Error('unsafe symlink or non-file source');
- if(stat.size>500_000)throw new RangeError('co-change source verification byte limit exceeded');
+ if(stat.size>512_000)throw new RangeError('co-change source verification byte limit exceeded');
  if(hash(readFileSync(target))!==record.contentSha256)throw new Error('source changed since CodeIndex refresh; retry after reindex');
  return key;
 }

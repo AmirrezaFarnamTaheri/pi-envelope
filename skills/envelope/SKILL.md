@@ -134,3 +134,7 @@ The optional `scripts/envelope-graphql-local.mjs` starts **only** after the huma
 ### Human-only local embedding generation
 
 Users may explicitly pin a trusted executable outside the project with `/envelope code vectors encoder <absolute path>`, enable `/envelope code vectors on`, and run `/envelope code vectors build`, `replace`, or `find <text>`. The **agent may not invoke** these commands as a tool or automatically choose/launch a model. The binary receives checked source excerpts or the human query and must be trusted; credential allowlisting/offline flags do **not** provide a hard network sandbox. The generated `.envelope/embeddings.json` is private and should be gitignored. Existing `envelope_code_vector` remains read-only numeric search. Never claim semantic quality, full source coverage or token savings from cosine values. See `docs/LOCAL_EMBEDDING_RUNTIME.md`.
+
+### Human-only persistent symbol history
+
+The agent may use `envelope_code_symbol_history` for `status` and `diff` only. Durable `capture` and `erase` are restricted to direct human `/envelope code history capture [incomplete]` and `/envelope code history erase <snapshot UUID>` slash commands. Never attempt those actions from agent tools. See `docs/PERSISTENT_SYMBOL_HISTORY.md`.
