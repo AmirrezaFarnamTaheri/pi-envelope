@@ -109,7 +109,7 @@ For explicit durable static graph history, see [persistent graph version command
 
 [Go compiler evidence](docs/GO_COMPILER_EVIDENCE.md) documents the scoped offline go/types adapter, trust boundaries and unsupported external imports.
 
-[Human-only local embedding encoder](docs/LOCAL_EMBEDDING_RUNTIME.md) documents the no-shell subprocess JSON protocol, private manifest, model consistency and lack of a guaranteed network sandbox.
+[Human-only local embedding encoder](docs/LOCAL_EMBEDDING_RUNTIME.md) documents the no-shell subprocess JSON protocol, private manifest, model consistency and lack of a guaranteed network sandbox. The explicit `/envelope code vectors sync` command re-embeds only source-hash-changed/new indexed files, reuses verified unchanged vectors, and prunes deleted indexed files without starting any background model process. `.envelope/` is Git-ignored in this repository; operators should also ignore it in projects where Envelope stores vectors.
 
 ## Optional persistent symbol history
 
