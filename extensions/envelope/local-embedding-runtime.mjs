@@ -28,6 +28,30 @@ function rootOf(index){
  if(index.root!==root)throw new Error('indexed project root changed');
  return root;
 }
+/** Refuse destructive indexing when the source scope may be partial.
+ * CodeIndex silently bounds discoveries and can omit unavailable parser families.
+ * A saved manifest must not be pruned against that incomplete set.
+ */
+function checkedIndexScope(index){
+ const state=index.lastRefresh;
+ if(!state||!Array.isArray(state.unavailable)||state.unavailable.length)
+   throw new Error('incomplete embedding index: refresh/parser unavailable; do not prune vectors');
+ if(!Number.isInteger(index.maxFiles)||index.maxFiles<1||index.files.size>=index.maxFiles)
+   throw new Error('incomplete embedding index: discovery may have reached the file cap');
+ if(!Number.isInteger(index.maxBytesPerFile)||index.maxBytesPerFile<1)
+   throw new Error('invalid embedding indexing byte scope');
+ return {languagesEnabled:index.languagesEnabled===true,maxFiles:index.maxFiles,maxBytesPerFile:index.maxBytesPerFile};
+}
+/** Persist the bounded index policy to distinguish real deletions from lost coverage. */
+function checkScopeEqual(saved,current){
+ if(!saved||typeof saved!=='object'||Array.isArray(saved)||
+    typeof saved.languagesEnabled!=='boolean'||!Number.isInteger(saved.maxFiles)||
+    !Number.isInteger(saved.maxBytesPerFile))
+   throw new Error('legacy embeddings manifest missing index scope; explicit replace required');
+ if(saved.languagesEnabled!==current.languagesEnabled||
+    saved.maxFiles!==current.maxFiles||saved.maxBytesPerFile!==current.maxBytesPerFile)
+   throw new Error('embedding indexing scope mismatch; explicit replace required');
+}
 function checkedEncoder(executable,root){
  if(typeof executable!=='string'||!isAbsolute(executable)||executable.length>1024||/[\u0000-\u001f\u007f]/.test(executable))throw new Error('pinned absolute encoder executable required');
  let file,st;
@@ -104,7 +128,7 @@ function readManifest(root){
    checkVector(entry.vector,manifest.dimensions);
    seen.add(path);entries.push({path,sha256:entry.sha256,vector:entry.vector});
  }
- return {data:{schema:1,model:manifest.model,dimensions:manifest.dimensions,entries},manifestHash:hash(raw)};
+ return {data:{schema:1,model:manifest.model,dimensions:manifest.dimensions,entries,indexScope:manifest.indexScope},manifestHash:hash(raw)};
 }
 function outputResponse(response,sourceFiles){
  checkModel(response);
@@ -188,10 +212,12 @@ export class LocalEmbeddingRuntime {
   if(this.activeRoots.has(root))throw new Error('embedding build already running for project');
   this.activeRoots.add(root);
   try{
+   const scope=checkedIndexScope(index);
    const {request,provenance,verifiedBytes,truncatedTexts}=readSource(index,root);
    const response=await callEncoder(binary,root,request,{timeoutMs,signal,spawnProcess:this.spawnProcess,controllers:this.controllers});
-   const payload=outputResponse(response,provenance);
+   const payload={...outputResponse(response,provenance),indexScope:scope};
    checkUnchanged(index,root,provenance);
+   checkScopeEqual(scope,checkedIndexScope(index));
    const oldExists=existsSync(target),result=writeManifest(root,payload,{replace});
    return {created:true,replaced:oldExists,files:provenance.length,model:payload.model,dimensions:payload.dimensions,
     manifestHash:result.manifestHash,verifiedSourceBytes:verifiedBytes,truncatedTexts,
@@ -204,7 +230,11 @@ export class LocalEmbeddingRuntime {
   if(this.activeRoots.has(root))throw new Error('embedding operation already running for project');
   this.activeRoots.add(root);
   try{
+   const scope=checkedIndexScope(index);
    const {data:previous,manifestHash:expectedManifestHash}=readManifest(root);
+   checkScopeEqual(previous.indexScope,scope);
+   if(index.files.size===0&&previous.entries.length>0)
+     throw new Error('refuse to delete every embedding row from an empty indexed source set');
    const prior=new Map(previous.entries.map(row=>[row.path,row]));
    const {request,provenance,verifiedBytes,truncatedTexts}=readSource(index,root,{
      include:(path,sha256)=>prior.get(path)?.sha256!==sha256,allowEmpty:true
@@ -215,6 +245,7 @@ export class LocalEmbeddingRuntime {
    const reused=provenance.length-changedProvenance.length;
    if(!changedProvenance.length&&!removed){
      checkUnchanged(index,root,provenance);
+     checkScopeEqual(scope,checkedIndexScope(index));
      return {unchanged:true,files:provenance.length,embedded:0,reused,removed:0,
        model:previous.model,dimensions:previous.dimensions,manifestHash:expectedManifestHash,
        verifiedSourceBytes:verifiedBytes,truncatedTexts,
@@ -229,9 +260,10 @@ export class LocalEmbeddingRuntime {
      updates=new Map(generated.entries.map(row=>[row.path,row]));
    }
    checkUnchanged(index,root,provenance);
+   checkScopeEqual(scope,checkedIndexScope(index));
    const entries=provenance.map(({path})=>updates.get(path)||prior.get(path));
    if(entries.some(row=>!row))throw new Error('incomplete embeddings sync manifest');
-   const payload={schema:1,model:previous.model,dimensions:previous.dimensions,entries};
+   const payload={schema:1,model:previous.model,dimensions:previous.dimensions,entries,indexScope:scope};
    const written=writeManifest(root,payload,{replace:true,expectedManifestHash});
    return {unchanged:false,files:provenance.length,embedded:changedProvenance.length,reused,removed,
      model:payload.model,dimensions:payload.dimensions,manifestHash:written.manifestHash,
