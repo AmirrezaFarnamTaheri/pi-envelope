@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,mkdirSync,writeFileSync,rmSync,chmodSync,existsSync,symlinkSync,unlinkSync} from 'node:fs';
 import {tmpdir} from 'node:os';
+import {spawn} from 'node:child_process';
 import {join} from 'node:path';
 import {GraphifyCliBridge,composeGraphifyOrientation} from '../extensions/envelope/graphify-cli.mjs';
 import registerEnvelope from '../extensions/envelope/index.mjs';
@@ -201,4 +202,29 @@ test('human Graphify writes refuse symlink output directories and files before e
  const dir=join(f.root,'graphify-out');
  rmSync(dir,{recursive:true,force:true});symlinkSync(outside,dir);
  await assert.rejects(()=>bridge.run(f.root,f.config,{action:'build'},undefined,{humanCommand:true}),/symlink|unsafe/i);
+});
+
+
+test('human Graphify writes wait for active read subprocesses before replacing graph',async t=>{
+ const f=fixture(t,{scriptBody:"if(process.argv[2]==='query')setTimeout(()=>console.log('query complete'),120);else console.log('written');"});
+ const calls=[],bridge=new GraphifyCliBridge({spawnProcess:(bin,args,opts)=>{calls.push(args[0]);return spawn(bin,args,opts);}});
+ const reading=bridge.run(f.root,f.config,{action:'query',question:'inspect'});
+ const writing=bridge.run(f.root,f.config,{action:'build'},undefined,{humanCommand:true});
+ assert.deepEqual(calls,['query']);
+ await reading;const after=await writing;
+ assert.deepEqual(calls,['query','extract']);assert.equal(after.action,'build');
+});
+
+test('POSIX cancellation kills Graphify descendants that inherit stdout pipes',async t=>{
+ if(process.platform==='win32')return t.skip('POSIX process-group-specific test');
+ const f=fixture(t),marker=join(f.home,'descendant-started');
+ const grandchild="require('node:fs').writeFileSync("+JSON.stringify(marker)+",'ready');setInterval(()=>{},1000)";
+ writeFileSync(f.executable,'#!/usr/bin/env node\n'+
+   'require("node:child_process").spawn(process.execPath,["-e",'+JSON.stringify(grandchild)+'],{stdio:"inherit"});setInterval(()=>{},1000);\n');
+ chmodSync(f.executable,0o700);
+ const bridge=new GraphifyCliBridge(),controller=new AbortController();
+ const running=bridge.run(f.root,{...f.config,timeoutMs:5000},{action:'query',question:'test'},controller.signal);
+ for(let i=0;i<70&&!existsSync(marker);i++)await new Promise(done=>setTimeout(done,25));
+ assert.ok(existsSync(marker),'grandchild must exist before cancellation');
+ controller.abort();await assert.rejects(running,/cancelled/i);
 });

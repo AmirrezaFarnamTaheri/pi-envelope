@@ -88,6 +88,11 @@ test('the CLI rejects simultaneous project graph mutations, then releases its wr
  await assert.rejects(()=>cli.run(f.root,f.config,{action:'build'},undefined,{humanCommand:true}),/in progress|concurrent|busy/i);
  controller.abort();
  assert.match((await caught).message,/cancel/i);
+ writeFileSync(f.config.executable,'#!/usr/bin/env node\nprocess.stdout.write("ok")\n');
+ chmodSync(f.config.executable,0o700);
+ const recovered=await cli.run(f.root,f.config,{action:'build'},undefined,{humanCommand:true});
+ assert.equal(recovered.writeRequested,true);
+ assert.equal(recovered.output,'ok');
 });
 
 test('Graphify child stderr cannot reveal tokens or source paths in agent error messages',async t=>{

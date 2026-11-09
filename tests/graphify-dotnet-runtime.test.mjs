@@ -106,3 +106,18 @@ test('large externally written artifacts are rejected without returning graph da
  const state=await f.bridge.run(f.root,f.config,{action:'status'});
  assert.equal(state.artifactState,'invalid');assert.equal(state.graphHash,null);
 });
+
+
+test('POSIX Graphify.NET cancellation kills inherited-pipe descendants',async t=>{
+ if(process.platform==='win32')return t.skip('POSIX process-group-specific test');
+ const f=fixture(t),marker=join(f.top,'dotnet-descendant-started');
+ const grandchild="require('node:fs').writeFileSync("+JSON.stringify(marker)+",'ready');setInterval(()=>{},1000)";
+ writeFileSync(f.executable,'#!/usr/bin/env node\n'+
+   'require("node:child_process").spawn(process.execPath,["-e",'+JSON.stringify(grandchild)+'],{stdio:"inherit"});setInterval(()=>{},1000);\n',{mode:0o700});
+ const {existsSync}=await import('node:fs');
+ const controller=new AbortController();
+ const running=f.bridge.run(f.root,{...f.config,timeoutMs:5000},{action:'build'},controller.signal,{humanCommand:true});
+ for(let i=0;i<70&&!existsSync(marker);i++)await new Promise(done=>setTimeout(done,25));
+ assert.ok(existsSync(marker),'grandchild must exist before cancellation');
+ controller.abort();await assert.rejects(running,/cancelled/i);
+});
