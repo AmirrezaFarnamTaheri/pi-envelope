@@ -271,9 +271,11 @@ export class LocalEmbeddingRuntime {
      notes:'Explicit incremental sync only: reuses matching source-hash vectors, never auto-runs encoders; model metadata is not attested.'};
   }finally{this.activeRoots.delete(root);}
  }
- async find(index,{executable,query,timeoutMs=30000,signal}={}){
+ /** Human-only benchmark mode reuses one query vector for vector-only and hybrid rankings. */
+ async find(index,{executable,query,timeoutMs=30000,signal,compare=false}={}){
   const root=rootOf(index),binary=checkedEncoder(executable,root);
   if(typeof query!=='string'||!query.trim()||query.length>160)throw new TypeError('text query must be 1..160 chars');
+  if(typeof compare!=='boolean')throw new TypeError('compare must be boolean');
   if(!Number.isInteger(timeoutMs)||timeoutMs<50||timeoutMs>120000)throw new RangeError('invalid encoder timeout');
   const target=privateManifestPath(root,{create:false});
   let manifest;
@@ -284,6 +286,9 @@ export class LocalEmbeddingRuntime {
   checkModel(response);checkVector(response.vector,response.dimensions);
   if(response.model!==manifest.model||response.dimensions!==manifest.dimensions)throw new Error('query encoder model/dimension mismatch with source vectors');
   const {searchLocalVectors}=await import('./local-vectors.mjs');
-  return searchLocalVectors(index,{queryVector:response.vector,query,limit:8,maxChars:4000});
+  const hybrid=searchLocalVectors(index,{queryVector:response.vector,query,limit:8,maxChars:4000});
+  if(!compare)return hybrid;
+  const vector=searchLocalVectors(index,{queryVector:response.vector,limit:8,maxChars:4000});
+  return {vector,hybrid};
  }
 }
