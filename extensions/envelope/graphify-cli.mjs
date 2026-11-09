@@ -11,6 +11,7 @@ import {accessSync, constants, realpathSync, statSync, lstatSync} from 'node:fs'
 import {isAbsolute, join, relative, resolve, sep} from 'node:path';
 import {ExternalGraphReader} from './graphify-adapter.mjs';
 import {GraphifyWatchCoordinator} from './graphify-watch.mjs';
+import {treeSpawnOptions,terminateTree} from './process-tree.mjs';
 
 const ACTIONS=new Set(['status','query','path','explain','build','update']);
 const OUTPUT_LIMIT=16_384;
@@ -108,15 +109,15 @@ async function spawnBounded(binary,args,{cwd,timeoutMs,signal,spawnProcess=spawn
   if(signal?.aborted)throw new Error('Graphify operation cancelled before launch');
   return new Promise((resolvePromise,rejectPromise)=>{
     let child;
-    try{child=spawnProcess(binary,args,{cwd,env:processEnv(),shell:false,stdio:['ignore','pipe','pipe'],windowsHide:true});}
+    try{child=spawnProcess(binary,args,{cwd,env:processEnv(),shell:false,stdio:['ignore','pipe','pipe'],windowsHide:true,...treeSpawnOptions(spawnProcess)});}
     catch{rejectPromise(new Error('Graphify process could not be launched'));return;}
     let stdout=[],stderr=[],outBytes=0,errBytes=0,oversized=false,timedOut=false,cancelled=false,done=false;
     let escalation,stopping=false;
     const kill=()=>{
       if(stopping)return;
       stopping=true;
-      try{child.kill('SIGTERM');}catch{/* already exited */}
-      escalation=setTimeout(()=>{try{child.kill('SIGKILL');}catch{/* already exited */}},250);escalation.unref?.();
+      terminateTree(child,'SIGTERM',{spawnProcess});
+      escalation=setTimeout(()=>terminateTree(child,'SIGKILL',{spawnProcess}),250);escalation.unref?.();
     };
     const timer=setTimeout(()=>{timedOut=true;kill();},timeoutMs);timer.unref?.();
     const onAbort=()=>{cancelled=true;kill();};
@@ -148,7 +149,7 @@ async function spawnBounded(binary,args,{cwd,timeoutMs,signal,spawnProcess=spawn
 }
 
 export class GraphifyCliBridge {
-  constructor({spawnProcess=spawn}={}){this.spawnProcess=spawnProcess;this.active=new Set();this.activeWrites=new Set();}
+  constructor({spawnProcess=spawn}={}){this.spawnProcess=spawnProcess;this.active=new Set();this.activeWrites=new Set();this.pendingWrites=new Set();this.activeReads=new Map();}
   close(){for(const controller of this.active)controller.abort();}
   async run(projectRoot,config,params={},signal,{humanCommand=false}={}){
     if(!params||typeof params!=='object'||Array.isArray(params))throw new TypeError('Graphify params required');
@@ -168,9 +169,8 @@ export class GraphifyCliBridge {
     if(!candidate.available)throw new Error(`Graphify CLI unavailable or unsafe: ${candidate.reason}`);
     const write=action==='build'||action==='update';
     if(write&&!humanCommand)throw new Error('Graphify mutations require the human /envelope graphify build|update slash command');
-    if(write&&this.activeWrites.has(root))throw new Error('Graphify graph write already in progress for this project');
-    if(write)safeOutputForWrite(root);
-    if(!write&&this.activeWrites.has(root))throw new Error('Graphify graph update in progress for this project');
+    if(write&&(this.activeWrites.has(root)||this.pendingWrites.has(root)))throw new Error('Graphify graph write already in progress for this project');
+    if(!write&&(this.activeWrites.has(root)||this.pendingWrites.has(root)))throw new Error('Graphify graph update in progress for this project');
     let args;
     if(action==='query'){
       const question=safeInput(params.question,'question');
@@ -196,10 +196,32 @@ export class GraphifyCliBridge {
     if(signal?.aborted)cancel();
     signal?.addEventListener('abort',cancel,{once:true});
     this.active.add(task);
-    if(write)this.activeWrites.add(root);
+    let readDone,finishRead;
+    if(write)this.pendingWrites.add(root);
+    else{
+      readDone=new Promise(r=>{finishRead=r;});
+      if(!this.activeReads.has(root))this.activeReads.set(root,new Set());
+      this.activeReads.get(root).add(readDone);
+    }
     let output;
-    try{output=await spawnBounded(candidate.path,args,{cwd:root,timeoutMs,signal:task.signal,spawnProcess:this.spawnProcess});}
-    finally{signal?.removeEventListener('abort',cancel);this.active.delete(task);if(write)this.activeWrites.delete(root);}
+    try{
+      if(write){
+        const readers=this.activeReads.get(root);
+        if(readers?.size)await Promise.allSettled([...readers]);
+        if(task.signal.aborted)throw new Error('Graphify operation cancelled while waiting for reads');
+        safeOutputForWrite(root);
+        this.activeWrites.add(root);
+      }
+      output=await spawnBounded(candidate.path,args,{cwd:root,timeoutMs,signal:task.signal,spawnProcess:this.spawnProcess});
+    }finally{
+      signal?.removeEventListener('abort',cancel);this.active.delete(task);
+      if(write){this.activeWrites.delete(root);this.pendingWrites.delete(root);}
+      else{
+        this.activeReads.get(root)?.delete(readDone);
+        if(this.activeReads.get(root)?.size===0)this.activeReads.delete(root);
+        finishRead();
+      }
+    }
     const after=write?localStatus(root):artifact;
     return {...base,action,artifactState:after.state,reasons:after.reasons??[],
       ...(write?{writeRequested:true,artifactChanged:after.graphSha256!==artifact.graphSha256,graphHash:after.graphSha256??null}:{}),

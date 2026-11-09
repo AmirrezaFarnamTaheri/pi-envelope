@@ -70,3 +70,6 @@ For explicitly authorized incremental AST updates, run `/envelope graphify watch
 
 
 **Graph output preflight:** Human and explicitly consented watcher writes fail before launching Graphify when `graphify-out` is a symlink/non-directory or known graph output files are symlinks/non-files. These checks are defense in depth against a changed project tree, not OS isolation for the pinned executable.
+
+
+**CLI concurrency:** A project-scoped reader/writer coordinator prevents a graph write from overtaking an in-flight CLI query. A queued writer blocks new reads and awaits current readers, preserving this bridge's status hash/read pairing. Other processes remain outside the in-process guard. Cancellation attempts to terminate the full subprocess group on POSIX and process tree on Windows, but a trusted executable can escape the group; this is not a sandbox.

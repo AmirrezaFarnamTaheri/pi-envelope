@@ -4,6 +4,7 @@ import {createHash} from 'node:crypto';
 import {accessSync,constants,statSync,realpathSync,lstatSync,mkdirSync,mkdtempSync,rmSync,openSync,readSync,fstatSync,closeSync} from 'node:fs';
 import {join,resolve,isAbsolute,sep} from 'node:path';
 import {tmpdir} from 'node:os';
+import {treeSpawnOptions,terminateTree} from './process-tree.mjs';
 const OUT='.envelope/graphify-dotnet-out',OUTPUT_LIMIT=16384,GRAPH_LIMIT=2_000_000;
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const within=(root,p)=>p===root||p.startsWith(root+sep);
@@ -76,10 +77,12 @@ async function spawnOffline(binary,root,timeout,signal,spawnProcess,controllers)
    DOTNET_NOLOGO:'1',DOTNET_CLI_TELEMETRY_OPTOUT:'1',TMPDIR:tmpdir(),TMP:tmpdir(),TEMP:tmpdir()};
  if(process.platform==='win32'){env.SYSTEMROOT=process.env.SYSTEMROOT||'';env.WINDIR=process.env.WINDIR||'';}
  try{return await new Promise((resolvePromise,rejectPromise)=>{
-   let child;try{child=spawnProcess(binary,args,{cwd:root,env,shell:false,stdio:['ignore','pipe','pipe'],windowsHide:true});}
+   let child;try{child=spawnProcess(binary,args,{cwd:root,env,shell:false,stdio:['ignore','pipe','pipe'],windowsHide:true,...treeSpawnOptions(spawnProcess)});}
    catch{rejectPromise(new Error('Graphify.NET process could not launch'));return;}
    let done=false,stdoutBytes=0,timeoutHit=false,cancelled=false,oversized=false,esc;
-   const kill=()=>{try{child.kill('SIGTERM');}catch{}esc=setTimeout(()=>{try{child.kill('SIGKILL');}catch{}},250);esc.unref?.();};
+   let stopping=false;
+   const kill=()=>{if(stopping)return;stopping=true;terminateTree(child,'SIGTERM',{spawnProcess});
+     esc=setTimeout(()=>terminateTree(child,'SIGKILL',{spawnProcess}),250);esc.unref?.();};
    const timer=setTimeout(()=>{timeoutHit=true;kill();},timeout);timer.unref?.();
    const cancel=()=>{cancelled=true;kill();};signal?.addEventListener('abort',cancel,{once:true});controller.signal.addEventListener('abort',cancel,{once:true});
    const end=(err)=>{if(done)return;done=true;clearTimeout(timer);if(esc)clearTimeout(esc);signal?.removeEventListener('abort',cancel);

@@ -33,3 +33,6 @@ See [16-source audit](GRAPH_SOURCE_AUDIT.md) and [integration tracker #10](https
 
 
 **Artifact safety:** Before a human build, `graph.json` must be absent or an ordinary file, never a symlink. Status opens existing files without following final-component symlinks, verifies the opened descriptor, reads no more than 2 MiB plus an overflow probe, and rejects concurrent file changes. This mitigates accidental output redirection and oversized local graph reads, but does not sandbox the trusted executable or eliminate all filesystem races against privileged local processes.
+
+
+**Subprocess-tree cancellation:** The bridge uses a POSIX process group or Windows process-tree termination on timeout, cancellation and output limit violations. This is best effort, not a sandbox against detached daemons or independent filesystem access.
