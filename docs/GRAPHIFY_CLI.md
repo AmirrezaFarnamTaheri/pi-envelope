@@ -67,3 +67,6 @@ This adds the optional read-only/runtime command layer described by `gaodes/pi-g
 ## Optional session-only code watcher
 
 For explicitly authorized incremental AST updates, run `/envelope graphify watch on 1200`; inspect `/envelope graphify watch status`, and revoke it with `/envelope graphify watch off`. Only supported code suffixes trigger local `GRAPHIFY_BACKEND=none` updates. Documents, images, unfamiliar file types, new source directories and watcher errors require manual review/rebuild instead. Failed updates halt further automatic retries; manual build/update awaits watcher cancellation and CLI graph writes cannot overlap. The agent's read-only tool cannot enable this watcher. Full constraints and caveats are in [Graphify watcher](GRAPHIFY_WATCH.md).
+
+
+**Graph output preflight:** Human and explicitly consented watcher writes fail before launching Graphify when `graphify-out` is a symlink/non-directory or known graph output files are symlinks/non-files. These checks are defense in depth against a changed project tree, not OS isolation for the pinned executable.

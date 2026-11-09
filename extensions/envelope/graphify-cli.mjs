@@ -7,8 +7,8 @@
  * This is a subprocess adapter, never an Envelope native AST assertion.
  */
 import {spawn} from 'node:child_process';
-import {accessSync, constants, realpathSync, statSync} from 'node:fs';
-import {isAbsolute, relative, resolve, sep} from 'node:path';
+import {accessSync, constants, realpathSync, statSync, lstatSync} from 'node:fs';
+import {isAbsolute, join, relative, resolve, sep} from 'node:path';
 import {ExternalGraphReader} from './graphify-adapter.mjs';
 import {GraphifyWatchCoordinator} from './graphify-watch.mjs';
 
@@ -44,6 +44,17 @@ function executableStatus(root,executable){
     if(process.platform!=='win32')accessSync(path,constants.X_OK);
     return {available:true,path};
   }catch{return {available:false,reason:'executable-unavailable-or-unsafe'};}
+}
+function safeOutputForWrite(root){
+ const out=join(root,'graphify-out');let st;
+ try{st=lstatSync(out);}catch(err){if(err.code==='ENOENT')return;throw err;}
+ if(st.isSymbolicLink()||!st.isDirectory())throw new Error('unsafe graphify-out output symlink or non-directory');
+ for(const name of ['graph.json','envelope-sources.json','needs_update']){
+   try{
+     const file=lstatSync(join(out,name));
+     if(file.isSymbolicLink()||!file.isFile())throw new Error('unsafe Graphify output file symlink or non-file');
+   }catch(err){if(err.code!=='ENOENT')throw err;}
+ }
 }
 function localStatus(root){
   const reader=new ExternalGraphReader(root);
@@ -158,6 +169,7 @@ export class GraphifyCliBridge {
     const write=action==='build'||action==='update';
     if(write&&!humanCommand)throw new Error('Graphify mutations require the human /envelope graphify build|update slash command');
     if(write&&this.activeWrites.has(root))throw new Error('Graphify graph write already in progress for this project');
+    if(write)safeOutputForWrite(root);
     if(!write&&this.activeWrites.has(root))throw new Error('Graphify graph update in progress for this project');
     let args;
     if(action==='query'){

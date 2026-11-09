@@ -1,7 +1,7 @@
 /** Explicit Graphify.NET CLI AST-only bridge. Never imports provider credentials. */
 import {spawn} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {accessSync,constants,statSync,realpathSync,lstatSync,mkdirSync,mkdtempSync,rmSync,openSync,readFileSync,closeSync} from 'node:fs';
+import {accessSync,constants,statSync,realpathSync,lstatSync,mkdirSync,mkdtempSync,rmSync,openSync,readSync,fstatSync,closeSync} from 'node:fs';
 import {join,resolve,isAbsolute,sep} from 'node:path';
 import {tmpdir} from 'node:os';
 const OUT='.envelope/graphify-dotnet-out',OUTPUT_LIMIT=16384,GRAPH_LIMIT=2_000_000;
@@ -31,6 +31,13 @@ function paths(root,create=false){
  }
  return {out,graph:join(out,'graph.json')};
 }
+function validateWriteTarget(root){
+ const graph=paths(root,true).graph;
+ try{
+   const st=lstatSync(graph);
+   if(st.isSymbolicLink()||!st.isFile())throw new Error('unsafe Graphify.NET graph.json symlink or non-file target');
+ }catch(err){if(err.code!=='ENOENT')throw err;}
+}
 function artifact(root){
  let graph;
  try{graph=paths(root,false)?.graph;}catch{return {artifactState:'invalid',nodes:0,edges:0,graphHash:null};}
@@ -40,7 +47,18 @@ function artifact(root){
    const st=lstatSync(graph);
    if(!st.isFile()||st.isSymbolicLink()||st.size>GRAPH_LIMIT)throw new Error('invalid Graphify.NET graph artifact');
    fd=openSync(graph,constants.O_RDONLY|(constants.O_NOFOLLOW||0));
-   const bytes=readFileSync(fd);if(bytes.length>GRAPH_LIMIT)throw new Error('invalid graph size');
+   const opened=fstatSync(fd);
+   if(!opened.isFile()||opened.size>GRAPH_LIMIT||opened.size<2)throw new Error('invalid graph size');
+   const bytes=Buffer.alloc(opened.size);let at=0;
+   while(at<bytes.length){
+     const read=readSync(fd,bytes,at,bytes.length-at,at);
+     if(read<=0)throw new Error('graph changed during read');
+     at+=read;
+   }
+   const extra=Buffer.alloc(1);
+   if(readSync(fd,extra,0,1,at)>0)throw new Error('graph grew during read');
+   const after=fstatSync(fd);
+   if(after.size!==opened.size||after.ino!==opened.ino||after.mtimeMs!==opened.mtimeMs)throw new Error('graph changed during read');
    const parsed=JSON.parse(bytes.toString('utf8'));
    const data=Array.isArray(parsed?.nodes)?parsed:parsed?.graph;
    const nodes=data?.nodes,edges=data?.links??data?.edges;
@@ -97,7 +115,7 @@ export class GraphifyDotnetBridge {
    if(this.writing.has(root))throw new Error('Graphify.NET build already running for this project');
    const timeout=config.timeoutMs??30000;
    if(!Number.isInteger(timeout)||timeout<50||timeout>120000)throw new RangeError('invalid Graphify.NET timeout');
-   paths(root,true);
+   validateWriteTarget(root);
    this.writing.add(root);
    try{
      const proc=await spawnOffline(binary.path,root,timeout,signal,this.spawnProcess,this.active);

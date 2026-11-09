@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,writeFileSync,rmSync,chmodSync,existsSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,rmSync,chmodSync,existsSync,symlinkSync,unlinkSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {GraphifyCliBridge,composeGraphifyOrientation} from '../extensions/envelope/graphify-cli.mjs';
@@ -189,4 +189,16 @@ test('capability cockpit routes the optional Graphify CLI only when explicitly c
   const off=inspectCapabilityCockpit({...config,graphify:{...config.graphify,enabled:false}},{intent:'graph',pathEnv:''});
   assert.equal(off.capabilities.graphifyCli,'disabled');
   assert.ok(!off.plan.some(x=>x.tool==='envelope_graphify_cli'));
+});
+
+test('human Graphify writes refuse symlink output directories and files before executing CLI',async t=>{
+ const f=fixture(t),outside=join(f.home,'outside');mkdirSync(outside);
+ const graph=join(f.root,'graphify-out','graph.json');
+ unlinkSync(graph);symlinkSync(join(outside,'target'),graph);
+ await assert.rejects(()=>bridge.run(f.root,f.config,{action:'update'},undefined,{humanCommand:true}),/symlink|unsafe/i);
+ assert.equal(existsSync(join(outside,'target')),false);
+ unlinkSync(graph);
+ const dir=join(f.root,'graphify-out');
+ rmSync(dir,{recursive:true,force:true});symlinkSync(outside,dir);
+ await assert.rejects(()=>bridge.run(f.root,f.config,{action:'build'},undefined,{humanCommand:true}),/symlink|unsafe/i);
 });

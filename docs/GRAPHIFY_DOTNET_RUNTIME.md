@@ -30,3 +30,6 @@ Output is isolated under `.envelope/graphify-dotnet-out/graph.json`, preserving 
 - Separate external graph freshness, source provenance, actual C# semantic correctness, full Copilot SDK, AI-backed extractor, Neo4j/Obsidian exporters, dynamic server and watcher parity are **not implemented**.
 
 See [16-source audit](GRAPH_SOURCE_AUDIT.md) and [integration tracker #10](https://github.com/AmirrezaFarnamTaheri/pi-envelope/issues/10). This is a narrowly scoped execution bridge, not a full .NET port into JavaScript or any claim of full 16-project integration.
+
+
+**Artifact safety:** Before a human build, `graph.json` must be absent or an ordinary file, never a symlink. Status opens existing files without following final-component symlinks, verifies the opened descriptor, reads no more than 2 MiB plus an overflow probe, and rejects concurrent file changes. This mitigates accidental output redirection and oversized local graph reads, but does not sandbox the trusted executable or eliminate all filesystem races against privileged local processes.

@@ -90,3 +90,19 @@ test('Pi agent can only read status; human command alone builds; original hooks 
  await command('graphify-dotnet off');
  for(const hook of ['before_agent_start','tool_result','session_shutdown'])assert.equal(hooks.get(hook).length,1);
 });
+
+test('existing graph.json symlink must not be overwritten by trusted Graphify.NET build',async t=>{
+ const f=fixture(t),outside=join(f.top,'outside-target.json');
+ mkdirSync(join(f.root,'.envelope'));mkdirSync(join(f.root,'.envelope','graphify-dotnet-out'));
+ writeFileSync(outside,'do not overwrite');
+ symlinkSync(outside,join(f.root,'.envelope','graphify-dotnet-out','graph.json'));
+ await assert.rejects(()=>f.bridge.run(f.root,f.config,{action:'build'},undefined,{humanCommand:true}),/symlink|unsafe/i);
+ assert.equal((await import('node:fs')).readFileSync(outside,'utf8'),'do not overwrite');
+});
+
+test('large externally written artifacts are rejected without returning graph data',async t=>{
+ const f=fixture(t);mkdirSync(join(f.root,'.envelope'));mkdirSync(join(f.root,'.envelope','graphify-dotnet-out'));
+ writeFileSync(join(f.root,'.envelope','graphify-dotnet-out','graph.json'),'x'.repeat(2_000_100));
+ const state=await f.bridge.run(f.root,f.config,{action:'status'});
+ assert.equal(state.artifactState,'invalid');assert.equal(state.graphHash,null);
+});
