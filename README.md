@@ -1,6 +1,6 @@
 # Envelope
 
-**Envelope v0.19.0 (unmerged candidate)** is one Pi coding-agent package that combines pinned Tersio modes with native, project-scoped output recovery, context checkpoints, code intelligence, reviewed worktree tasks, and local numeric observability. It is a source distribution: **no installed Pi, Tersio, or Tree-sitter WASM runtime is included**.
+**Envelope v0.22.0 (unmerged review candidate)** is one Pi coding-agent package that combines pinned Tersio modes with native, project-scoped output recovery, context checkpoints, code intelligence, reviewed worktree tasks, and local numeric observability. It is a source distribution: **no installed Pi, Tersio, or Tree-sitter WASM runtime is included**.
 
 The [16-source graph adoption audit](docs/GRAPH_SOURCE_AUDIT.md) and [33-source, commit-pinned audit](docs/ALL_33_SOURCE_AUDIT.md), with their [graph ledger](integrations/graph-source-audit.json) and [original-source ledger](integrations/extraction-audit.json), distinguish delivered adaptations from external or deferred capabilities. These are **not** claims of full upstream parity.
 
@@ -34,6 +34,17 @@ pi install .
 | Context cards | `envelope_code_context_card` | Bounded source-hash-verified symbol, import and syntactic call evidence; no source bodies unless explicitly requested |
 | Git history | `envelope_code_history` | Bounded read-only co-change/churn evidence; never causal dependency or author identity |
 | Graphify | `envelope_code_external_graph` | Opt-in local NetworkX/Graphify node-link artifact inspection: source hash freshness, typed external assertions, bounded paths/neighbors, explicit read-only watcher; no external program or model calls |
+| Symbol deltas (session-local) | `envelope_code_delta` | Explicit verified baseline, bounded versioned changes for AST declarations, conservative Python/Go uncertainty, static importer hints; no raw source or token-savings claim |
+| Context slices (bounded) | `envelope_code_slice` | Lexical or exact-path source seeds, static import traversal, hash-verified card/skeleton/ETag references, version-safe pagination and strict JSON byte budget; no embeddings or source excerpts |
+| Co-change review (advisory) | `envelope_code_coupling` | Bounded Git co-edit candidates compared with direct static file imports, source-hash verified, no causal or numeric risk claim |
+| Persistent graph versions (explicit) | `envelope_code_versions` | Private, content-addressed file-hash + static-import snapshots; human-only capture/prune, metadata-only historical diffs |
+| Local vectors (explicit opt-in) | `envelope_code_vector` | Source-hash verified cosine/hybrid ranking over user-provided numeric embeddings, no encoder or provider calls |
+| Local encoder (human-only) | `/envelope code vectors encoder/build/replace/find` | Operator-pinned trusted executable generates verified embeddings and text-query vectors on explicit commands; no bundled model, auto-download or semantic-quality claim |
+| Static graph invariant checks | `envelope_code_invariant` | Verified import cycles, reachability and no-path closures with checkable witnesses; no program-correctness proof |
+| TypeScript compiler evidence | `envelope_code_typecheck` | Real pinned TypeScript 5.8.3 typechecker diagnostics and cross-module declaration/type facts over verified indexed JS/TS |
+| Go compiler evidence | `envelope_code_go_types` | Actual offline Go `go/types` package-local typed declarations/diagnostics from source-hash-verified Go index; no project builds or cross-language proof |
+| Graphify.NET CLI (explicit) | `envelope_graphify_dotnet` status; `/envelope graphify-dotnet ...` | Separate .NET 10 AST-only runtime, pinned executable, no credential inheritance, separate unverified graph output |
+| Graphify CLI (opt-in) | `/envelope graphify status/on/off/binary/timeout/orientation/build/update/watch`, `envelope_graphify_cli` | User-pinned external Graphify executable: status, read-only query/path/explain, explicit human build/update or consent-only session code watch, no LLM provider keys; bounded and stale-aware |
 | Changes | `envelope_code_change_impact` | Commit-pinned clean-checkout diff with changed-line evidence, static dependents, and candidate tests; not a complete semantic blast radius |
 | Other languages | `/envelope code languages on\|off`, `envelope_code_languages` | Opt-in Python/Go stdlib AST through bounded subprocess parsing |
 | Tree-sitter | `/envelope code tree on\|off\|status`, `envelope_code_tree_status`, `envelope_code_tree_query`, `envelope_code_tree_capture` | Optional real WASM S-expression queries and capture groups; unavailable grammar is reported, not simulated |
@@ -77,3 +88,25 @@ Envelope's native modules are independently authored adaptations; the 33 origina
 ## Capability discovery and read-only visual interoperability (v0.21.0 candidate)
 
 `envelope_capabilities` shows actual Envelope mode toggles, detected-but-unverified external CLI presence and manual orientation/review/resume tool sequences. `envelope_code_graph` can export a bounded static SVG or Obsidian-compatible Mermaid Markdown note with safely encoded labels. `envelope_code_external_graph` can inspect Graphify/Graphify.NET exporter-declared communities, never as native inferred graph proof. None of these changes install new host adapters, execute external CLI tools, modify a vault or publish a service. See [capability cockpit](docs/CAPABILITY_COCKPIT.md) and [visual exports](docs/GRAPH_VIEW_EXPORT.md).
+
+## v0.22.0 opt-in Graphify CLI review candidate
+
+The existing read-only `graphify-out/graph.json` adapter can optionally be complemented by `envelope_graphify_cli` to run a pinned, trusted Graphify Python executable. Disabled until explicitly configured; agent tool operations are read-only and project-scoped, while local AST-only build/update require user slash commands. Optional graph orientation reuses the existing prompt hook; an explicitly enabled session-only code watcher can debounce local AST updates without LLM calls. See [CLI contracts](docs/GRAPHIFY_CLI.md) and [consent-only watcher controls](docs/GRAPHIFY_WATCH.md). [Verified symbol delta guide](docs/SYMBOL_DELTA.md) and [context slice guide](docs/CONTEXT_SLICE.md) and [co-change review guide](docs/COCHANGE_REVIEW.md) describes explicit, session-local declaration snapshots and budgeted, source-checked change pages. Real Graphify CLI compatibility is tested by a new isolated `graphifyy==0.9.100` release gate; verify the specific hosted run before treating this candidate as runtime-tested.
+
+For explicit durable static graph history, see [persistent graph version commands](docs/PERSISTENT_GRAPH_VERSIONS.md). Captures contain private source paths and declaration names, but never source bodies.
+
+[Local vector retrieval guide](docs/LOCAL_VECTOR_RETRIEVAL.md) documents the operator-supplied embedding manifest and strict source-staleness controls.
+
+[Static graph invariant guide](docs/STATIC_GRAPH_INVARIANTS.md) explains the limited proof boundary and `unknown` verdicts for incomplete index evidence.
+
+[Graphify.NET runtime guide](docs/GRAPHIFY_DOTNET_RUNTIME.md) documents explicit build, provider-free process environment and real-version smoke requirements.
+
+**Read-only external MCP:** a manually launched [MCP stdio bridge](docs/MCP_STDIO_BRIDGE.md) exposes only operator-captured private file-graph versions (list, snapshot and compare). It does not start automatically or open a network port.
+
+[TypeScript compiler evidence](docs/TYPESCRIPT_COMPILER_EVIDENCE.md) documents checked JS/TS types, bounded diagnostic provenance, and explicit multi-language gaps.
+
+**Optional local GraphQL:** an operator-started [GraphQL.js history bridge](docs/GRAPHQL_HISTORY_BRIDGE.md) offers authenticated **loopback-only, read-only** queries over previously captured graph metadata. It does not start a public server, scan code, or install GraphQL.js automatically.
+
+[Go compiler evidence](docs/GO_COMPILER_EVIDENCE.md) documents the scoped offline go/types adapter, trust boundaries and unsupported external imports.
+
+[Human-only local embedding encoder](docs/LOCAL_EMBEDDING_RUNTIME.md) documents the no-shell subprocess JSON protocol, private manifest, model consistency and lack of a guaranteed network sandbox.

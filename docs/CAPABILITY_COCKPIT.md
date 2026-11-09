@@ -7,3 +7,7 @@ It reports the current Envelope settings for code, context, memory, output, work
 `intent` accepts `orient`, `graph`, `review`, `resume` or `evidence`. The output is a bounded list of existing native Envelope tool names with `suggested`/`blocked` states, e.g. `envelope_code_overview` → `envelope_code_retrieve` → `envelope_code_graph` for orientation. The user or agent explicitly selects the next action. No automatic skill enforcement, tool routing, permission bypass, provider billing, or hidden child process is implied.
 
 See `tests/capability-cockpit.test.mjs` for deterministic route selection, disabled-mode handling, executable detection with no execution, and Pi integration with exactly the original context/tool hooks. External services remain optional and unsupported until separately tested.
+
+## v0.22 opt-in Graphify runtime route
+
+When `/envelope graphify on` is set and an absolute executable path is pinned, `intent:"graph"` includes `envelope_graphify_cli` as an additional **advisory**, read-only step after `envelope_code_external_graph`. The cockpit reports `graphifyCli:"configured-unverified"` rather than claiming the external CLI works. With the mode off or without a path, no CLI step is recommended. No binary is launched by capability inspection. Builds/updates remain human-only `/envelope graphify build|update` operations; see `docs/GRAPHIFY_CLI.md`.
