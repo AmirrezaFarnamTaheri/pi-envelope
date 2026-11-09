@@ -134,3 +134,33 @@ test('stopAndWait finds and cancels authorized session after project root is ren
  assert.equal(f.coordinator.status(f.repo).active,false);
  assert.ok(f.handles.every(h=>h.closed));
 });
+
+
+test('synchronous watch runner failure clears running so an explicit restart is permitted',async t=>{
+ const f=fixture(t);
+ f.coordinator.start(f.repo,{runUpdate:()=>{throw Error('untrusted update failed');}});
+ f.emit('src','base.ts');
+ await f.coordinator.flush(f.repo);
+ const result=f.coordinator.status(f.repo);
+ assert.equal(result.active,false);assert.equal(result.manualRebuildRequired,true);
+ const restarted=f.coordinator.start(f.repo,{runUpdate:async()=>{},debounceMs:250});
+ assert.equal(restarted.active,true);
+ f.coordinator.close();
+});
+
+test('watch activation refuses a directory replaced by a symlink during handle creation',t=>{
+ const f=fixture(t),outside=join(f.top,'outside-subtree');mkdirSync(outside);
+ let swapped=false;
+ const coordinator=new GraphifyWatchCoordinator({watchFactory:(dir,_opt,_cb)=>{
+   if(!swapped&&dir===join(f.repo,'src')){
+     swapped=true;
+     const renamed=join(f.repo,'source-original');
+     renameSync(dir,renamed);
+     symlinkSync(outside,dir);
+   }
+   const h={closed:false,close(){this.closed=true;}};
+   return h;
+ }});
+ assert.throws(()=>coordinator.start(f.repo,{runUpdate:async()=>{}}),/unsafe|replaced|setup failed|symlink/i);
+ assert.equal(coordinator.status(f.repo).active,false);
+});

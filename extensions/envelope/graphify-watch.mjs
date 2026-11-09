@@ -5,7 +5,7 @@
  */
 import {lstatSync,readdirSync,realpathSync,openSync,closeSync,writeSync,watch as fsWatch} from 'node:fs';
 import {constants} from 'node:fs';
-import {extname,join,resolve} from 'node:path';
+import {extname,join,resolve,sep} from 'node:path';
 
 const SKIP_DIRS=new Set(['.git','node_modules','graphify-out','dist','build','coverage','.cache','.next','.turbo','vendor','__pycache__','.venv','.tox','.pnpm-store']);
 const CODE_SUFFIXES=new Set(['.ts','.tsx','.js','.jsx','.mjs','.cjs','.mts','.cts','.py','.pyi','.go','.rs','.java','.c','.h','.cc','.cpp','.hpp','.cxx','.rb','.swift','.kt','.scala','.php','.lua','.zig','.dart','.ex','.exs','.vue','.svelte','.cs','.fs','.fsx','.sh','.bash']);
@@ -49,11 +49,19 @@ function markGraphStale(root){
  try{writeSync(fd,Buffer.from('manual-rebuild-required'));}
  finally{closeSync(fd);}
 }
+function checkedDirectory(root,dir){
+  const st=lstatSync(dir),canonical=realpathSync(dir);
+  if(!st.isDirectory()||st.isSymbolicLink()||canonical!==dir||
+    (dir!==root&&!dir.startsWith(root+sep)))
+    throw new Error('unsafe graph watch source directory or symlink');
+  return {ino:st.ino,dev:st.dev};
+}
 function sourceDirectories(root){
   const dirs=[],queue=[root];
   for(let index=0;index<queue.length;index++){
     const dir=queue[index];
     if(dirs.length>=MAX_DIRS)throw new RangeError('graph watch directory budget exceeded');
+    checkedDirectory(root,dir);
     dirs.push(dir);
     let entries;
     try{entries=readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name));}
@@ -112,9 +120,12 @@ export class GraphifyWatchCoordinator {
       batches:0,lastOutcome:'never',closed:false};
     try{
       for(const dir of dirs){
+        const before=checkedDirectory(key,dir);
         const handle=this.watchFactory(dir,{persistent:false},(_event,filename)=>this.change(session,dir,filename));
         if(!handle||typeof handle.close!=='function')throw new Error('invalid watcher handle');
         session.handles.push(handle);
+        const after=checkedDirectory(key,dir);
+        if(before.dev!==after.dev||before.ino!==after.ino)throw new Error('graph watch directory replaced during start');
         // fs.FSWatcher emits an error event on watch failure. Without a listener
         // Node would terminate the entire Pi process. Fail closed instead.
         handle.on?.('error',()=>{
@@ -170,22 +181,22 @@ export class GraphifyWatchCoordinator {
     const controller=new AbortController();
     session.controller=controller;
     session.lastOutcome='running';
-    session.running=(async()=>{
-      try{
-        await session.runUpdate(key,controller.signal);
-        if(!session.closed){session.batches++;session.lastOutcome='ok';}
-      }catch{
-        if(!session.closed){
-          session.lastOutcome='failed';this.flagManual(session);
-          this.halt(session); // no uncontrolled retry after a failed update
-        }
-      }finally{
-        session.controller=null;
-        session.running=null;
-        if(!session.closed&&session.pending.size&&!session.overflow)this.schedule(session);
+    // Defer invoking the operator-approved runner until after the promise has
+    // been assigned. Synchronous throws cannot resurrect a settled "running".
+    const executing=Promise.resolve().then(()=>session.runUpdate(key,controller.signal));
+    const settled=executing.then(()=>{
+      if(!session.closed){session.batches++;session.lastOutcome='ok';}
+    },()=>{
+      if(!session.closed){
+        session.lastOutcome='failed';this.flagManual(session);
+        this.halt(session); // no uncontrolled retry after a failed update
       }
-      return watchSnapshot(session);
-    })();
+    }).finally(()=>{
+      session.controller=null;
+      session.running=null;
+      if(!session.closed&&session.pending.size&&!session.overflow)this.schedule(session);
+    });
+    session.running=settled.then(()=>watchSnapshot(session));
     return session.running;
   }
   halt(session){
