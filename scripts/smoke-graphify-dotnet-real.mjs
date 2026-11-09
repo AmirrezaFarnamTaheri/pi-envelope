@@ -25,11 +25,13 @@ export async function smokeRealGraphifyDotnet(executable){
    assert.ok(Array.isArray(raw.nodes),'graph nodes missing');
    assert.ok(Array.isArray(raw.edges)||Array.isArray(raw.links),'graph edges missing');
    const declarations=raw.nodes.filter(node=>{
-     const text=JSON.stringify(node);
-     return text.includes('Customer')&&
-       /(class|method|property|type|member|declaration)/i.test(String(node.type||node.kind||node.node_type||node.label||node.name||''));
+     const identity=String(node.label||node.name||node.id||'');
+     const source=String(node.file_path||node.metadata?.source_file||'').replaceAll('\\','/');
+     const declarationNode=node.type==='Entity'||/class|method|property|declaration/i.test(String(node.type||node.kind||''));
+     return declarationNode&&/(^|\\/)Customer[.]cs$/.test(source)&&
+       /Customer|Create|Id/i.test(identity)&&Boolean(node.metadata?.source_location);
    });
-   assert.ok(declarations.length>0,'C# Customer declaration evidence missing from Graphify.NET AST graph');
+   assert.ok(declarations.length>0,'C# Customer declaration evidence with source location missing from Graphify.NET AST graph');
    const after=await cli.run(project,config,{action:'status'});
    assert.equal(after.graphHash,done.graphHash,'status graph checksum changed unexpectedly');
    return {ok:true,provider:'None',nodes:done.nodes,edges:done.edges,isolatedOutput:true,engine:'graphify-dotnet',externalGraphProven:false};

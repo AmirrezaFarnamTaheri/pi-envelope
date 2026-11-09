@@ -152,6 +152,7 @@ test('final graph diff page fits its exact byte budget without imaginary continu
 
 test('graph diff pages respect a real UTF-8 byte budget through the final page',t=>{
  const f=setup(t),first=f.ledger.capture(f.index);
+ f.index.maxFiles=100;
  for(let i=0;i<35;i++)f.put('diffbudget_'+i+'.ts','export const marker'+i+' = '+i+';');
  f.index.refresh();const second=f.ledger.capture(f.index);
  let offset=0,cursor,round=0,total=0,finished=false;
