@@ -1,7 +1,7 @@
 /** Bounded TypeScript/JavaScript compiler facts, not execution or formal proof. */
 import {createHash} from 'node:crypto';
 import {lstatSync,realpathSync,readFileSync} from 'node:fs';
-import {resolve,relative,sep} from 'node:path';
+import {basename,dirname,resolve,relative,sep} from 'node:path';
 const TS_EXT=/\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/i;
 const sha=x=>createHash('sha256').update(x).digest('hex');
 const within=(root,p)=>p===root||p.startsWith(root+sep);
@@ -14,32 +14,59 @@ export function inspectTypedSource(index,{action='diagnostics',path,line,column,
  const key=index.checkedPath(path),selected=index.files.get(key);
  if(!selected||!TS_EXT.test(key))throw new Error('unsupported source: indexed TypeScript/JavaScript file required');
  if(realpathSync(index.root)!==index.root)throw new Error('project root changed');
- const rows=[],sources=new Map(),root=index.root;let scanned=0;
- for(const [sourcePath,record] of [...index.files].sort(([a],[b])=>a.localeCompare(b))){
-   if(!TS_EXT.test(sourcePath))continue;
-   if(rows.length>=100)throw new RangeError('TypeScript compiler file budget exceeded');
+ const root=index.root,ts=index.ts,rows=[],sources=new Map(),reasons=[];
+ const selectedPaths=new Set([key]),queue=[key];
+ let sourceSetTruncated=false,sourceBytesTruncated=false,scanned=0;
+ // Only the selected file and bounded, indexed *forward* static imports are
+ // relevant to this compiler query. Other files are not loaded, or attested.
+ for(let i=0;i<queue.length;i++){
+   const dependencies=[...(index.edges?.get(queue[i])||[])].filter(x=>TS_EXT.test(x)&&index.files.has(x)).sort();
+   for(const dep of dependencies){
+     if(selectedPaths.has(dep))continue;
+     if(selectedPaths.size>=100){sourceSetTruncated=true;continue;}
+     selectedPaths.add(dep);queue.push(dep);
+   }
+ }
+ for(const sourcePath of queue){
+   const record=index.files.get(sourcePath);
    if(sourcePath!==index.checkedPath(sourcePath))throw new Error('noncanonical source path');
    const absolute=resolve(root,sourcePath),st=lstatSync(absolute),canonical=realpathSync(absolute);
    if(!within(root,absolute)||!within(root,canonical)||!st.isFile()||st.isSymbolicLink())throw new Error('unsafe symlink or source path');
-   scanned+=st.size;if(scanned>8*1024*1024)throw new RangeError('TypeScript source verification byte budget exceeded');
+   if(scanned+st.size>8*1024*1024){
+     if(sourcePath===key)throw new RangeError('selected TypeScript source exceeds verification byte budget');
+     sourceBytesTruncated=true;continue;
+   }
    const buffer=readFileSync(absolute);if(sha(buffer)!==record.contentSha256)throw new Error('source changed since index refresh; TypeScript evidence refused');
-   rows.push(absolute);sources.set(absolute,buffer.toString('utf8'));
+   scanned+=buffer.length;rows.push(absolute);sources.set(absolute,buffer.toString('utf8'));
  }
- const ts=index.ts,options={noEmit:true,allowJs:true,checkJs:true,skipLibCheck:true,strict:true,
+ if(sourceSetTruncated)reasons.push('compiler-file-budget');
+ if(sourceBytesTruncated)reasons.push('compiler-source-byte-budget');
+ const options={noEmit:true,allowJs:true,checkJs:true,skipLibCheck:true,strict:true,
    target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext,moduleResolution:ts.ModuleResolutionKind.Bundler,
    jsx:ts.JsxEmit.Preserve,types:[]};
  const host=ts.createCompilerHost(options,true),originalRead=host.readFile,originalExists=host.fileExists;
- host.readFile=p=>sources.has(p)?sources.get(p):within(root,resolve(p))?undefined:originalRead(p);
- host.fileExists=p=>sources.has(p)||(!within(root,resolve(p))&&originalExists(p));
+ // TypeScript's own installed standard-library declarations are compiler
+ // runtime inputs, even if node_modules happens to live under the project.
+ const compilerLib=dirname(resolve(ts.getDefaultLibFilePath(options)));
+ const normalize=p=>resolve(p);
+ const trustedLib=p=>within(compilerLib,p)&&/^lib[.][a-z0-9._-]+[.]d[.]ts$/i.test(basename(p));
+ host.readFile=p=>{
+   const abs=normalize(p);
+   return sources.has(abs)?sources.get(abs):within(root,abs)&&!trustedLib(abs)?undefined:originalRead(p);
+ };
+ host.fileExists=p=>{
+   const abs=normalize(p);
+   return sources.has(abs)||(!within(root,abs)||trustedLib(abs))&&originalExists(p);
+ };
  const program=ts.createProgram(rows,options,host),sf=program.getSourceFile(resolve(root,key));
  if(!sf)throw new Error('TypeScript compiler did not load indexed source');
- const reasons=[];
  if(index.lastRefresh?.unavailable?.length)reasons.push('parser-unavailable');
  if(index.files.size>=index.maxFiles)reasons.push('index-file-cap-possibly-reached');
  const diagnostics=ts.getPreEmitDiagnostics(program,sf);
  if(diagnostics.some(d=>d.code===2307||d.code===2792))reasons.push('unresolved-compiler-module');
  const general={mode:'typescript-compiler-evidence',provider:'TypeScript '+ts.version,action,path:key,
     version:sha(JSON.stringify(rows.map(p=>[relative(root,p),index.files.get(relative(root,p).split(sep).join('/'))?.contentSha256]))),
+    filesLoaded:rows.length,filesSelected:selectedPaths.size,scopedToRequestedImportClosure:true,
     complete:reasons.length===0,reasons,
     notes:'Real TS compiler type facts only across indexed JS/TS files; no runtime execution, cross-language resolution, formal program proof or complete project build.'};
  if(action==='diagnostics'){

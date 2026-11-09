@@ -74,3 +74,35 @@ test('one native tool reuses shared CodeIndex without new lifecycle hooks',async
  assert.equal(JSON.parse(out.content[0].text).provider,'TypeScript 5.8.3');
  assert.equal(events.length,0);
 });
+
+test('large repositories typecheck requested static-import closure rather than all indexed files',t=>{
+ const f=fixture(t);
+ f.index.maxFiles=300;
+ for(let i=0;i<120;i++)f.write('unrelated_'+i+'.ts','export const unrelated'+i+'='+i+';');
+ f.index.refresh();
+ const result=inspectTypedSource(f.index,{action:'symbol',path:'src/entry.ts',line:2,column:24});
+ assert.equal(result.status,'resolved');assert.equal(result.symbol,'twice');
+ assert.equal(result.filesLoaded,2);
+ assert.equal(result.scopedToRequestedImportClosure,true);
+ assert.equal(result.complete,true);
+});
+
+test('bounded deep dependency closure reports incomplete evidence instead of rejecting the query',t=>{
+ const f=fixture(t);
+ f.index.maxFiles=400;
+ f.write('entry.ts',"import { value } from './chain_0';\nexport const answer=value;");
+ for(let i=0;i<110;i++)f.write('chain_'+i+'.ts',i<109?
+   "export { value } from './chain_"+(i+1)+"';\n":"export const value: number = 21;\n");
+ f.index.refresh();
+ const result=inspectTypedSource(f.index,{action:'diagnostics',path:'src/entry.ts',limit:5});
+ assert.ok(result.filesLoaded<=100);
+ assert.equal(result.complete,false);
+ assert.ok(result.reasons.includes('compiler-file-budget'),JSON.stringify(result));
+});
+
+test('unrelated stale files do not poison attested compiler evidence for selected dependencies',t=>{
+ const f=fixture(t);f.write('unrelated.ts','export const x=1;');f.index.refresh();
+ f.write('unrelated.ts','export const x=10000;');
+ const r=inspectTypedSource(f.index,{action:'diagnostics',path:'src/entry.ts'});
+ assert.equal(r.errors,0);assert.equal(r.filesLoaded,2);
+});
