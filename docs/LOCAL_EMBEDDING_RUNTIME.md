@@ -57,3 +57,12 @@ This is a **local encoding interface**, not a bundled/benchmark-validated semant
 
 
 See [operator-supplied semantic model benchmarking](SEMANTIC_MODEL_BENCHMARK.md) for a reproducible local model comparison harness; no benchmark results from actual models are asserted here.
+
+
+## Verified incremental-source universe and durable writer coordination
+
+CodeIndex now explicitly reports `discoveryTruncated` and `discoveryReadErrors` in its refresh/status results. **The raw source candidate count is checked before language eligibility filtering.** A project containing many disabled Python/Go candidates can exceed the discovery cap even when the active TS/JS map is small; an embedding build or sync **refuses** this incomplete source universe rather than mistaking absent indexed rows for deleted files. Sync also refuses pruning a manifest row when its source file still physically exists but was excluded (for example because its size exceeds the index byte limit, or it becomes ignored). Only physically missing, previously indexed paths may be pruned, and destructive empty-index synchronization still fails closed.
+
+Build, explicit replace and sync acquire one private per-project `.envelope/.embeddings-writer.lock` using exclusive creation. The lock spans encoder execution and manifest publication, preventing two cooperative Envelope writer instances from colliding. An operation refuses an existing lock; a process crash may leave a **stale lock that requires manual inspection** (never automatic cleanup). Independent privileged processes can ignore the lock and are **not** sandboxed. Both synchronization and explicit full replacement also hash-check the original manifest before publishing, so a concurrent external modification cannot be silently overwritten. Manifest writes use a bounded, fully written and fsynced temporary file followed by atomic rename and directory fsync on supported POSIX filesystems; these do not guarantee hardware durability on every storage backend.
+
+Encoder cancellation/timeout/output-budget termination now targets its POSIX process group or the available Windows process tree, rather than only the immediate child. This prevents ordinary inherited-pipe descendants from blocking cancellation; it remains best-effort and does not stop a trusted executable from deliberately escaping the process group. Existing query/build/sync use the same operator-supplied executable contract; **no model is downloaded or started automatically**. See the exact-head CI results on PR #24 for execution evidence.

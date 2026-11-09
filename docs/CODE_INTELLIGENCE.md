@@ -44,3 +44,8 @@ npm run pack:check
 `smoke:lsp-real` exercised real installed clangd 17 with C language IDs on temporary fixtures. `smoke:runtime` is independently blocked by absent Pi/Tersio in the offline environment; fake RPC tests are separate. `npm pack` must be run only after installing Tersio and TypeScript into `node_modules` to produce a fully bundled npm distribution.
 
 Phase 12 adds bounded, unverified syntactic call evidence through `envelope_code_calls` without a second source scanner. See [CALL_EVIDENCE.md](CALL_EVIDENCE.md).
+
+
+## Discovery completeness and downstream write safety
+
+A refreshed CodeIndex reports `discoveryTruncated` and `discoveryReadErrors` separately from the final parsed file count. Discovery limits apply to the source universe **before** excluded language files or skipped unsafe/oversized sources can reduce that count. Read-only AST queries can still report partial evidence; a durable vector build/sync refuses discovery truncation, directory read failures, parser unavailability or a changed index policy. For pruning, the embedding integration additionally checks that a previously indexed missing row is actually absent from disk, rather than merely excluded by new size or ignore rules. This does not establish comprehensive auto-sync or a complete cross-language compiler graph.
