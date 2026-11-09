@@ -324,3 +324,33 @@ test('human full replacement refuses a manifest modified concurrently by its enc
  assert.equal(current.externalModification,'keep','the runtime must not clobber the concurrently updated manifest');
  assert.deepEqual(current.entries,old.entries);
 });
+
+
+test('independent embedding instances obey an exclusive project-local writer lock',async t=>{
+ const f=fixture(t),runtime=new LocalEmbeddingRuntime();
+ await runtime.build(f.index,{executable:f.encoder});
+ const lock=join(f.root,'.envelope','.embeddings-writer.lock');
+ writeFileSync(lock,'active unrelated writer',{mode:0o600});
+ await assert.rejects(runtime.sync(f.index,{executable:f.encoder}),/writer|busy|lock|concurrent/i);
+ assert.equal(readFileSync(lock,'utf8'),'active unrelated writer');
+});
+
+test('cancelling an embedding encoder terminates children that inherited stdout',async t=>{
+ if(process.platform==='win32')return t.skip('POSIX process-group-specific cancellation test');
+ const f=fixture(t),runtime=new LocalEmbeddingRuntime();
+ const marker=join(f.trusted,'encoder-descendant-started');
+ const grandchild="require('node:fs').writeFileSync("+JSON.stringify(marker)+",'yes');setTimeout(()=>process.exit(0),4000)";
+ const hanging=join(f.trusted,'encoder-with-descendant');
+ writeFileSync(hanging,'#!/usr/bin/env node\n'+
+   "require('node:child_process').spawn(process.execPath,['-e',"+JSON.stringify(grandchild)+"],{stdio:'inherit'});setInterval(()=>{},1000);\n",
+   {mode:0o700});
+ const signal=new AbortController();
+ const running=runtime.build(f.index,{executable:hanging,signal:signal.signal,timeoutMs:7000});
+ for(let i=0;i<70&&!lstatMaybe(marker);i++)await new Promise(done=>setTimeout(done,25));
+ assert.ok(lstatMaybe(marker),'the descendant must exist before triggering cancellation');
+ const start=Date.now();
+ signal.abort();
+ await assert.rejects(running,/cancelled/i);
+ assert.ok(Date.now()-start<1250,'all inherited pipes must close promptly after cancellation');
+});
+function lstatMaybe(path){try{lstatSync(path);return true;}catch{return false;}}
