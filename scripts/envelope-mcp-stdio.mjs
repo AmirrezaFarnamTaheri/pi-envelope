@@ -1,5 +1,5 @@
 /** Operator-launched read-only MCP stdio over explicitly persisted graph metadata. */
-import {createInterface} from 'node:readline';
+import {once} from 'node:events';
 import {realpathSync} from 'node:fs';
 import {join,isAbsolute,resolve} from 'node:path';
 import {GraphVersionStore} from '../extensions/envelope/graph-versions.mjs';
@@ -10,7 +10,7 @@ const tools=[
  {name:'envelope.graph.snapshot',description:'Inspect one stored graph metadata version with capped file list',
   inputSchema:{type:'object',properties:{version:{type:'string'},limit:{type:'integer',minimum:1,maximum:50},offset:{type:'integer',minimum:0,maximum:512}},required:['version'],additionalProperties:false},annotations:{readOnlyHint:true}},
  {name:'envelope.graph.compare',description:'Compare two content-addressed historical snapshots, read-only',
-  inputSchema:{type:'object',properties:{from:{type:'string'},to:{type:'string'},limit:{type:'integer',minimum:1,maximum:25},offset:{type:'integer',minimum:0,maximum:512},ifVersion:{type:'string'},maxChars:{type:'integer',minimum:900,maximum:16000}},required:['from','to'],additionalProperties:false},annotations:{readOnlyHint:true}}
+  inputSchema:{type:'object',properties:{from:{type:'string'},to:{type:'string'},limit:{type:'integer',minimum:1,maximum:25},offset:{type:'integer',minimum:0,maximum:1024},ifVersion:{type:'string'},maxChars:{type:'integer',minimum:900,maximum:16000}},required:['from','to'],additionalProperties:false},annotations:{readOnlyHint:true}}
 ];
 function argsOf(argv){
  const args=argv.slice(2);if(args.length!==4||args[0]!=='--project'||args[2]!=='--home')throw Error('Usage: node scripts/envelope-mcp-stdio.mjs --project /absolute/project --home /absolute/home');
@@ -52,22 +52,46 @@ export function createMcpHandler(store,source){
        if(Object.keys(arguments_).some(x=>!['from','to','limit','offset','ifVersion','maxChars'].includes(x)))throw Error('unknown argument');
        data=store.compare(source,arguments_);
      }
-     if(Buffer.byteLength(JSON.stringify(data),'utf8')>MAX_RESPONSE)throw Error('response exceeded byte budget');
-     return ok(id,{content:[{type:'text',text:JSON.stringify(data)}],structuredContent:data,isError:false});
+     const serialized=JSON.stringify(data);
+     const response=ok(id,{content:[{type:'text',text:serialized}],structuredContent:data,isError:false});
+     if(Buffer.byteLength(JSON.stringify(response),'utf8')>MAX_RESPONSE)throw Error('response exceeded byte budget');
+     return response;
    }catch{return ok(id,{content:[{type:'text',text:'Snapshot unavailable or invalid. Check authorization, version and byte limits.'}],isError:true});}
  };
 }
 export async function runMcpStdio(argv=process.argv,stdin=process.stdin,stdout=process.stdout){
  const {root,home}=argsOf(argv);
  const handler=createMcpHandler(new GraphVersionStore(join(home,'envelope-graph-versions')),index(root));
- const reader=createInterface({input:stdin,crlfDelay:Infinity});
- for await(const line of reader){
-   let reply;
-   try{
-     if(Buffer.byteLength(line,'utf8')>MAX_LINE)reply={jsonrpc:'2.0',id:null,error:{code:-32600,message:'Request too large'}};
-     else reply=handler(JSON.parse(line));
-   }catch{reply={jsonrpc:'2.0',id:null,error:{code:-32700,message:'Parse error'}};}
-   if(reply){const serialized=JSON.stringify(reply);stdout.write(serialized+'\n');}
+ // Parse raw bytes before assembling any unbounded line. Pausing consumption
+ // while waiting for stdout drain also applies the stream's highWaterMark to
+ // queued request bytes instead of accumulating every pipelined request.
+ let pending=Buffer.alloc(0),tooLong=false;
+ const send=async reply=>{
+   if(!reply)return;
+   let encoded=JSON.stringify(reply);
+   if(Buffer.byteLength(encoded,'utf8')>MAX_RESPONSE)
+     encoded=JSON.stringify({jsonrpc:'2.0',id:null,error:{code:-32600,message:'Response too large'}});
+   if(!stdout.write(encoded+'\n'))await once(stdout,'drain');
+ };
+ for await(const part of stdin){
+   const chunk=Buffer.isBuffer(part)?part:Buffer.from(part);let cursor=0;
+   while(cursor<chunk.length){
+     const newline=chunk.indexOf(10,cursor),end=newline===-1?chunk.length:newline;
+     const fragment=chunk.subarray(cursor,end);
+     if(!tooLong){
+       if(pending.length+fragment.length>MAX_LINE){tooLong=true;pending=Buffer.alloc(0);}
+       else pending=Buffer.concat([pending,fragment]);
+     }
+     if(newline<0)break;
+     let reply;
+     if(tooLong)reply={jsonrpc:'2.0',id:null,error:{code:-32600,message:'Request too large'}};
+     else{
+       try{reply=handler(JSON.parse(pending.toString('utf8')));}
+       catch{reply={jsonrpc:'2.0',id:null,error:{code:-32700,message:'Parse error'}};}
+     }
+     pending=Buffer.alloc(0);tooLong=false;cursor=newline+1;
+     await send(reply);
+   }
  }
 }
 if(process.argv[1]?.endsWith('envelope-mcp-stdio.mjs')){

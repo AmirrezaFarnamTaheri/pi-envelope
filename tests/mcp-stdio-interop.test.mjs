@@ -4,10 +4,11 @@ import {mkdtempSync,rmSync,mkdirSync,writeFileSync,realpathSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawn} from 'node:child_process';
+import {Readable,Writable} from 'node:stream';
 import ts from 'typescript';
 import {CodeIndex} from '../extensions/envelope/code-index.mjs';
 import {GraphVersionStore} from '../extensions/envelope/graph-versions.mjs';
-import {createMcpHandler} from '../scripts/envelope-mcp-stdio.mjs';
+import {createMcpHandler,runMcpStdio} from '../scripts/envelope-mcp-stdio.mjs';
 function fixture(t){
  const root=realpathSync(mkdtempSync(join(tmpdir(),'env-mcp-repo-'))),home=realpathSync(mkdtempSync(join(tmpdir(),'env-mcp-home-')));
  t.after(()=>{rmSync(root,{recursive:true,force:true});rmSync(home,{recursive:true,force:true});});
@@ -66,4 +67,26 @@ test('bad and oversized frames yield bounded protocol errors',async t=>{
  assert.equal(r.status,0,r.stderr);
  assert.deepEqual(r.lines.map(x=>x.error.code),[-32700,-32600]);
  assert.ok(r.lines.every(x=>JSON.stringify(x).length<400));
+});
+
+test('MCP budgets the complete doubled JSON-RPC payload, not just the graph metadata',t=>{
+ const f=fixture(t);
+ const fake=createMcpHandler({list:()=>({data:'z'.repeat(12000)})},f.index);
+ fake(init());fake({jsonrpc:'2.0',method:'notifications/initialized'});
+ const reply=fake(req(8,'tools/call',{name:'envelope.graph.versions',arguments:{}}));
+ assert.equal(reply.result.isError,true);
+ assert.ok(Buffer.byteLength(JSON.stringify(reply),'utf8')<20000);
+});
+test('raw stream rejects enormous unterminated frames then processes valid later requests',async t=>{
+ const f=fixture(t),input=Readable.from([Buffer.from('Q'.repeat(100_000)),Buffer.from('\n'+JSON.stringify(init())+'\n')]);
+ let output='';
+ const sink=new Writable({highWaterMark:5,write(chunk,_enc,done){
+   output+=chunk.toString('utf8');
+   setImmediate(done); // Force actual backpressure and a drain event.
+ }});
+ await runMcpStdio(['node','server','--project',f.root,'--home',f.home],input,sink);
+ const frames=output.trim().split('\n').map(JSON.parse);
+ assert.deepEqual(frames.map(x=>x.id),[null,1]);
+ assert.equal(frames[0].error.code,-32600);
+ assert.equal(frames[1].result.protocolVersion,'2025-11-25');
 });
