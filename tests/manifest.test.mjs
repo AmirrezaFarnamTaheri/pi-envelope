@@ -34,3 +34,9 @@ test('bundles a pinned native AST parser alongside the Tersio base', () => {
   assert.ok(manifest.pi.extensions.includes('./extensions/envelope/index.js'));
   assert.equal(manifest.version, '0.22.0');
 });
+
+
+test('private project-local embedding manifests are ignored from this repository', () => {
+  const ignore = readFileSync(new URL('../.gitignore',import.meta.url),'utf8');
+  assert.match(ignore, /^\/\.envelope\/$/m);
+});
