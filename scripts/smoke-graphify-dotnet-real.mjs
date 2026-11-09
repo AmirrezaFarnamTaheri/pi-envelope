@@ -28,7 +28,7 @@ export async function smokeRealGraphifyDotnet(executable){
      const identity=String(node.label||node.name||node.id||'');
      const source=String(node.file_path||node.metadata?.source_file||'').replaceAll('\\','/');
      const declarationNode=node.type==='Entity'||/class|method|property|declaration/i.test(String(node.type||node.kind||''));
-     return declarationNode&&/(^|\\/)Customer[.]cs$/.test(source)&&
+     return declarationNode&&/(^|[/])Customer[.]cs$/.test(source)&&
        /Customer|Create|Id/i.test(identity)&&Boolean(node.metadata?.source_location);
    });
    assert.ok(declarations.length>0,'C# Customer declaration evidence with source location missing from Graphify.NET AST graph');
