@@ -43,3 +43,6 @@ Not included: automatic documentation/media LLM extraction, multi-provider crede
 
 
 **Watch-directory safety and lifecycle:** Every queued directory is lstat/realpath checked before enumeration. A watch path is checked both before and immediately after handle creation, rejecting symlinks or changes to its device/inode. These checks detect common directory replacement races but cannot provide an OS-level race-free guarantee without a directory-descriptor watch API. A synchronous CLI update failure settles and clears the running state before explicit reactivation.
+
+
+A successful Graphify CLI exit that changes declared source files or graph bytes can leave the operator's existing self-attestation outdated. The runtime reports `attestationRefreshRequired:true` and specific stale reasons after checking the post-update artifact. The watcher halts and leaves the `needs_update` marker; it never silently rewrites `envelope-sources.json` as though the external CLI had proven the new source hashes. A human must independently verify/re-attest then explicitly opt in again. Automatic attestation regeneration is **not implemented**, and this is a deliberate provenance boundary.

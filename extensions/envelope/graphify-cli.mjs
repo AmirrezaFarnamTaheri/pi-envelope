@@ -223,10 +223,16 @@ export class GraphifyCliBridge {
       }
     }
     const after=write?localStatus(root):artifact;
+    const pendingAttestation=write&&after.state==='stale'&&
+      (after.reasons||[]).some(reason=>['source-hash-mismatch','artifact-hash-mismatch','source-missing','graphify-needs-update'].includes(reason));
     return {...base,action,artifactState:after.state,reasons:after.reasons??[],
-      ...(write?{writeRequested:true,artifactChanged:after.graphSha256!==artifact.graphSha256,graphHash:after.graphSha256??null}:{}),
+      ...(write?{writeRequested:true,artifactChanged:after.graphSha256!==artifact.graphSha256,
+        graphHash:after.graphSha256??null,attestationRefreshRequired:pendingAttestation}:{}),
       output,outputBytes:Buffer.byteLength(output),
-      notes:write?'Explicit local code-only Graphify run; a zero exit code alone does not prove graph completeness.':'CLI text comes from an external engine; verify source evidence before acting.'};
+      notes:write?(pendingAttestation?
+        'Graphify exited but source attestation remains stale; operator must verify and refresh envelope-sources.json before trusted reads or re-enabling watch. No automatic re-attestation.':
+        'Explicit local code-only Graphify run; a zero exit code alone does not prove graph completeness.'):
+        'CLI text comes from an external engine; verify source evidence before acting.'};
   }
 }
 

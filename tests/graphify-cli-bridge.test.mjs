@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {mkdtempSync,mkdirSync,writeFileSync,rmSync,chmodSync,existsSync,symlinkSync,unlinkSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {spawn} from 'node:child_process';
+import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {join} from 'node:path';
 import {GraphifyCliBridge,composeGraphifyOrientation} from '../extensions/envelope/graphify-cli.mjs';
 import registerEnvelope from '../extensions/envelope/index.mjs';
@@ -227,4 +229,22 @@ test('POSIX cancellation kills Graphify descendants that inherit stdout pipes',a
  for(let i=0;i<70&&!existsSync(marker);i++)await new Promise(done=>setTimeout(done,25));
  assert.ok(existsSync(marker),'grandchild must exist before cancellation');
  controller.abort();await assert.rejects(running,/cancelled/i);
+});
+
+
+test('successful Graphify update reports source-attestation drift without silently rewriting hashes',async t=>{
+ const f=fixture(t,{scriptBody:"require('node:fs').writeFileSync('src/declaration.ts','export const marker=22;');process.stdout.write('updated')"});
+ mkdirSync(join(f.root,'src'));
+ writeFileSync(join(f.root,'src','declaration.ts'),'export const marker=11;');
+ const sha=x=>createHash('sha256').update(x).digest('hex');
+ const graph=readFileSync(join(f.root,'graphify-out','graph.json'));
+ const manifest=join(f.root,'graphify-out','envelope-sources.json');
+ const previous={version:1,graphSha256:sha(graph),files:[{path:'src/declaration.ts',sha256:sha('export const marker=11;')}]};
+ writeFileSync(manifest,JSON.stringify(previous));
+ const result=await bridge.run(f.root,f.config,{action:'update'},undefined,{humanCommand:true});
+ assert.equal(result.artifactState,'stale');
+ assert.equal(result.attestationRefreshRequired,true);
+ assert.match(result.notes,/operator|stale|attest/i);
+ assert.ok(result.reasons.includes('source-hash-mismatch'));
+ assert.deepEqual(JSON.parse(readFileSync(manifest,'utf8')),previous,'operator-provided attestation must not be regenerated without consent');
 });
