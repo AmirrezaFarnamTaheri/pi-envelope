@@ -123,3 +123,10 @@ The separate optional GraphQL.js bridge exposes only `versions`, `snapshot`, and
 ## Operator-provided embedding generation (stacked review candidate)
 
 `LocalEmbeddingRuntime` can now explicitly invoke a separately installed and trusted *local encoder executable* for a bounded, source-SHA-256-verified set of indexed file excerpts and a human query. It requires a human-pinned absolute executable and manual `build`, `replace` and `find` commands; the existing Pi agent vector tool cannot launch it. It stores a private 0600 source-hash-bound manifest and performs exact model/dimension checks before existing cosine+lexical retrieval. The child receives an allowlisted credential-free environment with offline hints, **not** a network/filesystem sandbox; the external model's quality and provenance are unverified. This narrows the embedding pipeline gap for SDL-MCP, CodeGraph and TeaRAGs without bundling a semantic model, vector DB, background watcher, ANN or measurable relevance guarantee. See `docs/LOCAL_EMBEDDING_RUNTIME.md`, `tests/local-embedding-runtime.test.mjs` and issue #10.
+
+
+## Pinned source-file evidence and remaining parity
+
+The [machine-readable 16-source file matrix](../integrations/upstream-source-evidence.json) identifies actual files in each pinned upstream revision and the corresponding Envelope module and tests. Every full-port status remains false, and each entry states a concrete remaining acceptance gate. A source path or passing local test is not proof of full functionality. The repo-harness project transferred to aimpact-inc/repo-harness after the pinned review; TeaRAGs-MCP has newer code that has not been silently adopted. Licensing is an owner-provided assumption, not a legal determination.
+
+The four major unfinished milestones remain real-model semantic benchmarks, comprehensive incremental embedding synchronization (the current hash-stable sync is operator-only), unified compiler-backed cross-language graphs, and formal program proofs. The new benchmark harness can run an operator-provided model but its synthetic protocol test is not a genuine semantic quality result.
