@@ -25,7 +25,7 @@ If the metrics database fails to open or write, optimization and coding continue
 
 The `message_end` observer records only finalized **assistant** messages carrying `usage` from Pi. `inputTokens`, `outputTokens`, `cacheReadTokens`, and `cacheWriteTokens` are copied from the host's usage fields. Cost is split between `providerBilledUsd` when `usage.cost.totalFromProvider === true` and `catalogEstimatedUsd` otherwise. These numbers are consumption, **not savings**; attributing cost differences to one optimization requires a controlled on/off comparison with the same model, prompts, caching regime and workload. No token usage is invented when the host supplies none. Storing a non-billed price estimate is never described as a provider invoice.
 
-`code_query` events record predefined four tool names, outcomes and durations. `workflow_action` records predefined nine tool names, outcomes and durations. A tool's successful return is not evidence of code correctness: reviewed workflow completion still requires the explicit workflow evidence gate and, for isolated tasks, fresh fingerprint verification.
+`code_query` events record all 27 registered code and LSP intelligence tool names, outcomes and durations. `workflow_action` records predefined nine tool names, outcomes and durations. A tool's successful return is not evidence of code correctness: reviewed workflow completion still requires the explicit workflow evidence gate and, for isolated tasks, fresh fingerprint verification.
 
 ## Reproducible offline benchmark
 
