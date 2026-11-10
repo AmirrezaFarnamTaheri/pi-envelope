@@ -147,3 +147,21 @@ test('an uncertain stale supervisor never becomes an automatically prunable comp
   assert.equal(jobs.prune(a,{olderThanDays:0}).removed,0);
   assert.equal(jobs.status(a,id).status,'interrupted');
 });
+
+
+test('job control never returns launch arguments to model responses, including after wait',async t=>{
+  const {root,a}=fixture(t);
+  const toolMap=new Map();
+  registerManagedJobs({registerTool(tool){toolMap.set(tool.name,tool);}},{home:join(root,'state'),project:ctx=>ctx.cwd,allowStarts:()=>true});
+  const tool=toolMap.get('envelope_job');
+  const ctx={cwd:a},secret='private-user-input-should-not-appear';
+  const launched=await tool.execute('job-start',{action:'start',command:process.execPath,args:['-e','process.stdout.write("OK") // '+secret]},undefined,undefined,ctx);
+  assert.equal(launched.isError,false);
+  const id=JSON.parse(launched.content[0].text).id;
+  const waited=await tool.execute('job-wait',{action:'wait',jobId:id,waitMs:5000},undefined,undefined,ctx);
+  assert.equal(waited.isError,false);
+  assert.doesNotMatch(waited.content[0].text,/private-user-input-should-not-appear/);
+  const status=await tool.execute('job-status',{action:'status',jobId:id},undefined,undefined,ctx);
+  assert.doesNotMatch(status.content[0].text,/private-user-input-should-not-appear/);
+  assert.match(JSON.parse((await tool.execute('job-logs',{action:'logs',jobId:id},undefined,undefined,ctx)).content[0].text).text,/OK/);
+});
