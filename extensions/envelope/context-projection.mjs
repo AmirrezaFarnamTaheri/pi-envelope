@@ -30,12 +30,16 @@ function outputCandidate(message, minBytes) {
 /** Build a bounded plain-text preview; this is never used for source-edit anchors. */
 function preview(text, id, limit) {
   const marker = `[envelope-context: archived ${Buffer.byteLength(text)} raw bytes; exact original: envelope_recall_output id=${id}]`;
+  if (Buffer.byteLength(marker) > limit) return null;
   const spacer = '\n[... historical result omitted; retrieve original for full detail ...]\n';
-  if (Buffer.byteLength(marker + spacer) + 64 > limit) return null;
+  if (Buffer.byteLength(marker + spacer) + 24 > limit) return marker;
+  const points = Array.from(text);
   let budget = Math.floor((limit - Buffer.byteLength(marker + spacer)) / 2);
   for (let retries=0; retries<6; retries++) {
-    const head = text.slice(0, Math.floor(budget * 1.1)).trimEnd();
-    const tail = text.slice(-Math.floor(budget * 0.7)).trimStart();
+    const headCount = Math.min(points.length, Math.max(1, Math.floor(budget * 1.1)));
+    const tailCount = Math.min(Math.max(0, points.length - headCount), Math.max(1, Math.floor(budget * 0.7)));
+    const head = points.slice(0, headCount).join('').trimEnd();
+    const tail = tailCount > 0 ? points.slice(points.length - tailCount).join('').trimStart() : '';
     const rendered = `${marker}\n${head}${spacer}${tail}`;
     if (Buffer.byteLength(rendered) <= limit) return rendered;
     budget = Math.floor(budget * 0.7);
@@ -103,7 +107,7 @@ export function projectContext(messages, options) {
           const recalled = options.store.retrieve(id);
           if (!recalled || recalled.project !== options.project || recalled.text !== original) continue;
         } else {
-          if (newBlocks.length >= 128) break; // Bounded, cache-friendly batch per invocation.
+          if (newBlocks.length >= 128) continue; // Bounded, cache-friendly batch per invocation without skipping prior archived blocks.
           if(options.store.isErased?.(id,options.project))continue;
           const saved = options.store.save({text:original,project:options.project,tool:message.toolName,command,historical:true});
           if (saved.id !== id) continue;
