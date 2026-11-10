@@ -26,9 +26,9 @@ export function resolveTrustedAgentCommand(project,{pathEnv=process.env.PATH||''
     let file,stat;
     try{file=realpathSync(entry);stat=statSync(file);}catch{return null;}
     if(!stat.isFile()||inside(root,file))return null;
-    if(/\\.[cm]?js$/i.test(file))return {command:process.execPath,prefix:[file]};
+    if(/\.[cm]?js$/i.test(file))return {command:process.execPath,prefix:[file]};
     if(process.platform==='win32'){
-      if(/\\.exe$/i.test(file))return {command:file,prefix:[]};
+      if(/\.exe$/i.test(file))return {command:file,prefix:[]};
       return null;
     }
     return (stat.mode&0o111)!==0?{command:file,prefix:[]}:null;
