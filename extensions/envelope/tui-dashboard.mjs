@@ -11,6 +11,7 @@ const health=(status)=>{
  if(status?.active)return status.updating?'WATCHING (SYNCING)':'WATCHING';
  return 'OFF';
 };
+/** Produce a short source-private status signal without starting or configuring a model. */
 export function formatEmbeddingFooter(watch){
  if(watch?.manualRebuildRequired||watch?.queueOverflow)return 'Envelope vectors: REVIEW';
  if(watch?.active)return watch.updating?'Envelope vectors: SYNCING':'Envelope vectors: WATCH ON';

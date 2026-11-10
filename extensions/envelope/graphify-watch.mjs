@@ -105,15 +105,18 @@ export class GraphifyWatchCoordinator {
     const key=storedKey(this.sessions,root);
     return watchSnapshot(key?this.sessions.get(key):null);
   }
+  /** Publish a sanitized watch snapshot. UI callback failures must never interrupt source safety. */
   report(session){
     try{session.onStatus?.(watchSnapshot(session));}catch{/* TUI feedback must never interrupt source safety */}
   }
+  /** Invalidate automated source coverage and abort any in-flight update after uncertainty. */
   flagManual(session){
     session.manual=true;
     session.controller?.abort(); // Never accept a running result after source-universe uncertainty.
     try{this.markStale(session.root);}catch{session.lastOutcome='failed';}
     this.report(session);
   }
+  /** Create a bounded, nonpersistent watch only after source and callback checks succeed. */
   start(root,{runUpdate,debounceMs=1200,codeSuffixes=CODE_SUFFIXES,onStatus}={}){
     if(typeof runUpdate!=='function')throw new TypeError('Graphify watch requires an authorized code update runner');
     if(!(codeSuffixes instanceof Set)||[...codeSuffixes].some(s=>typeof s!=='string'||!/^[.][a-z0-9]{1,8}$/.test(s)))
@@ -151,6 +154,7 @@ export class GraphifyWatchCoordinator {
     this.report(session);
     return watchSnapshot(session);
   }
+  /** Classify filesystem events conservatively; unknown events demand manual rebuild. */
   change(session,dir,rawName){
     if(session.closed)return;
     const name=safeFilename(rawName);
@@ -181,6 +185,7 @@ export class GraphifyWatchCoordinator {
     session.timer=setTimeout(()=>{session.timer=null;void this.flush(session.root);},session.debounceMs);
     session.timer.unref?.();
   }
+  /** Execute at most one authorized incremental update, retaining failure as a manual-recovery state. */
   async flush(root){
     const key=storedKey(this.sessions,root);
     const session=key?this.sessions.get(key):null;
@@ -218,6 +223,7 @@ export class GraphifyWatchCoordinator {
     this.report(session);
     return session.running;
   }
+  /** Stop accepting events, abort work and close all filesystem handles. */
   halt(session){
     if(session.closed)return;
     session.closed=true;

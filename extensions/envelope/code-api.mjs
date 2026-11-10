@@ -26,6 +26,7 @@ const result = (value,isError=false) => ({
 const intProp = (description,min,max) => ({type:'integer',minimum:min,maximum:max,description});
 function schema(properties,required=[]) {return {type:'object',properties,required,additionalProperties:false};}
 
+/** Register bounded, source-index-backed code tools; vector watch state remains advisory and opt-in. */
 export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>import('typescript'),observe,home,loadTreeRuntime,getTreeGrammarPath,watchGraphFactory,watchGraphStatus,watchVectorStatus}={}) {
   const indices=new Map();
   const treeBrokers=new Map();

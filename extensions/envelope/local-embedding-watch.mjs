@@ -16,6 +16,7 @@ export class EmbeddingWatchCoordinator {
  }
  status(root){return this.watcher.status(root);}
  flush(root){return this.watcher.flush(root);}
+ /** Start a session-scoped embedding watcher only after verified manifest preflight and consent. */
  async start(root,{refresh,preflight,update,checkEnabled,onStatus,debounceMs=1200}={}){
   if(onStatus!==undefined&&typeof onStatus!=='function')throw new TypeError('embedding watch status callback required');
   if([refresh,preflight,update,checkEnabled].some(fn=>typeof fn!=='function'))
