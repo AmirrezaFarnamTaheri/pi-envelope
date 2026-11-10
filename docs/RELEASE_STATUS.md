@@ -2,7 +2,7 @@
 
 This document is the current, user-facing release assessment. It replaces the historic execution plans and avoids retaining obsolete command and package examples.
 
-## v0.22.0 candidate: implemented locally
+## v0.22.1 patch release candidate: compiled-Pi Node worker interoperability
 
 - Namespaced `pi-envelope` package, `envelope` command and `envelope_*` tools, `extensions/envelope` and `skills/envelope`. No `upper` command or extension is shipped.
 - Default-safe bash output compactor with exact recall, byte checks, durable FTS5 chunk search and bounded lexical/BM25 reciprocal-rank fusion, and optional retention/erasure, all project scoped. Raw output can contain secrets and no filesystem erasure claim covers backups/snapshots.

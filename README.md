@@ -1,12 +1,12 @@
 # Envelope
 
-**Envelope v0.22.0 (GitHub prerelease candidate)** is one Pi coding-agent package that combines pinned Tersio modes with native, project-scoped output recovery, context checkpoints, code intelligence, reviewed worktree tasks, and local numeric observability. It is a source distribution: **no installed Pi, Tersio, or Tree-sitter WASM runtime is included**.
+**Envelope v0.22.1 (GitHub-only patch release candidate)** is one Pi coding-agent package that combines pinned Tersio modes with native, project-scoped output recovery, context checkpoints, code intelligence, reviewed worktree tasks, and local numeric observability. It is a source distribution: **no installed Pi, Tersio, or Tree-sitter WASM runtime is included**.
 
 The [16-source graph adoption audit](docs/GRAPH_SOURCE_AUDIT.md) and [33-source, commit-pinned audit](docs/ALL_33_SOURCE_AUDIT.md), with their [graph ledger](integrations/graph-source-audit.json) and [original-source ledger](integrations/extraction-audit.json), distinguish delivered adaptations from external or deferred capabilities. These are **not** claims of full upstream parity.
 
 ## Install and verify
 
-Requires Node.js >=22.13.0, a Pi coding-agent CLI supporting package manifests, and npm access to install `@krtclcdy/tersio@2.25.18` and `typescript@5.8.3`. Git is required for worktree child execution; Python, Go, Tree-sitter and a trusted LSP executable are optional.
+Requires Node.js >=22.19.0, a Pi coding-agent CLI supporting package manifests, and npm access to install `@krtclcdy/tersio@2.25.18` and `typescript@5.8.3`. Git is required for worktree child execution; Python, Go, Tree-sitter and a trusted LSP executable are optional.
 
 ```sh
 cd pi-envelope

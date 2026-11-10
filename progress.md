@@ -1,6 +1,6 @@
 # Envelope — release progress
 
-**Current source candidate:** v0.22.0 (PR #26 under review; prior validated release candidate v0.16.0). The initial v0.1–v0.12 development plans and duplicate upstream ledger were interim planning artifacts; they are removed from the deliverable. The 33 pinned source references live only in `integrations/extraction-audit.json` and `docs/ALL_33_SOURCE_AUDIT.md`.
+**Current source candidate:** v0.22.1 (PR #26 under review; prior validated release candidate v0.16.0). The initial v0.1–v0.12 development plans and duplicate upstream ledger were interim planning artifacts; they are removed from the deliverable. The 33 pinned source references live only in `integrations/extraction-audit.json` and `docs/ALL_33_SOURCE_AUDIT.md`.
 
 ## Integrated
 

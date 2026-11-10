@@ -1,4 +1,4 @@
-# Managed background jobs (review candidate)
+# Managed background jobs
 
 Envelope adds a small, independent job-control surface. It deliberately does **not** reuse the workflow DAG, claim leases or reviewed worktree handoffs for ordinary commands. Foreground Pi execution remains unchanged.
 
@@ -34,7 +34,7 @@ The command is executed directly with an argv array. It is **not** interpreted b
 
 ## Durable state and failure rules
 
-The supervisor runs as a detached Node process, so Pi can return without waiting. A separate process owns child stdout/stderr and records exit status. Jobs live under `<ENVELOPE_HOME>/envelope-jobs/<sha256-project-prefix>/<uuid>/`, with private metadata, bounded output and a heartbeat. Project identity comes from the canonical project path. There is no global cross-project job search.
+The supervisor runs as a detached Node process, so Pi can return without waiting. With a compiled Bun-based Pi executable, Envelope selects a trusted project-external Node.js 22.19+ executable from the system PATH instead of spawning Pi again. If no trusted Node executable is found, the start request fails before a job record is created. JavaScript background-agent entrypoints follow the same Node selection rule. A separate process owns child stdout/stderr and records exit status. Jobs live under `<ENVELOPE_HOME>/envelope-jobs/<sha256-project-prefix>/<uuid>/`, with private metadata, bounded output and a heartbeat. Project identity comes from the canonical project path. There is no global cross-project job search.
 
 States include `starting`, `running`, `cancelling`, `completed`, `failed`, `cancelled` and `interrupted`. Exit code 0 alone means the process exited successfully, **not** that code edits or tests were reviewed. A missing supervisor heartbeat after 15 seconds is reported as `interrupted` rather than inventing a successful exit. An interrupted job is not automatically retried: verify its actual processes and output before starting a replacement.
 
