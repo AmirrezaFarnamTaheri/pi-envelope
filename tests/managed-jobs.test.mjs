@@ -61,6 +61,7 @@ test('bounds logs and never interprets shell syntax in argv',async t=>{
   assert.equal(finished.status,'completed');
   const out=jobs.logs(a,started.id,{maxBytes:2048});
   assert.equal(out.truncated,true);
+  assert.equal(finished.outputTruncated,true);
   assert.ok(Buffer.byteLength(out.text)<=2048);
 });
 
@@ -123,4 +124,13 @@ test('start requires explicit extension policy even if job-control reads are all
   assert.equal(denied.isError,true);assert.match(denied.content[0].text,/disabled/i);
   const listed=await registered.get('envelope_job').execute('t',{action:'list'},undefined,undefined,{cwd:a});
   assert.equal(listed.isError,false);
+});
+
+test('exactly full log is not falsely reported as truncated',async t=>{
+  const {a,jobs}=fixture(t);
+  const started=await jobs.start({project:a,command:process.execPath,args:['-e','process.stdout.write("x".repeat(4096))'],maxLogBytes:4096});
+  const state=await jobs.wait(a,started.id,{timeoutMs:5000});
+  assert.equal(state.status,'completed');
+  assert.equal(state.outputTruncated,false);
+  assert.equal(jobs.logs(a,started.id).bytes,4096);
 });
