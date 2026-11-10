@@ -16,19 +16,21 @@ const ROUTES={
 /** Inspect bounded PATH entries without executing them, resolving ordinary package-manager symlinks. */
 function hasExecutable(name,pathEnv){
  if(typeof pathEnv!=='string'||pathEnv.length>4096)return false;
- const sep=pathEnv.includes(delimiter)?delimiter:':';
- const folders=pathEnv.split(sep).slice(0,24);
+ const folders=pathEnv.split(delimiter).slice(0,24);
+ const names=process.platform==='win32'?[name,name+'.exe',name+'.cmd',name+'.bat',name+'.com']:[name];
  for(const folder of folders){
   if(!folder||!isAbsolute(folder)||folder.length>250)continue;
-  try{
-   const candidate=join(folder,name),lst=lstatSync(candidate);
-   const target=lst.isSymbolicLink()?realpathSync(candidate):candidate;
-   if(!isAbsolute(target)||target.length>512)continue;
-   const st=statSync(target);
-   if(!st.isFile())continue;
-   accessSync(target,constants.X_OK);
-   return true;
-  }catch{/* Treat inaccessible commands as absent; do not execute them. */}
+  for(const executableName of names){
+   try{
+    const candidate=join(folder,executableName),lst=lstatSync(candidate);
+    const target=lst.isSymbolicLink()?realpathSync(candidate):candidate;
+    if(!isAbsolute(target)||target.length>512)continue;
+    const st=statSync(target);
+    if(!st.isFile())continue;
+    accessSync(target,constants.X_OK);
+    return true;
+   }catch{/* Treat inaccessible commands as absent; do not execute them. */}
+  }
  }
  return false;
 }
