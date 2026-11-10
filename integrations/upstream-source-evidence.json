@@ -212,7 +212,7 @@
     },
     {
       "repo": "AxiomCodeAI/axiomcodegraph",
-      "pinnedSha": "29f7ecf052973b4c79574cc54b61fcd9f55b3b9f",
+      "pinnedSha": "45ee8b1b9d422409e93caed9a123d9c7b7998a8e",
       "role": "formal-graph",
       "upstreamSourcePaths": [
         "graph/bundle/schema.ts",
@@ -250,7 +250,7 @@
     },
     {
       "repo": "Ancienttwo/repo-harness",
-      "pinnedSha": "6b3c8def0a5b394087506d7ccc7ecae822306b8f",
+      "pinnedSha": "c2bfe28bf495b1c2366148c4826b967c5ba04db6",
       "role": "workflow-harness",
       "upstreamSourcePaths": [
         "src/core/board/board.ts",
@@ -289,7 +289,7 @@
     },
     {
       "repo": "artk0de/TeaRAGs-MCP",
-      "pinnedSha": "5ba0ac24a02d1b4daf3b4ca1027b13974a66b184",
+      "pinnedSha": "c921c47d76c7178ccd0f07d26538fca82bf8e259",
       "role": "semantic-rag",
       "upstreamSourcePaths": [
         "src/core/adapters/embeddings/onnx.ts",
