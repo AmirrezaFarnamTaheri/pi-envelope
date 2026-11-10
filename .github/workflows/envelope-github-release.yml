@@ -64,7 +64,8 @@ jobs:
           npm pack --ignore-scripts --json --pack-destination release-assets > release-assets/pack-metadata.json
           tarball="$(node -p 'JSON.parse(require("node:fs").readFileSync("release-assets/pack-metadata.json","utf8"))[0].filename')"
           test "$tarball" = "pi-envelope-$VERSION.tgz"
-          tar -tzf "release-assets/$tarball" | grep -qx 'package/extensions/envelope/index.js'
+          tar -tzf "release-assets/$tarball" > "$RUNNER_TEMP/envelope-tar-contents.txt"
+          grep -qx 'package/extensions/envelope/index.js' "$RUNNER_TEMP/envelope-tar-contents.txt"
           node -e 'const fs=require("node:fs");fs.writeFileSync("release-assets/BUILD_MANIFEST.json",JSON.stringify({sourceCommit:process.env.GITHUB_SHA,packageVersion:process.env.VERSION,channel:"github-release-only",dependencyInstall:"exact-direct-pins-no-lockfile",node:process.version},null,2)+"\n")'
           (cd release-assets && sha256sum "pi-envelope-$VERSION.tgz" BUILD_MANIFEST.json > SHA256SUMS)
           (cd release-assets && sha256sum -c SHA256SUMS)
