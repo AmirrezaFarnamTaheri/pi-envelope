@@ -13,20 +13,32 @@ Keep error text, code, paths, commands, numbers and negations exact. Report what
 ${END}`;
 
 function dropStale(text) {
-  const start = text.indexOf(START);
-  if (start < 0) return text;
-  const end = text.indexOf(END, start);
-  if (end < 0) return text;
-  return (text.slice(0, start) + text.slice(end + END.length)).trimEnd();
+  let out = text;
+  for (;;) {
+    const start = out.indexOf(START);
+    if (start < 0) break;
+    const end = out.indexOf(END, start);
+    if (end < 0) {
+      out = out.slice(0, start);
+      break;
+    }
+    out = out.slice(0, start) + out.slice(end + END.length);
+  }
+  return out.trimEnd();
 }
 
 export function composePolicy(prompt, enabled) {
   if (typeof prompt !== 'string' && !Array.isArray(prompt)) return null;
   const parts = Array.isArray(prompt) ? prompt : [prompt];
-  const present = parts.some((p) => typeof p === 'string' && p.includes(START));
-  if (enabled && present) return { systemPrompt: prompt };
-  if (!enabled && !present) return null;
-  const clean = parts.map((s) => typeof s === 'string' ? dropStale(s) : s);
+  const hasComplete = parts.some((p) => typeof p === 'string' && p.includes(START) && p.includes(END));
+  const hasAny = parts.some((p) => typeof p === 'string' && (p.includes(START) || p.includes(END)));
+  if (enabled && hasComplete && parts.filter((p) => typeof p === 'string' && p.includes(START)).length === 1) {
+    return { systemPrompt: prompt };
+  }
+  if (!enabled && !hasAny) return null;
+  const clean = parts
+    .map((s) => typeof s === 'string' ? dropStale(s) : s)
+    .filter((s) => typeof s !== 'string' || s.length > 0);
   if (enabled) clean.push(BODY);
   return { systemPrompt: Array.isArray(prompt) ? clean : clean.join('\n\n') };
 }

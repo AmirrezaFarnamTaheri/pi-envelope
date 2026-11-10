@@ -5,7 +5,7 @@
  * Only local JS/TS syntax is checked; this is not a typechecker or security gate.
  */
 import {lstatSync,readFileSync,realpathSync} from 'node:fs';
-import {extname,isAbsolute,relative,resolve,sep} from 'node:path';
+import {dirname,extname,isAbsolute,relative,resolve,sep} from 'node:path';
 
 const TYPES=new Set(['.ts','.tsx','.mts','.cts','.js','.jsx','.mjs','.cjs']);
 const MAX_BYTES=1_000_000;
@@ -14,8 +14,9 @@ const normalizeLF=s=>s.replace(/\r\n?/g,'\n');
 
 function parse(ts,path,text) {
  const ext=extname(path).toLowerCase();
- const mode=['.tsx','.jsx'].includes(ext)?ts.ScriptKind.TSX:
-  ['.js','.jsx','.mjs','.cjs'].includes(ext)?ts.ScriptKind.JS:ts.ScriptKind.TS;
+ const mode=ext==='.tsx'?ts.ScriptKind.TSX:
+  ext==='.jsx'?(ts.ScriptKind.JSX??ts.ScriptKind.JS):
+  ['.js','.mjs','.cjs'].includes(ext)?ts.ScriptKind.JS:ts.ScriptKind.TS;
  const sf=ts.createSourceFile(path,text,ts.ScriptTarget.Latest,true,mode);
  return (sf.parseDiagnostics||[]).map(d=>{
   const loc=sf.getLineAndCharacterOfPosition(d.start||0);
@@ -67,9 +68,15 @@ export function guardMutation(toolName,input,cwd,ts) {
   let old=null;
   try{
    const stat=lstatSync(file);
-   if(!stat.isFile()||stat.isSymbolicLink()||stat.size>MAX_BYTES||!within(root,realpathSync(file)))return;
-   if(toolName==='edit')old=readFileSync(file,'utf8');
-  }catch{if(toolName==='edit')return;}
+   if(!stat.isFile()||stat.isSymbolicLink()||!within(root,realpathSync(file)))return;
+   if(toolName==='edit'){if(stat.size>MAX_BYTES)return;old=readFileSync(file,'utf8');}
+  }catch{
+   if(toolName==='edit')return;
+   let parent=dirname(file);
+   while(within(root,parent)){
+    try{if(!within(root,realpathSync(parent)))return;break;}catch{parent=dirname(parent);}
+   }
+  }
   let proposed;
   if(toolName==='write'){
    if(typeof input.content!=='string'||Buffer.byteLength(input.content)>MAX_BYTES)return;
