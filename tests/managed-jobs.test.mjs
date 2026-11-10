@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync, mkdirSync, rmSync, realpathSync, writeFileSync} from 'node:fs';
+import {mkdtempSync, mkdirSync, rmSync, realpathSync, writeFileSync, chmodSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {ManagedJobs, registerManagedJobs} from '../extensions/envelope/managed-jobs.mjs';
+import {ManagedJobs, registerManagedJobs, resolveTrustedAgentCommand} from '../extensions/envelope/managed-jobs.mjs';
 
 function fixture(t) {
   const root=mkdtempSync(join(tmpdir(),'envelope-jobs-test-'));
@@ -216,4 +216,17 @@ test('UTF-8 cursor pages preserve complete multibyte code points',async t=>{
   const last=jobs.logs(a,started.id,{fromByte:second.nextByte,maxBytes:4});
   assert.equal(last.text,'B');
   assert.equal(last.remainingBytes,0);
+});
+
+test('untrusted project-local pi on PATH is never selected for a background agent',t=>{
+  const {root,a}=fixture(t);
+  const spoof=join(a,process.platform==='win32'?'pi.exe':'pi');
+  writeFileSync(spoof,'not a trusted Pi entrypoint');
+  if(process.platform!=='win32')chmodSync(spoof,0o755);
+  assert.throws(()=>resolveTrustedAgentCommand(a,{pathEnv:a,configured:''}),/No trusted Pi/);
+  const trusted=join(root,'trusted-pi-cli.mjs');
+  writeFileSync(trusted,'// trusted fixture');
+  assert.deepEqual(resolveTrustedAgentCommand(a,{pathEnv:a,configured:trusted}),
+    {command:process.execPath,prefix:[realpathSync(trusted)]});
+  assert.throws(()=>resolveTrustedAgentCommand(a,{pathEnv:a,configured:spoof}),/outside the project/);
 });

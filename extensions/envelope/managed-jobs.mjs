@@ -2,7 +2,7 @@
 import {randomUUID, createHash} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {existsSync, realpathSync, mkdirSync, readFileSync, writeFileSync, renameSync, readdirSync, statSync, openSync, closeSync, writeSync, readSync, rmSync} from 'node:fs';
-import {dirname, join, resolve} from 'node:path';
+import {delimiter, dirname, isAbsolute, join, resolve, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {terminateTree, treeSpawnOptions} from './process-tree.mjs';
 
@@ -11,6 +11,40 @@ const IDENTIFIER=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$
 const FINISHED=new Set(['completed','failed','cancelled','interrupted']);
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const respond=(data,isError=false)=>({isError,content:[{type:'text',text:typeof data==='string'?data:JSON.stringify(data)}],details:{}});
+const inside=(root,path)=>path===root||path.startsWith(root+sep);
+
+/**
+ * Resolve a project-external Pi CLI before spawning it with the project as cwd.
+ * PATH entries that are relative or within the project are not trusted.
+ * Windows .cmd npm shims are not supported by shell:false: select a trusted
+ * absolute .js/.mjs CLI entrypoint with ENVELOPE_PI_CLI_ENTRYPOINT instead.
+ */
+export function resolveTrustedAgentCommand(project,{pathEnv=process.env.PATH||'',configured=process.env.ENVELOPE_PI_CLI_ENTRYPOINT||''}={}){
+  const root=realpathSync(resolve(project));
+  const choose=(entry,explicit)=>{
+    if(!isAbsolute(entry)||inside(root,resolve(entry)))return null;
+    let file,stat;
+    try{file=realpathSync(entry);stat=statSync(file);}catch{return null;}
+    if(!stat.isFile()||inside(root,file))return null;
+    if(/\\.[cm]?js$/i.test(file))return {command:process.execPath,prefix:[file]};
+    if(process.platform==='win32'){
+      if(/\\.exe$/i.test(file))return {command:file,prefix:[]};
+      return null;
+    }
+    return (stat.mode&0o111)!==0?{command:file,prefix:[]}:null;
+  };
+  if(configured){
+    const selected=choose(configured,true);
+    if(!selected)throw new Error('ENVELOPE_PI_CLI_ENTRYPOINT must be an absolute, trusted executable or Node script outside the project');
+    return selected;
+  }
+  for(const entry of pathEnv.split(delimiter)){
+    if(!entry||!isAbsolute(entry))continue;
+    const selected=choose(join(entry,process.platform==='win32'?'pi.exe':'pi'),false);
+    if(selected)return selected;
+  }
+  throw new Error('No trusted Pi executable outside the project; configure ENVELOPE_PI_CLI_ENTRYPOINT to an absolute installed Pi CLI script');
+}
 const schema=(props,required=[])=>({type:'object',properties:props,required,additionalProperties:false});
 
 function atomicJson(path,value){
@@ -87,8 +121,13 @@ export class ManagedJobs {
       const offset=fromByte===undefined?Math.max(0,length-maxBytes):Math.min(fromByte,length);
       const size=Math.min(maxBytes,length-offset);
       const data=Buffer.alloc(size),n=size?readFileChunk(fd,data,offset):0;
-      return {id,text:data.subarray(0,n).toString('utf8'),fromByte:offset,nextByte:offset+n,
-        remainingBytes:Math.max(0,length-offset-n),truncated:fromByte===undefined&&offset>0,bytes:length};
+      // Cursor reads stop on complete UTF-8 codepoint boundaries so the next
+      // page can resume without replacement characters or dropped bytes.
+      const consumed=utf8PageEnd(data.subarray(0,n),fromByte===undefined);
+      const displayStart=fromByte===undefined?utf8LeadingContinuation(data.subarray(0,consumed)):0;
+      return {id,text:data.subarray(displayStart,consumed).toString('utf8'),fromByte:offset,
+        nextByte:offset+consumed,remainingBytes:Math.max(0,length-offset-consumed),
+        truncated:fromByte===undefined&&offset>0,bytes:length};
     }finally{closeSync(fd);}
   }
   prune(project,{olderThanDays=30}={}){
@@ -119,6 +158,22 @@ export class ManagedJobs {
       await pause(Math.min(100,until-Date.now()));
     }
   }
+}
+function utf8LeadingContinuation(buf){
+  let i=0;
+  while(i<buf.length&&(buf[i]&0xc0)===0x80)i++;
+  return i;
+}
+function utf8PageEnd(buf,tail){
+  if(!buf.length)return 0;
+  const start=tail?utf8LeadingContinuation(buf):0;
+  let i=buf.length-1;
+  while(i>=start&&(buf[i]&0xc0)===0x80)i--;
+  if(i<start)return buf.length; // No complete codepoint; advance tiny pages.
+  const b=buf[i];
+  const bytes=b<0x80?1:b>=0xc2&&b<=0xdf?2:b>=0xe0&&b<=0xef?3:b>=0xf0&&b<=0xf4?4:1;
+  const complete=i+bytes<=buf.length?buf.length:i;
+  return complete<=start?buf.length:complete; // maxBytes<one glyph: make progress.
 }
 function readFileChunk(fd,data,offset){
   let total=0;
@@ -169,7 +224,8 @@ export function registerManagedJobs(pi,{home,project,allowStarts=()=>false,allow
         if(!allowAgentRuns())throw new Error('Background agent sessions are disabled; enable /envelope jobs agent on');
         const sessionId='envelope-'+randomUUID();
         const argv=['--print','--no-mcp','--no-extensions','--session-id',sessionId,'--tools','read,grep,find,ls','--name',p.name||'Envelope background review','--',p.prompt];
-        const started=await jobs.start({project:project(ctx),command:'pi',args:argv,kind:'agent',sessionId});
+        const cwd=project(ctx),trusted=resolveTrustedAgentCommand(cwd);
+        const started=await jobs.start({project:cwd,command:trusted.command,args:[...trusted.prefix,...argv],kind:'agent',sessionId});
         return respond({...started,resumeCommand:'pi --session-id '+sessionId,readOnly:true});
       }catch(error){return respond('Envelope agent: '+error.message,true);}
     }
