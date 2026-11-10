@@ -454,3 +454,47 @@ test('already-aborted incremental deletion-only sync leaves prior embeddings unt
  await assert.rejects(runtime.sync(f.index,{executable:f.encoder,signal:ctrl.signal}),/cancel|abort/i);
  assert.equal(readFileSync(f.manifest,'utf8'),saved,'cancellation must forbid deletion-only manifest publication');
 });
+
+
+test('a paused embedding watch warns once per recovery transition and continues to refresh the dashboard',async t=>{
+ const f=fixture(t);
+ const commands=new Map(),handles=[],notices=[],statuses=[];
+ const watch=new EmbeddingWatchCoordinator({watchFactory:(dir,opts,callback)=>{
+   assert.equal(opts.persistent,false);
+   const handle={dir,callback,closed:false,close(){this.closed=true;}};
+   handles.push(handle);return handle;
+ }});
+ const pi={cwd:f.root,on:()=>{},registerTool:()=>{},registerCommand:(name,command)=>commands.set(name,command),logger:{warn(){}}};
+ registerEnvelope(pi,{home:f.home,loadCompiler:()=>ts,embeddingWatcher:watch});
+ const ctx={cwd:f.root,ui:{
+   notify:(value,level)=>notices.push({text:String(value),level}),
+   setStatus:(key,value)=>statuses.push({key,value})
+ }};
+ const call=async cmd=>commands.get('envelope').handler(cmd,ctx);
+ const warningCount=()=>notices.filter(note=>note.text.includes('Envelope vectors paused:')).length;
+ await call('code vectors encoder '+f.encoder);
+ await call('code vectors on');
+ await call('code vectors build');
+ await call('code vectors watch on 250');
+ assert.equal(warningCount(),0,'healthy setup must not warn');
+ const source=handles.find(h=>!h.closed&&h.dir===join(f.root,'src'));
+ assert.ok(source,'source watcher must start');
+ const initialUpdates=statuses.length;
+ source.callback('rename',null);
+ source.callback('rename',null);
+ source.callback('change','unknown.yaml');
+ source.callback('change','first.ts');
+ assert.equal(watch.status(f.root).manualRebuildRequired,true);
+ assert.equal(warningCount(),1,'repeated reports of one paused state must not spam notifications');
+ assert.ok(statuses.length>=initialUpdates+4,'each status update must still refresh the terminal footer');
+ await call('code vectors watch off');
+ assert.equal(warningCount(),1,'stopping a paused watch must not duplicate the warning');
+ await call('code vectors sync');
+ await call('code vectors watch on 250');
+ const next=handles.find(h=>!h.closed&&h.dir===join(f.root,'src'));
+ assert.ok(next&&next!==source,'re-enabling creates an independent watch session');
+ next.callback('rename',null);
+ assert.equal(warningCount(),2,'a new recovery episode can raise a new warning');
+ await call('code vectors watch off');
+ assert.equal(warningCount(),2);
+});
