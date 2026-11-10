@@ -105,21 +105,26 @@ export class GraphifyWatchCoordinator {
     const key=storedKey(this.sessions,root);
     return watchSnapshot(key?this.sessions.get(key):null);
   }
+  report(session){
+    try{session.onStatus?.(watchSnapshot(session));}catch{/* TUI feedback must never interrupt source safety */}
+  }
   flagManual(session){
     session.manual=true;
     session.controller?.abort(); // Never accept a running result after source-universe uncertainty.
     try{this.markStale(session.root);}catch{session.lastOutcome='failed';}
+    this.report(session);
   }
-  start(root,{runUpdate,debounceMs=1200,codeSuffixes=CODE_SUFFIXES}={}){
+  start(root,{runUpdate,debounceMs=1200,codeSuffixes=CODE_SUFFIXES,onStatus}={}){
     if(typeof runUpdate!=='function')throw new TypeError('Graphify watch requires an authorized code update runner');
     if(!(codeSuffixes instanceof Set)||[...codeSuffixes].some(s=>typeof s!=='string'||!/^[.][a-z0-9]{1,8}$/.test(s)))
       throw new TypeError('watch source suffix set is invalid');
+    if(onStatus!==undefined&&typeof onStatus!=='function')throw new TypeError('watch status callback must be a function');
     if(!Number.isInteger(debounceMs)||debounceMs<250||debounceMs>10000)throw new RangeError('Graphify watch debounce must be 250..10000 ms');
     const key=normalizeRoot(root);
     const dirs=sourceDirectories(key); // fail before disrupting an existing watch
     if(this.sessions.get(key)?.running)throw new Error('Graphify watch update still running; stop and wait before restart');
     this.stop(key);
-    const session={root:key,debounceMs,runUpdate,codeSuffixes:new Set(codeSuffixes),handles:[],pending:new Set(),
+    const session={root:key,debounceMs,runUpdate,onStatus,codeSuffixes:new Set(codeSuffixes),handles:[],pending:new Set(),
       timer:null,running:null,controller:null,manual:false,overflow:false,
       batches:0,lastOutcome:'never',closed:false};
     try{
@@ -143,6 +148,7 @@ export class GraphifyWatchCoordinator {
       throw new Error('Graphify watch setup failed: directory watch unavailable');
     }
     this.sessions.set(key,session);
+    this.report(session);
     return watchSnapshot(session);
   }
   change(session,dir,rawName){
@@ -167,6 +173,7 @@ export class GraphifyWatchCoordinator {
     }
     session.pending.add(join(dir,name));
     this.schedule(session);
+    this.report(session);
   }
   schedule(session){
     if(session.closed||session.manual||session.overflow||session.pending.size===0)return;
@@ -205,8 +212,10 @@ export class GraphifyWatchCoordinator {
       session.controller=null;
       session.running=null;
       if(!session.closed&&session.pending.size&&!session.overflow)this.schedule(session);
+      this.report(session);
     });
     session.running=settled.then(()=>watchSnapshot(session));
+    this.report(session);
     return session.running;
   }
   halt(session){
@@ -216,6 +225,7 @@ export class GraphifyWatchCoordinator {
     session.controller?.abort();
     for(const handle of session.handles){try{handle.close();}catch{/* close only */}}
     session.handles=[];session.pending.clear();
+    this.report(session);
   }
   /** Cancel now, but wait for in-flight writes to settle before manual writes. */
   async stopAndWait(root){

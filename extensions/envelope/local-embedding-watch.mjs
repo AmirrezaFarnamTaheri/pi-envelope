@@ -16,7 +16,8 @@ export class EmbeddingWatchCoordinator {
  }
  status(root){return this.watcher.status(root);}
  flush(root){return this.watcher.flush(root);}
- async start(root,{refresh,preflight,update,checkEnabled,debounceMs=1200}={}){
+ async start(root,{refresh,preflight,update,checkEnabled,onStatus,debounceMs=1200}={}){
+  if(onStatus!==undefined&&typeof onStatus!=='function')throw new TypeError('embedding watch status callback required');
   if([refresh,preflight,update,checkEnabled].some(fn=>typeof fn!=='function'))
     throw new TypeError('embedding watch requires explicit consent and verified source/update handlers');
   if(!Number.isInteger(debounceMs)||debounceMs<250||debounceMs>10000)
@@ -35,7 +36,7 @@ export class EmbeddingWatchCoordinator {
   checkEnabled();
   const codeSuffixes=new Set(EMBEDDING_SUFFIXES);
   if(initial.languagesEnabled===true)for(const suffix of EMBEDDING_LANGUAGE_SUFFIXES)codeSuffixes.add(suffix);
-  const status=this.watcher.start(canonical,{debounceMs,codeSuffixes,
+  const status=this.watcher.start(canonical,{debounceMs,codeSuffixes,onStatus,
    runUpdate:async(_root,signal)=>{
     if(signal.aborted)throw new Error('embedding watch cancelled');
     checkEnabled();
