@@ -62,3 +62,14 @@ test('managed jobs and single-agent execution are separately discoverable and ne
  const both=inspectCapabilityCockpit({...DEFAULT_CONFIG,jobs:{enabled:true,agentEnabled:true}},{intent:'jobs',pathEnv:''});
  assert.deepEqual(both.plan.map(x=>x.state),['suggested','suggested']);
 });
+
+
+test('Windows PATH detection accepts one directory and standard command wrappers',t=>{
+ if(process.platform!=='win32')return t.skip('Windows PATHEXT-specific behavior');
+ const dir=mkdtempSync(join(tmpdir(),'envelope-windows-path-'));
+ t.after(()=>rmSync(dir,{recursive:true,force:true}));
+ writeFileSync(join(dir,'graphify.cmd'),'@echo off\r\nexit /b 0\r\n');
+ const report=inspectCapabilityCockpit(DEFAULT_CONFIG,{intent:'graph',pathEnv:dir});
+ assert.equal(report.externalCli.graphify,'detected-unverified');
+ assert.equal(report.toolExecution,false,'PATH detection must never invoke a command');
+});
