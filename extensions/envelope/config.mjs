@@ -1,6 +1,6 @@
 /** Versioned, local settings. Independent of Tersio's existing mode state. */
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute } from 'node:path';
 
 export const DEFAULT_CONFIG = Object.freeze({
@@ -89,11 +89,31 @@ export function normalizeConfig(raw = {}) {
   };
 }
 
-function readSettingsRoot(path) {
+function readSettingsRoot(path, { strict = false } = {}) {
+  let text;
   try {
-    const raw = JSON.parse(readFileSync(path, 'utf8'));
-    return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
-  } catch { return {}; }
+    const stat = lstatSync(path, { throwIfNoEntry: false });
+    if (!stat) return {};
+    if (stat.isSymbolicLink() || !stat.isFile()) {
+      if (strict) throw new Error('settings path must be a regular file, not a symlink');
+      return {};
+    }
+    text = readFileSync(path, 'utf8');
+  } catch (err) {
+    if (strict && err?.code !== 'ENOENT') throw err;
+    return {};
+  }
+  try {
+    const raw = JSON.parse(text);
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      if (strict) throw new Error('existing settings.json root must be a JSON object');
+      return {};
+    }
+    return raw;
+  } catch (err) {
+    if (strict) throw new Error(`refusing to overwrite malformed settings.json: ${err.message}`);
+    return {};
+  }
 }
 
 export function readConfig(path) {
@@ -104,10 +124,14 @@ export function readConfig(path) {
 
 export function saveConfig(path, config) {
   const normalized = normalizeConfig(config);
-  const previous = readSettingsRoot(path);
+  const previous = readSettingsRoot(path, { strict: true });
   const combined = { ...previous, envelope: normalized };
   const folder = dirname(path);
+  if (lstatSync(folder, { throwIfNoEntry: false })?.isSymbolicLink()) {
+    throw new Error('settings directory may not be a symlink');
+  }
   mkdirSync(folder, { recursive: true, mode: 0o700 });
+  chmodSync(folder, 0o700);
   const temp = `${path}.${process.pid}.${randomUUID()}.tmp`;
   try {
     writeFileSync(temp, `${JSON.stringify(combined, null, 2)}\n`, { mode: 0o600, flag: 'wx' });

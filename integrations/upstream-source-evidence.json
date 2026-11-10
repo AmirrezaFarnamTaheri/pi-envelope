@@ -33,10 +33,12 @@
         "src/Graphify.Sdk/CopilotExtractor.cs"
       ],
       "envelopeFiles": [
-        "extensions/envelope/graphify-dotnet-runtime.mjs"
+        "extensions/envelope/graphify-dotnet-runtime.mjs",
+        "extensions/envelope/graphify-adapter.mjs"
       ],
       "verificationFiles": [
-        "tests/graphify-dotnet-runtime.test.mjs"
+        "tests/graphify-dotnet-runtime.test.mjs",
+        "tests/graphify-dotnet.test.mjs"
       ],
       "coverage": "partial",
       "completePort": false,
@@ -51,10 +53,12 @@
         "skills/graphify/SKILL.md"
       ],
       "envelopeFiles": [
-        "extensions/envelope/graphify-cli.mjs"
+        "extensions/envelope/graphify-cli.mjs",
+        "extensions/envelope/graphify-adapter.mjs"
       ],
       "verificationFiles": [
-        "tests/graphify-cli-bridge.test.mjs"
+        "tests/graphify-cli-bridge.test.mjs",
+        "tests/graphify-adapter.test.mjs"
       ],
       "coverage": "partial",
       "completePort": false,
@@ -72,6 +76,7 @@
         "extensions/envelope/capability-cockpit.mjs"
       ],
       "verificationFiles": [
+        "tests/capability-cockpit.test.mjs",
         "tests/extension.test.mjs"
       ],
       "coverage": "partial",
@@ -201,10 +206,16 @@
       ],
       "envelopeFiles": [
         "extensions/envelope/code-call-evidence.mjs",
-        "extensions/envelope/code-index.mjs"
+        "extensions/envelope/code-index.mjs",
+        "extensions/envelope/graph-intelligence.mjs",
+        "extensions/envelope/code-history.mjs",
+        "extensions/envelope/go-typechecker-evidence.mjs"
       ],
       "verificationFiles": [
-        "tests/code-call-graph.test.mjs"
+        "tests/code-call-graph.test.mjs",
+        "tests/graph-intelligence.test.mjs",
+        "tests/code-history.test.mjs",
+        "tests/go-typechecker-evidence.test.mjs"
       ],
       "coverage": "partial",
       "completePort": false,
@@ -220,10 +231,13 @@
       ],
       "envelopeFiles": [
         "extensions/envelope/graph-invariants.mjs",
-        "extensions/envelope/typechecker-evidence.mjs"
+        "extensions/envelope/typechecker-evidence.mjs",
+        "extensions/envelope/go-typechecker-evidence.mjs"
       ],
       "verificationFiles": [
-        "tests/graph-invariants.test.mjs"
+        "tests/graph-invariants.test.mjs",
+        "tests/typechecker-evidence.test.mjs",
+        "tests/go-typechecker-evidence.test.mjs"
       ],
       "coverage": "partial",
       "completePort": false,
@@ -239,10 +253,17 @@
       ],
       "envelopeFiles": [
         "extensions/envelope/symbol-delta.mjs",
-        "extensions/envelope/persistent-symbol-history.mjs"
+        "extensions/envelope/persistent-symbol-history.mjs",
+        "extensions/envelope/context-card.mjs",
+        "extensions/envelope/context-slice.mjs",
+        "extensions/envelope/graph-versions.mjs"
       ],
       "verificationFiles": [
-        "tests/symbol-delta.test.mjs"
+        "tests/symbol-delta.test.mjs",
+        "tests/persistent-symbol-history.test.mjs",
+        "tests/context-card.test.mjs",
+        "tests/context-slice.test.mjs",
+        "tests/graph-versions.test.mjs"
       ],
       "coverage": "partial",
       "completePort": false,
@@ -278,10 +299,13 @@
       ],
       "envelopeFiles": [
         "extensions/envelope/code-index.mjs",
-        "extensions/envelope/architecture-policy.mjs"
+        "extensions/envelope/architecture-policy.mjs",
+        "extensions/envelope/cochange-review.mjs",
+        "scripts/architecture-gate.mjs"
       ],
       "verificationFiles": [
-        "tests/architecture-policy.test.mjs"
+        "tests/architecture-policy.test.mjs",
+        "tests/cochange-review.test.mjs"
       ],
       "coverage": "partial",
       "completePort": false,
@@ -296,10 +320,15 @@
         "src/core/api/entry-points/auto-update/trigger.ts"
       ],
       "envelopeFiles": [
+        "extensions/envelope/code-retrieval.mjs",
+        "extensions/envelope/local-vectors.mjs",
         "extensions/envelope/local-embedding-runtime.mjs",
         "scripts/benchmark-local-embeddings.mjs"
       ],
       "verificationFiles": [
+        "tests/code-retrieval.test.mjs",
+        "tests/local-vectors.test.mjs",
+        "tests/local-embedding-runtime.test.mjs",
         "tests/semantic-benchmark.test.mjs"
       ],
       "coverage": "partial",

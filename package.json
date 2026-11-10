@@ -110,7 +110,8 @@
     "smoke:lsp-real": "node scripts/smoke-clangd.mjs",
     "smoke:tree": "node scripts/smoke-tree-sitter.mjs",
     "pack:source-check": "npm pack --dry-run --ignore-scripts",
-    "architecture:gate": "node scripts/architecture-gate.mjs"
+    "architecture:gate": "node scripts/architecture-gate.mjs",
+    "smoke:graphql-real": "node scripts/smoke-graphql-real.mjs"
   },
   "optionalDependencies": {
     "web-tree-sitter": "0.25.3",

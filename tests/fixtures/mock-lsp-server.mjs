@@ -28,7 +28,8 @@ function onMessage(msg){
  if(msg.method==='textDocument/diagnostic'){
    if(mode==='hang-diagnostics')return;
    if(mode==='unchanged')return reply(msg.id,{kind:'unchanged',resultId:'none'});
-   let items=mode==='errors'||(mode==='errors-in-b'&&msg.params.textDocument.uri.endsWith('/b.ts'))?[{range:{start:{line:0,character:1},end:{line:0,character:4}},severity:1,code:'TS999',message:'Example error'}]:[];
+   const docText=opened.get(msg.params.textDocument.uri)?.text||'';
+   let items=mode==='errors'||(mode==='errors-in-b'&&msg.params.textDocument.uri.endsWith('/b.ts'))||(mode==='error-after-rename'&&docText.includes('multiply'))?[{range:{start:{line:0,character:1},end:{line:0,character:4}},severity:1,code:'TS999',message:'Post-rename error'}]:[];
    if(mode==='infra')items=[1,2,3].map(n=>({range:{start:{line:0,character:n},end:{line:0,character:n+1}},severity:1,message:'Cannot find module dependency'}));
    if(mode==='bad-range')items=[{severity:1,message:'bad range'}];
    return reply(msg.id,{kind:'full',items,...(mode==='related'?{relatedDocuments:{'file:///other.ts':{kind:'full',items:[]}}}:{})});

@@ -127,9 +127,14 @@ export class StdioLspSession {
   }
   async open(path,text){
     if(typeof text!=='string'||Buffer.byteLength(text)>512_000)throw new Error('LSP file is too large');
-    const uri=this.uri(path);this.opened.set(uri,1);this.published.delete(uri);
+    const uri=this.uri(path);
+    const nextVersion=(this.opened.get(uri)||0)+1;
+    if(this.opened.has(uri)){
+      this.send({jsonrpc:'2.0',method:'textDocument/didClose',params:{textDocument:{uri}}});
+    }
+    this.opened.set(uri,nextVersion);this.published.delete(uri);
     const languageId=lspLanguageId(path);
-    this.send({jsonrpc:'2.0',method:'textDocument/didOpen',params:{textDocument:{uri,languageId,version:1,text}}});
+    this.send({jsonrpc:'2.0',method:'textDocument/didOpen',params:{textDocument:{uri,languageId,version:nextVersion,text}}});
   }
   async diagnostics(path){
     const uri=this.uri(path);

@@ -39,6 +39,12 @@ func utf16Col(text string,byteCol int) int {
  if byteCol<1{return 1}; end:=byteCol-1;if end>len(text){end=len(text)}
  return len(utf16.Encode([]rune(text[:end])))+1
 }
+func fileLineUtf16Col(texts map[string]string,file string,line int,byteCol int) int {
+ src,ok:=texts[file];if !ok||line<1||byteCol<1{if byteCol<1{return 1};return byteCol}
+ lines:=strings.Split(src,"\n")
+ if line>len(lines){return byteCol}
+ return utf16Col(lines[line-1],byteCol)
+}
 func main(){
  raw,err:=io.ReadAll(io.LimitReader(os.Stdin,maxInput+1));if err!=nil||len(raw)>maxInput{os.Exit(2)}
  var input request
@@ -65,7 +71,7 @@ func main(){
    msg:="Go typechecker error";point:=token.Position{}
    if e,ok:=err.(types.Error);ok{msg=e.Msg;point=fset.Position(e.Pos)}
    if strings.Contains(msg,"could not import")||strings.Contains(msg,"cannot find package"){result.Reasons=append(result.Reasons,"unresolved-package-import")}
-   if len(result.Diagnostics)<input.Limit{p:=point.Filename;if !allPaths[p]{p=input.Path};result.Diagnostics=append(result.Diagnostics,diagnostic{Code:"GO_TYPE",Path:p,Line:point.Line,Column:point.Column,Message:sanitize(msg)})}
+   if len(result.Diagnostics)<input.Limit{p:=point.Filename;if !allPaths[p]{p=input.Path};col:=fileLineUtf16Col(texts,p,point.Line,point.Column);result.Diagnostics=append(result.Diagnostics,diagnostic{Code:"GO_TYPE",Path:p,Line:point.Line,Column:col,Message:sanitize(msg)})}
  }}
  pkgName:=astFiles[0].Name.Name
  for _,f:=range astFiles{if f.Name.Name!=pkgName{result.Complete=false;result.Reasons=append(result.Reasons,"mixed-go-package");result.Errors++;}}
@@ -94,7 +100,7 @@ func main(){
     result.Status="resolved";result.Symbol=object.Name()
     if object.Type()!=nil{result.Type=object.Type().String()}
     loc:=fset.Position(object.Pos())
-    if allPaths[loc.Filename]{result.Declarations=append(result.Declarations,location{Path:loc.Filename,Line:loc.Line,Column:loc.Column})}else{result.Complete=false;result.Reasons=append(result.Reasons,"declaration-outside-indexed-package")}
+    if allPaths[loc.Filename]{col:=fileLineUtf16Col(texts,loc.Filename,loc.Line,loc.Column);result.Declarations=append(result.Declarations,location{Path:loc.Filename,Line:loc.Line,Column:col})}else{result.Complete=false;result.Reasons=append(result.Reasons,"declaration-outside-indexed-package")}
    }
   }
   if result.Status=="unresolved"{result.Complete=false;result.Reasons=append(result.Reasons,"no-compiler-symbol")}
