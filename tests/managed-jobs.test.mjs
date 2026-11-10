@@ -259,3 +259,17 @@ test('native Node runtime does not require an extra Node executable on PATH',t=>
   assert.equal(resolveTrustedNodeExecutable(a,{pathEnv:'',compiledBun:false,
     runtimeExecPath:process.execPath}),realpathSync(process.execPath));
 });
+
+
+test('trusted JavaScript background agents use the external Node runtime in compiled Pi',t=>{
+  const {root,a}=fixture(t);
+  const bin=join(root,'node-bin');mkdirSync(bin);
+  const runtime=join(bin,process.platform==='win32'?'node.exe':'node');
+  writeFileSync(runtime,'trusted node fixture');
+  if(process.platform!=='win32')chmodSync(runtime,0o755);
+  const cli=join(root,'pi-cli.mjs');writeFileSync(cli,'// trusted CLI fixture');
+  const chosen=resolveTrustedAgentCommand(a,{
+    pathEnv:bin,configured:cli,compiledBun:true
+  });
+  assert.deepEqual(chosen,{command:realpathSync(runtime),prefix:[realpathSync(cli)]});
+});
