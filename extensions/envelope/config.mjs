@@ -1,16 +1,18 @@
 /** Versioned, local settings. Independent of Tersio's existing mode state. */
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, isAbsolute } from 'node:path';
 
 export const DEFAULT_CONFIG = Object.freeze({
   version: 1,
   output: Object.freeze({ enabled: true, minBytes: 1200, maxChars: 12000, minSavingsRatio: 0.2, retentionDays: 0 }),
   policy: Object.freeze({ enabled: false }),
   context: Object.freeze({ enabled: false, minBytes: 2400, maxPreviewChars: 650, recentMessages: 8, minSavingsRatio: 0.4 }),
-  code: Object.freeze({ enabled: true, languagesEnabled: false, treeEnabled: false, guardEnabled: false, renameEnabled: false, lspCommand: null, lspTimeoutMs: 3500 }),
+  code: Object.freeze({ enabled: true, languagesEnabled: false, treeEnabled: false, guardEnabled: false, renameEnabled: false, vectorEnabled: false, vectorExecutable: null, lspCommand: null, lspTimeoutMs: 3500 }),
   workflow: Object.freeze({ enabled: true, runEnabled: false }),
   memory: Object.freeze({ enabled: false }),
+  graphify: Object.freeze({ enabled: false, executable: null, timeoutMs: 30000, orientationEnabled: false }),
+  graphifyDotnet: Object.freeze({ enabled: false, executable: null, timeoutMs: 30000 }),
   observability: Object.freeze({ enabled: true, retentionDays: 30 })
 });
 
@@ -32,6 +34,8 @@ export function normalizeConfig(raw = {}) {
   const code = source.code && typeof source.code === 'object' ? source.code : {};
   const workflow = source.workflow && typeof source.workflow === 'object' ? source.workflow : {};
   const memory = source.memory && typeof source.memory === 'object' ? source.memory : {};
+  const graphify = source.graphify && typeof source.graphify === 'object' && !Array.isArray(source.graphify) ? source.graphify : {};
+  const graphifyDotnet = source.graphifyDotnet && typeof source.graphifyDotnet === 'object' && !Array.isArray(source.graphifyDotnet) ? source.graphifyDotnet : {};
   const observability = source.observability && typeof source.observability === 'object' ? source.observability : {};
   return {
     version: 1,
@@ -56,11 +60,28 @@ export function normalizeConfig(raw = {}) {
       treeEnabled: safeBoolean(code.treeEnabled, DEFAULT_CONFIG.code.treeEnabled),
       guardEnabled: safeBoolean(code.guardEnabled, DEFAULT_CONFIG.code.guardEnabled),
       renameEnabled: safeBoolean(code.renameEnabled, DEFAULT_CONFIG.code.renameEnabled),
+      vectorEnabled: safeBoolean(code.vectorEnabled, DEFAULT_CONFIG.code.vectorEnabled),
+      vectorExecutable: typeof code.vectorExecutable === 'string' && code.vectorExecutable.length > 1 && code.vectorExecutable.length <= 1024 && isAbsolute(code.vectorExecutable) && !/[\u0000-\u001f\u007f]/.test(code.vectorExecutable) ? code.vectorExecutable : null,
       lspCommand: Array.isArray(code.lspCommand) && code.lspCommand.length>=1 && code.lspCommand.length<=16 && code.lspCommand.every(x=>typeof x==='string'&&x.length>=1&&x.length<=512&&!x.includes('\0')) ? [...code.lspCommand] : null,
       lspTimeoutMs: safeInteger(code.lspTimeoutMs, DEFAULT_CONFIG.code.lspTimeoutMs, 100, 10000)
     },
     workflow: { enabled: safeBoolean(workflow.enabled, DEFAULT_CONFIG.workflow.enabled), runEnabled: safeBoolean(workflow.runEnabled, DEFAULT_CONFIG.workflow.runEnabled) },
     memory: { enabled: safeBoolean(memory.enabled, DEFAULT_CONFIG.memory.enabled) },
+    graphify: {
+      enabled: safeBoolean(graphify.enabled, DEFAULT_CONFIG.graphify.enabled),
+      executable: typeof graphify.executable === 'string' && graphify.executable.length > 1 &&
+        graphify.executable.length <= 1024 && isAbsolute(graphify.executable) &&
+        !/[\u0000-\u001f\u007f]/.test(graphify.executable) ? graphify.executable : null,
+      timeoutMs: safeInteger(graphify.timeoutMs, DEFAULT_CONFIG.graphify.timeoutMs, 50, 120000),
+      orientationEnabled: safeBoolean(graphify.orientationEnabled, DEFAULT_CONFIG.graphify.orientationEnabled)
+    },
+    graphifyDotnet: {
+      enabled: safeBoolean(graphifyDotnet.enabled, DEFAULT_CONFIG.graphifyDotnet.enabled),
+      executable: typeof graphifyDotnet.executable === 'string' && graphifyDotnet.executable.length > 1 &&
+        graphifyDotnet.executable.length <= 1024 && isAbsolute(graphifyDotnet.executable) &&
+        !/[\u0000-\u001f\u007f]/.test(graphifyDotnet.executable) ? graphifyDotnet.executable : null,
+      timeoutMs: safeInteger(graphifyDotnet.timeoutMs, DEFAULT_CONFIG.graphifyDotnet.timeoutMs, 50, 120000)
+    },
     observability: { enabled: safeBoolean(observability.enabled, DEFAULT_CONFIG.observability.enabled), retentionDays: safeInteger(observability.retentionDays, DEFAULT_CONFIG.observability.retentionDays, 1, 365) }
   };
 }

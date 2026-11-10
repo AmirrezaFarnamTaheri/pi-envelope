@@ -99,3 +99,13 @@ test('event list limit is bounded and closing prevents further writes',t=>{
   ledger.close();
   assert.throws(()=>ledger.record('/repo','code_query',{action:'envelope_code_verify'}),/closed/i);
 });
+
+test('explicit symbol-history query metrics are permitted without arbitrary action labels',t=>{
+ const {ledger}=fixture(t);
+ ledger.record('/repo','code_query',{action:'envelope_code_symbol_history',outcome:'ok',durationMs:3});
+ ledger.record('/repo','code_query',{action:'envelope_code_symbol_history',outcome:'error',durationMs:1});
+ const rows=ledger.events('/repo',{limit:10});
+ assert.equal(rows.length,2);
+ assert.ok(rows.every(x=>x.action==='envelope_code_symbol_history'));
+ assert.equal(ledger.snapshot('/repo').byKind.code_query.count,2);
+});

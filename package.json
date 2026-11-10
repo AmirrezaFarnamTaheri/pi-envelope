@@ -1,6 +1,6 @@
 {
   "name": "pi-envelope",
-  "version": "0.21.0",
+  "version": "0.22.0",
   "private": true,
   "description": "Envelope: one Pi coding-agent package with Tersio modes, reversible local output/context, code intelligence, worktree workflows and private metrics",
   "type": "module",
@@ -59,7 +59,10 @@
     "capability-cockpit",
     "obsidian-graph",
     "svg-export",
-    "graph-communities"
+    "graph-communities",
+    "graphify-cli-runtime",
+    "opt-in-graphify",
+    "offline-ast-graph"
   ],
   "dependencies": {
     "@krtclcdy/tersio": "2.25.18",
@@ -102,6 +105,7 @@
     "pack:check": "npm run doctor:bundle && npm run pack:source-check",
     "doctor:bundle": "node scripts/verify-bundle.mjs",
     "benchmark": "node scripts/benchmark.mjs",
+    "benchmark:semantic": "node scripts/benchmark-local-embeddings.mjs",
     "smoke:runtime": "node scripts/smoke-runtime.mjs",
     "smoke:lsp-real": "node scripts/smoke-clangd.mjs",
     "smoke:tree": "node scripts/smoke-tree-sitter.mjs",

@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "auditDate": "2026-11-08",
   "baseCommit": "0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64",
-  "candidateVersion": "0.21.0",
+  "candidateVersion": "0.22.0",
   "licenseAssumption": "User assumes compatibility; independent legal review not performed",
-  "implementationScope": "Native graph projection plus bounded local external Graphify/NetworkX node-link artifact reader and opt-in invalidation-only watcher; opt-in project notes, bounded Claude JSONL fact import, Git co-change/churn, source context cards",
+  "implementationScope": "Native graph projection plus bounded local external Graphify/NetworkX node-link artifact reader and opt-in invalidation-only watcher; opt-in project notes, bounded Claude JSONL fact import, Git co-change/churn, source context cards; opt-in pinned Graphify Python CLI read-only query/path/explain plus human-only AST code build/update; optional graph orientation in existing Pi hook; revocable session-only code-change watcher for offline Graphify update (no provider, no persistent daemon); explicit bounded session-local symbol-delta baselines, source-verified declaration hashes, conservative static importer hints; source-verified lexical/exact entry static-import context slices with ETag references and strict serialized output budget; bounded, source-verified Git cochange versus direct static import advisory review (no causal or risk score); explicit private content-addressed file-graph metadata versions with human-only capture and pruning; opt-in, source-verified user-supplied cosine embeddings + lexical hybrid scoring, no provider inference; checkable SHA-verified file-import graph invariants with certificate/unknown semantics (no code-correctness proof); explicit human-only pinned Graphify.NET AST-only subprocess with separated untrusted export and no provider keys; operator-launched metadata-only MCP stdio read tools for persisted graph versions, no automatic server; actual TypeScript compiler API source-verified JS/TS type and cross-module symbol evidence, no unified cross-language semantics; manually launched bearer-authenticated loopback GraphQL.js read-only projection over previously captured graph metadata (no remote server or NestJS); bounded offline standard go/types source-verified package-local compiler evidence without code execution or full cross-language typed IR; explicit human-only trust-bounded embedding generator process and model-matched query vectors, no bundled model or measured semantic quality",
   "upstreams": [
     {
       "repo": "lucasrosati/claude-code-memory-setup",
@@ -17,49 +17,49 @@
       "repo": "elbruno/graphify-dotnet",
       "commit": "008477767c813f0cc48dda3644282330cc288c8b",
       "capabilities": "File extraction > typed graph > communities > report/export; AST or optional AI",
-      "adoption": "v0.20 actual .NET graph.json compatibility, v0.21 exporter-declared communities; .NET Copilot and SDK runtime are not bundled",
+      "adoption": "v0.20 actual .NET graph.json compatibility, v0.21 exporter-declared communities; .NET Copilot and SDK runtime are not bundled Stacked opt-in external .NET 10 CLI bridge: human-only pinned executable and AST-only `run` with isolated environment, status-only Pi tool, separate graph JSON and real pinned 0.7.0 hosted smoke. Not in-process SDK/Copilot provider.",
       "completePort": false
     },
     {
       "repo": "juhas96/graphify-pi",
       "commit": "dd54ac9ae22bc48195fafd5b25ffe0c7ef09c4a9",
       "capabilities": "Pi graphify CLI wrapper, freshness prompts and wiki-first guidance",
-      "adoption": "Single native graph-query tool; future external artifact health adapter v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded.",
+      "adoption": "Single native graph-query tool; future external artifact health adapter v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded. v0.22 adds opt-in pinned Graphify CLI read actions, human-only AST build/update, fixed argv, and opt-in bounded Pi orientation. No full host extension or LLM provider.",
       "completePort": false
     },
     {
       "repo": "franklywatson/claude-rig",
       "commit": "54b4a5c79ebea0d81c576c449d1828c349f3e453",
       "capabilities": "Claude cockpit, dependency detection, tool routing, skill-chain and metrics",
-      "adoption": "v0.21 local capability cockpit, external binary presence detection and manual workflow route advice; no Claude host hooks or automatic tool dispatch",
+      "adoption": "v0.21 local capability cockpit, external binary presence detection and manual workflow route advice; no Claude host hooks or automatic tool dispatch v0.22 adds opt-in pinned Graphify CLI read actions, human-only AST build/update, fixed argv, and opt-in bounded Pi orientation. No full host extension or LLM provider.",
       "completePort": false
     },
     {
       "repo": "gaodes/pi-graphify",
       "commit": "4826f5eb351b72f49f44dc5ede24f3a886552b2d",
       "capabilities": "Pi graphify CLI query, paths, hubs, reports, watchers and exports",
-      "adoption": "Native path/neighbor/hub/export; no automatic CLI/LLM backend v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded.",
+      "adoption": "Native path/neighbor/hub/export; no automatic CLI/LLM backend v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded. v0.22 adds opt-in pinned Graphify CLI read actions, human-only AST build/update, fixed argv, and opt-in bounded Pi orientation. No full host extension or LLM provider.",
       "completePort": false
     },
     {
       "repo": "QuantumKuba/dsh-graphify-plugin",
       "commit": "74a2c72b31abef95adf7afa53ec45d7dcb0ba47e",
       "capabilities": "DSH graph adapter, project-root fencing, freshness/status and MCP lifecycle",
-      "adoption": "Reuse CodeIndex project isolation and refresh; optional external adapter later v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded.",
+      "adoption": "Reuse CodeIndex project isolation and refresh; optional external adapter later v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded. v0.22 adds opt-in pinned Graphify CLI read actions, human-only AST build/update, fixed argv, and opt-in bounded Pi orientation. No full host extension or LLM provider. Stacked read-only operator-launched MCP 2025-11-25 stdio adapter over bounded, private previously captured file-graph metadata; no agent-mutable tools, remote OAuth/HTTP server or full upstream MCP surface.",
       "completePort": false
     },
     {
       "repo": "nainglinnphyo/OpenGraphify",
       "commit": "4732f159ffc74b7121fe671bd6dbeeffdfd51964",
       "capabilities": "NestJS/GraphQL server with Apollo playground, unrelated to AST Graphify",
-      "adoption": "No native runtime role; optional GraphQL read-only projection later",
+      "adoption": "No native runtime role; optional GraphQL read-only projection later New stacked, explicitly launched authenticated localhost GraphQL.js **metadata projection** for captured file-graph versions (read-only versions/snapshot/compare); no NestJS/Apollo/Prisma app, public service, automatic capture, or full OpenGraphify parity.",
       "completePort": false
     },
     {
       "repo": "yetanotheraryan/graphify-chokidar",
       "commit": "9c584df9ab087425fec3d030e3ef7d1a29431707",
       "capabilities": "Debounced file watcher, code vs media classification, user-confirmed LLM rebuild",
-      "adoption": "Existing incremental refresh; explicit opt-in watcher later v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded.",
+      "adoption": "Existing incremental refresh; explicit opt-in watcher later v0.18 adds the local read-only artifact reader / freshness status and explicit invalidation-only watcher; no original host adapter or CLI is embedded. v0.22 follow-up: user-authorized session-scoped code-only Graphify update watcher, bounded 64-directory/256-path scan, debounce, explicit stop/await, symlink exclusion, fail-closed filesystem errors, no automatic doc/media LLM, single-writer guard. Not full upstream parity.",
       "completePort": false
     },
     {
@@ -73,28 +73,28 @@
       "repo": "m4t0t0/cmd-mod-graphify",
       "commit": "474ecaecbf181832572af9934dba99d1dddbf06b",
       "capabilities": "CommandCode Graphify adapter with architecture exploration and god nodes",
-      "adoption": "v0.21 native hubs/paths and deterministic static visual exports; no CommandCode host adapter",
+      "adoption": "v0.21 native hubs/paths and deterministic static visual exports; no CommandCode host adapter v0.22 adds opt-in pinned Graphify CLI read actions, human-only AST build/update, fixed argv, and opt-in bounded Pi orientation. No full host extension or LLM provider.",
       "completePort": false
     },
     {
       "repo": "colbymchenry/codegraph",
       "commit": "f72c9d2efb14454ff4f9fd7b8460abd82f19a287",
       "capabilities": "Rust/TS codegraph kernel, typed traversal, auto-sync, impact and agent tools",
-      "adoption": "Native typed CodeIndex graph and bounded Git co-change/churn. No preindexed multi-agent graph daemon or full language matrix.",
+      "adoption": "Native typed CodeIndex graph and bounded Git co-change/churn. No preindexed multi-agent graph daemon or full language matrix. Stacked delta candidate reuses single CodeIndex for static importer candidates around changed declarations; no Rust indexing kernel or continuously synchronized multi-agent graph. Next staged candidate adds deterministic static file-import neighborhood context from verified local source; no Rust graph kernel, dynamic dispatch or broad language matrix. Staged durable-file-graph follow-up: explicit source-verified content-addressed snapshots (SHA, static imports, declaration labels), bounded per-project history and private metadata-only version diffs. This is not the upstream typed symbol graph/daemon. Staged opt-in numeric vector/hybrid search over source SHA-bound user-provided embeddings; no encoder, semantic quality guarantee, vector database or full upstream runtime. Stacked real TypeScript 5.8.3 compiler diagnostics and module/declaration type resolution over SHA-attested JS/TS files (no cross-language typed IR, CFG, formal proof or full upstream language matrix). Stacked real Go standard go/types offline compiler checks over source-hash-verified same-package Go files, with local typed declarations and error diagnostics, not full Go dependency/module resolution, runtime or unified cross-language IR. New staged human-only, operator-pinned local embedding subprocess with source-hash verified excerpt windows, private manifest and model-matched query vector generation; no model weights, network sandbox, auto-indexing or semantic relevance benchmark.",
       "completePort": false
     },
     {
       "repo": "AxiomCodeAI/axiomcodegraph",
       "commit": "29f7ecf052973b4c79574cc54b61fcd9f55b3b9f",
       "capabilities": "IR and formal-methods oriented call analysis with asserted links",
-      "adoption": "Explicit uncertainty; no false proof claim; optional IR link adapters later",
+      "adoption": "Explicit uncertainty; no false proof claim; optional IR link adapters later Stacked static import graph certificate checks: source-attested topology/cycle/reachability with independent witness verifier and unknown on incomplete coverage. No formal program IR or proofs. Stacked real TypeScript 5.8.3 compiler diagnostics and module/declaration type resolution over SHA-attested JS/TS files (no cross-language typed IR, CFG, formal proof or full upstream language matrix). Stacked real Go standard go/types offline compiler checks over source-hash-verified same-package Go files, with local typed declarations and error diagnostics, not full Go dependency/module resolution, runtime or unified cross-language IR.",
       "completePort": false
     },
     {
       "repo": "GlitterKill/sdl-mcp",
       "commit": "2a20acbd283a5edf8290fb217eee0ecff86b31f5",
       "capabilities": "Symbol delta ledger, compact context cards, graph slices, memory and policies",
-      "adoption": "Native graph/replay/FTS with v0.19 hash-verified symbol context cards and opt-in notes. No standalone SDL symbol delta engine.",
+      "adoption": "Native graph/replay/FTS with v0.19 hash-verified symbol context cards and opt-in notes. No standalone SDL symbol delta engine. Stacked delta candidate: explicit project-local, in-memory verified symbol baselines; JS/TS AST node body SHA-256, conservative Python/Go, stable comparison-version cursor, strict byte budget, static importer hints. No persistence, SCIP/provider facts, graph beam search, memory bridge or MCP parity. Next staged candidate adds read-only, query/exact-path budgeted graph-connected context slices over shared CodeIndex with conditional ETags, byte-limit card rungs, and version-safe paging. No persistent slice handles, rich symbol-edge beam search or full SDL runtime. Staged durable-file-graph follow-up: explicit source-verified content-addressed snapshots (SHA, static imports, declaration labels), bounded per-project history and private metadata-only version diffs. This is not the upstream typed symbol graph/daemon. Staged opt-in numeric vector/hybrid search over source SHA-bound user-provided embeddings; no encoder, semantic quality guarantee, vector database or full upstream runtime. Stacked static import graph certificate checks: source-attested topology/cycle/reachability with independent witness verifier and unknown on incomplete coverage. No formal program IR or proofs. Stacked read-only operator-launched MCP 2025-11-25 stdio adapter over bounded, private previously captured file-graph metadata; no agent-mutable tools, remote OAuth/HTTP server or full upstream MCP surface. New staged human-only, operator-pinned local embedding subprocess with source-hash verified excerpt windows, private manifest and model-matched query vector generation; no model weights, network sandbox, auto-indexing or semantic relevance benchmark.",
       "completePort": false
     },
     {
@@ -108,14 +108,14 @@
       "repo": "optave/ops-codegraph-tool",
       "commit": "427c96f6da08fed88559075ef3c3c9eaa2122319",
       "capabilities": "Dependency/impact graph, weak/semantic communities, boundaries, CI and co-change",
-      "adoption": "v0.20 opt-in static boundary/fan-in policy with standalone manually invoked CI gate; bounded Git co-change since v0.19; no full 34-language engine",
+      "adoption": "v0.20 opt-in static boundary/fan-in policy with standalone manually invoked CI gate; bounded Git co-change since v0.19; no full 34-language engine New stacked advisory Git co-edit/direct static import juxtaposition for manual review; no 34-language kernel or automatic CI quality gate. Stacked real TypeScript 5.8.3 compiler diagnostics and module/declaration type resolution over SHA-attested JS/TS files (no cross-language typed IR, CFG, formal proof or full upstream language matrix). Stacked real Go standard go/types offline compiler checks over source-hash-verified same-package Go files, with local typed declarations and error diagnostics, not full Go dependency/module resolution, runtime or unified cross-language IR.",
       "completePort": false
     },
     {
       "repo": "artk0de/TeaRAGs-MCP",
       "commit": "5ba0ac24a02d1b4daf3b4ca1027b13974a66b184",
       "capabilities": "Semantic retrieval, call graph, Git trajectory, architecture and naming lexicon",
-      "adoption": "v0.20 local hash-verified AST symbol/path rank fusion and bounded graph navigation; no embedding engine or provider calls",
+      "adoption": "v0.20 local hash-verified AST symbol/path rank fusion and bounded graph navigation; no embedding engine or provider calls Stacked delta candidate adds source-verified changed-declaration metadata for code review; no semantic embeddings, vector index, owner inference or evidence of automatic test coverage. Next staged candidate adds bounded task-shaped lexical context with importer navigation; no semantic/vector ranking, historical trajectory risk, ownership or test-coverage proof. New stacked advisory cochange diagnostic counts repeated co-edits without detected direct static imports; root/byte verified and history bounded. No causal claim or trajectory engine. Staged opt-in numeric vector/hybrid search over source SHA-bound user-provided embeddings; no encoder, semantic quality guarantee, vector database or full upstream runtime. New staged human-only, operator-pinned local embedding subprocess with source-hash verified excerpt windows, private manifest and model-matched query vector generation; no model weights, network sandbox, auto-indexing or semantic relevance benchmark.",
       "completePort": false
     }
   ],

@@ -18,7 +18,7 @@ const MAX_EDGES=8000;
 const MAX_WATCH_DIRS=16;
 const HASH=/^[a-f0-9]{64}$/;
 const TRUST='external-assertion-not-native-AST';
-const ACTIONS=new Set(['status','nodes','neighbors','communities','path','watch']);
+const ACTIONS=new Set(['status','nodes','neighbors','communities','path','explain','watch']);
 const DIRS=new Set(['outgoing','incoming','both']);
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 const safeString=(value,max)=>typeof value==='string' && value.length>0 && value.length<=max && !/[\u0000-\u001f\u007f]/.test(value);
@@ -119,10 +119,24 @@ function decodeGraph(bytes,root){
   const edges=[];
   for(const edge of links){
     if(!edge||typeof edge!=='object'||Array.isArray(edge))throw new Error('invalid graph edge');
-    const source=typeof edge.source==='object'&&edge.source!==null?edge.source.id:edge.source;
-    const target=typeof edge.target==='object'&&edge.target!==null?edge.target.id:edge.target;
+    // Graphify's NetworkX export uses undirected storage, but its link arcs
+    // are directional. Older canonicalized exports retain original arc order
+    // in _src/_tgt; those markers take precedence over reordered endpoints.
+    const serializedSource=typeof edge.source==='object'&&edge.source!==null?edge.source.id:edge.source;
+    const serializedTarget=typeof edge.target==='object'&&edge.target!==null?edge.target.id:edge.target;
+    const hasSrc=Object.hasOwn(edge,'_src'),hasTgt=Object.hasOwn(edge,'_tgt');
+    if(hasSrc!==hasTgt)throw new Error('incomplete Graphify arc direction markers');
+    const marked=hasSrc&&hasTgt;
+    const source=marked?edge._src:serializedSource;
+    const target=marked?edge._tgt:serializedTarget;
     const type=edge.relation??edge.type??edge.relationship??edge.label??'related_to';
-    if(!safeString(source,200)||!safeString(target,200)||!ids.has(source)||!ids.has(target)||!safeString(type,100))throw new Error('dangling or invalid graph edge');
+    if(!safeString(serializedSource,200)||!safeString(serializedTarget,200)||
+      !safeString(source,200)||!safeString(target,200)||!ids.has(source)||!ids.has(target)||
+      !ids.has(serializedSource)||!ids.has(serializedTarget)||!safeString(type,100))
+      throw new Error('dangling or invalid graph edge');
+    if(marked&&!((source===serializedSource&&target===serializedTarget)||
+      (source===serializedTarget&&target===serializedSource)))
+      throw new Error('Graphify direction markers disagree with link endpoints');
     const confidence=edge.confidence,score=edge.confidence_score;
     if(confidence!==undefined&&!['EXTRACTED','INFERRED','AMBIGUOUS'].includes(confidence))throw new Error('invalid graph edge confidence');
     if(score!==undefined&&!(typeof score==='number'&&Number.isFinite(score)&&score>=0&&score<=1))throw new Error('invalid graph confidence score');
@@ -131,6 +145,7 @@ function decodeGraph(bytes,root){
     const location=edge.source_location??edge.metadata?.source_location;
     if(location!==undefined&&!safeString(location,120))throw new Error('invalid graph edge location');
     edges.push({source,target,type,evidence:'external-graph-assertion',
+      ...(marked?{directionEvidence:'graphify-arc-markers'}:{}),
       ...(confidence?{confidence}:{}),...(score!==undefined?{confidenceScore:score}:{}),
       ...(sourcePath?{sourcePath}:{}),...(location?{sourceLocation:location}:{})});
   }
@@ -300,6 +315,15 @@ export class ExternalGraphReader {
       const all=links.get(source);
       return {action,...common,source,direction,total:all.length,
         neighbors:all.slice(0,limit).map(({id,edge})=>({id,...edge})),truncated:all.length>limit};
+    }
+    if(action==='explain'){
+      const incoming=adjacency(graph,'incoming').get(source);
+      const outgoing=adjacency(graph,'outgoing').get(source);
+      return {action,...common,node:graph.nodes.find(n=>n.id===source),source,
+        totalIncoming:incoming.length,totalOutgoing:outgoing.length,
+        incoming:incoming.slice(0,limit).map(({id,edge})=>({id,...edge})),
+        outgoing:outgoing.slice(0,limit).map(({id,edge})=>({id,...edge})),
+        truncated:incoming.length>limit||outgoing.length>limit};
     }
     if(!safeString(target,200)||!ids.has(target))throw new Error('unknown external graph target node');
     const maxDepth=bounded(args.maxDepth,5,1,8,'maxDepth');

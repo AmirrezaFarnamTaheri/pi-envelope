@@ -114,3 +114,22 @@ test('relative imports escaping project root never become fabricated graph edges
   index.refresh();
   assert.deepEqual(index.impact('root.ts').importers,[]);
 });
+
+
+test('discovery advertises truncation when excluded language files consume the raw source cap', t=>{
+ const {root}=fixture(t);
+ for(let i=0;i<5;i++)writeFileSync(join(root,'src','a'+i+'.py'),'def unused(): pass\n');
+ const capped=new CodeIndex(root,{ts,maxFiles:5,maxBytesPerFile:2048});
+ const result=capped.refresh();
+ assert.ok(capped.files.size<5,'Python candidates were filtered after discovery');
+ assert.equal(result.discoveryTruncated,true,'cap must describe all source candidates, not only indexed TS files');
+ assert.equal(capped.languageStatus().discoveryTruncated,true);
+});
+
+test('fallback directory traversal exposes truncation even with filtered language candidates',t=>{
+ const {root}=fixture(t,{git:false});
+ for(let i=0;i<5;i++)writeFileSync(join(root,'src','a'+i+'.py'),'def unused(): pass\n');
+ const capped=new CodeIndex(root,{ts,maxFiles:5,maxBytesPerFile:2048});
+ const result=capped.refresh();
+ assert.equal(result.discoveryTruncated,true);
+});

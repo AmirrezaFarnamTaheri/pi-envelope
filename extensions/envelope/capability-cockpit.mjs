@@ -30,9 +30,11 @@ export function inspectCapabilityCockpit(config,{intent='orient',pathEnv=process
  if(!ROUTES[intent])throw new TypeError('unsupported capability route intent');
  const enabled=(name)=>config?.[name]?.enabled===true;
  const code=enabled('code'),memory=enabled('memory'),workflow=enabled('workflow');
+ const graphifyCli=code&&enabled('graphify')&&typeof config?.graphify?.executable==='string'&&config.graphify.executable.length>0;
  const capabilities={
   code:code?'enabled':'disabled',graph:code?'native-static':'disabled',
   externalGraph:code?'opt-in-local-artifact':'disabled',
+  graphifyCli:graphifyCli?'configured-unverified':'disabled',
   memory:memory?'enabled':'disabled',context:enabled('context')?'enabled':'disabled',
   output:enabled('output')?'enabled':'disabled',
   workflow:workflow?'enabled':'disabled',childRunner:workflow&&config?.workflow?.runEnabled?'opt-in-enabled':'disabled',
@@ -41,16 +43,17 @@ export function inspectCapabilityCockpit(config,{intent='orient',pathEnv=process
   syntaxGuard:code&&config?.code?.guardEnabled?'opt-in-enabled':'disabled',
  };
  const externalCli=Object.fromEntries(CLI.map(name=>[name,hasExecutable(name,pathEnv)?'detected-unverified':'not-detected']));
- const plan=ROUTES[intent].map(tool=>{
+ const tools=intent==='graph'&&graphifyCli ? [ROUTES.graph[0],'envelope_graphify_cli',...ROUTES.graph.slice(1)] : ROUTES[intent];
+ const plan=tools.map(tool=>{
   const category=tool.startsWith('envelope_code_')?'code':tool==='envelope_memory'?'memory':
-    tool.startsWith('envelope_workflow_')?'workflow':tool.startsWith('envelope_metrics_')?'metrics':null;
-  const available=category==='code'?code:category==='memory'?memory:category==='workflow'?workflow:category==='metrics'?enabled('observability'):true;
+    tool==='envelope_graphify_cli'?'graphify':tool.startsWith('envelope_workflow_')?'workflow':tool.startsWith('envelope_metrics_')?'metrics':null;
+  const available=category==='code'?code:category==='graphify'?graphifyCli:category==='memory'?memory:category==='workflow'?workflow:category==='metrics'?enabled('observability'):true;
   return {tool,state:available?'suggested':'blocked',reason:available?null:`${category}-disabled`};
  });
  const reasons=[...new Set(plan.filter(x=>x.reason).map(x=>x.reason))];
  return {mode:'read-only-capability-advisory',intent,capabilities,externalCli,plan,reasons,
    toolExecution:false,externalProviderCalls:false,automaticSkillEnforcement:false,
-   note:'External CLI detection is presence-only, not proof of readiness. Routes are advisory; no tools or skills were invoked.'};
+   note:'External CLI detection and pinned Graphify settings are presence/configuration only, not proof of runtime compatibility. Routes are advisory; no tools or skills were invoked.'};
 }
 export function registerCapabilityCockpit(pi,{getConfig}={}){
  pi.registerTool?.({

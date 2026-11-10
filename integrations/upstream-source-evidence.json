@@ -1,0 +1,310 @@
+{
+  "schemaVersion": 1,
+  "auditBasis": "Exact file paths confirmed in pinned upstream Git trees; local files and tests are evidence anchors, not complete behavior claims.",
+  "auditDate": "2026-11-10",
+  "licenseAssumption": "Owner to resolve separately",
+  "fullUpstreamParityClaimed": false,
+  "sources": [
+    {
+      "repo": "lucasrosati/claude-code-memory-setup",
+      "pinnedSha": "4cd2e6bd4319fcb2e8d24c2407a864516e7c133a",
+      "role": "session-memory",
+      "upstreamSourcePaths": [
+        "scripts/claude_to_obsidian.py",
+        "scripts/session_autosave.py"
+      ],
+      "envelopeFiles": [
+        "extensions/envelope/project-memory.mjs"
+      ],
+      "verificationFiles": [
+        "tests/project-memory.test.mjs"
+      ],
+      "coverage": "partial",
+      "completePort": false,
+      "remainingAcceptance": "Automatic transcript capture, full Obsidian vault parity, independently measured token savings."
+    },
+    {
+      "repo": "elbruno/graphify-dotnet",
+      "pinnedSha": "008477767c813f0cc48dda3644282330cc288c8b",
+      "role": "dotnet-graphify",
+      "upstreamSourcePaths": [
+        "src/Graphify.Cli/Program.cs",
+        "src/Graphify.Mcp/GraphTools.cs",
+        "src/Graphify.Sdk/CopilotExtractor.cs"
+      ],
+      "envelopeFiles": [
+        "extensions/envelope/graphify-dotnet-runtime.mjs"
+      ],
+      "verificationFiles": [
+        "tests/graphify-dotnet-runtime.test.mjs"
+      ],
+      "coverage": "partial",
+      "completePort": false,
+      "remainingAcceptance": "Complete .NET SDK and MCP behavior, provider-backed extraction, community and export parity."
+    },
+    {
+      "repo": "juhas96/graphify-pi",
+      "pinnedSha": "dd54ac9ae22bc48195fafd5b25ffe0c7ef09c4a9",
+      "role": "pi-graphify-adapter",
+      "upstreamSourcePaths": [
+        "extensions/graphify.ts",
+        "skills/graphify/SKILL.md"
+      ],
+      "envelopeFiles": [
+        "extensions/envelope/graphify-cli.mjs"
+      ],
+      "verificationFiles": [
+        "tests/graphify-cli-bridge.test.mjs"
+      ],
+      "coverage": "partial",
+      "completePort": false,
+      "remainingAcceptance": "All upstream Pi host commands, wiki-first guidance, complete graph-state prompts and exports."
+    },
+    {
+      "repo": "franklywatson/claude-rig",
+      "pinnedSha": "54b4a5c79ebea0d81c576c449d1828c349f3e453",
+      "role": "claude-cockpit",
+      "upstreamSourcePaths": [
+        "src/router/resolver.ts",
+        "src/skills/phase-tracker.ts"
+      ],
+      "envelopeFiles": [
+        "extensions/envelope/capability-cockpit.mjs"
+      ],
+      "verificationFiles": [
+        "tests/extension.test.mjs"
+      ],
+      "coverage": "partial",
+      "completePort": false,
+      "remainingAcceptance": "Enforced skill-chain routing and full dependency/tool lifecycle with one Pi hook owner."
+    },
+    {
+      "repo": "gaodes/pi-graphify",
+      "pinnedSha": "4826f5eb351b72f49f44dc5ede24f3a886552b2d",
+      "role": "pi-graphify-cli",
+      "upstreamSourcePaths": [
+        "src/auto-context/augment.ts",
+        "src/tools/graphify-tools.ts"
+      ],
+      "envelopeFiles": [
+        "extensions/envelope/graphify-cli.mjs",
+        "extensions/envelope/graphify-watch.mjs"
+      ],
+      "verificationFiles": [
+        "tests/graphify-cli-bridge.test.mjs"
+      ],
+      "coverage": "partial",
+      "completePort": false,
+      "remainingAcceptance": "Full Graphify action set, source-grounded auto-context and operator-reviewed exports."
+    },
+    {
+      "repo": "QuantumKuba/dsh-graphify-plugin",
+      "pinnedSha": "74a2c72b31abef95adf7afa53ec45d7dcb0ba47e",
+      "role": "dsh-mcp",
+      "upstreamSourcePaths": [
+        "src/server-process.ts",
+        "src/freshness.ts",
+        "src/project-resolver.ts"
+      ],
+      "envelopeFiles": [
+        "extensions/envelope/graphify-watch.mjs",
+        "scripts/envelope-mcp-stdio.mjs"
+      ],
+      "verificationFiles": [
+        "tests/mcp-stdio-interop.test.mjs"
+      ],
+      "coverage": "partial",
+      "completePort": false,
+      "remainingAcceptance": "Complete MCP lifecycle, remote transports, explicit authorization, tool and version parity."
+    },
+    {
+      "repo": "nainglinnphyo/OpenGraphify",
+      "pinnedSha": "4732f159ffc74b7121fe671bd6dbeeffdfd51964",
+      "role": "nestjs-graphql",
+      "upstreamSourcePaths": [
+        "server/src/post/post.resolver.ts",
+        "server/prisma/schema.prisma"
+      ],
+      "envelopeFiles": [
+        "scripts/envelope-graphql-local.mjs"
+      ],
+      "verificationFiles": [
+        "tests/graphql-bridge.test.mjs"
+      ],
+      "coverage": "partial",
+      "completePort": false,
+      "remainingAcceptance": "Full NestJS, Apollo and Prisma behavior only if separately justified; current read-only metadata bridge is distinct."
+    },
+    {
+      "repo": "yetanotheraryan/graphify-chokidar",
+      "pinnedSha": "9c584df9ab087425fec3d030e3ef7d1a29431707",
+      "role": "chokidar-watcher",
+      "upstreamSourcePaths": [
+        "src/watcher.ts",
+        "src/debouncer.ts",
+        "src/classifier.ts"
+      ],
+      "envelopeFiles": [
+        "extensions/envelope/graphify-watch.mjs"
+      ],
+      "verificationFiles": [
+        "tests/graphify-watch.test.mjs"
+      ],
+      "coverage": "partial",
+      "completePort": false,
+      "remainingAcceptance": "Automatic persistent refresh with media confirmation, state recovery and source-integrity gates."
+    },
+    {
+      "repo": "crafter-station/graphify-visualizer",
+      "pinnedSha": "15c67d7e5a3c717a3917f6af410e09bc0d9142ed",
+      "role": "obsidian-viewer",
+      "upstreamSourcePaths": [
+        "plugin/src/catalog.ts",
+        "plugin/src/embed-html.ts"
+      ],
+      "envelopeFiles": [
+        "extensions/envelope/graph-intelligence.mjs"
+      ],
+      "verificationFiles": [
+        "tests/graph-visualization.test.mjs"
+      ],
+      "coverage": "partial",
+      "completePort": false,
+      "remainingAcceptance": "Native Obsidian plugin/catalog, safe official HTML preview and multi-graph viewer parity."
+    },
+    {
+      "repo": "m4t0t0/cmd-mod-graphify",
+      "pinnedSha": "474ecaecbf181832572af9934dba99d1dddbf06b",
+      "role": "commandcode-graphify",
+      "upstreamSourcePaths": [
+        "src/commands.ts",
+        "src/renderer.ts"
+      ],
+      "envelopeFiles": [
+        "extensions/envelope/graph-intelligence.mjs"
+      ],
+      "verificationFiles": [
+        "tests/graph-visualization.test.mjs"
+      ],
+      "coverage": "partial",
+      "completePort": false,
+      "remainingAcceptance": "Full CommandCode commands and interactive graph exploration without another host runtime."
+    },
+    {
+      "repo": "colbymchenry/codegraph",
+      "pinnedSha": "f72c9d2efb14454ff4f9fd7b8460abd82f19a287",
+      "role": "codegraph-kernel",
+      "upstreamSourcePaths": [
+        "src/graph/traversal.ts",
+        "src/graph/call-sites.ts",
+        "src/graph/type-hierarchy.ts"
+      ],
+      "envelopeFiles": [
+        "extensions/envelope/code-call-evidence.mjs",
+        "extensions/envelope/code-index.mjs"
+      ],
+      "verificationFiles": [
+        "tests/code-call-graph.test.mjs"
+      ],
+      "coverage": "partial",
+      "completePort": false,
+      "remainingAcceptance": "Persistent typed function and symbol graph, comprehensive multi-language traversal and auto-sync."
+    },
+    {
+      "repo": "AxiomCodeAI/axiomcodegraph",
+      "pinnedSha": "29f7ecf052973b4c79574cc54b61fcd9f55b3b9f",
+      "role": "formal-graph",
+      "upstreamSourcePaths": [
+        "graph/bundle/schema.ts",
+        "graph/bundle/build.ts"
+      ],
+      "envelopeFiles": [
+        "extensions/envelope/graph-invariants.mjs",
+        "extensions/envelope/typechecker-evidence.mjs"
+      ],
+      "verificationFiles": [
+        "tests/graph-invariants.test.mjs"
+      ],
+      "coverage": "partial",
+      "completePort": false,
+      "remainingAcceptance": "Unified formal intermediate representation, cross-language compiler evidence, mechanically checkable code proofs."
+    },
+    {
+      "repo": "GlitterKill/sdl-mcp",
+      "pinnedSha": "2a20acbd283a5edf8290fb217eee0ecff86b31f5",
+      "role": "symbol-delta-ledger",
+      "upstreamSourcePaths": [
+        "src/context/engine.ts",
+        "src/context/select.ts"
+      ],
+      "envelopeFiles": [
+        "extensions/envelope/symbol-delta.mjs",
+        "extensions/envelope/persistent-symbol-history.mjs"
+      ],
+      "verificationFiles": [
+        "tests/symbol-delta.test.mjs"
+      ],
+      "coverage": "partial",
+      "completePort": false,
+      "remainingAcceptance": "Full policy-budget context controls, reversible evidence and independent quality/token benchmarks."
+    },
+    {
+      "repo": "Ancienttwo/repo-harness",
+      "pinnedSha": "6b3c8def0a5b394087506d7ccc7ecae822306b8f",
+      "role": "workflow-harness",
+      "upstreamSourcePaths": [
+        "src/core/board/board.ts",
+        "src/core/evidence/checkpoint.ts"
+      ],
+      "envelopeFiles": [
+        "extensions/envelope/workflow-ledger.mjs",
+        "extensions/envelope/workflow-api.mjs"
+      ],
+      "verificationFiles": [
+        "tests/workflow-ledger.test.mjs"
+      ],
+      "coverage": "partial",
+      "completePort": false,
+      "remainingAcceptance": "Full board authority, file-backed workflow contracts, acceptance evidence and worker orchestration.",
+      "transferredTo": "aimpact-inc/repo-harness"
+    },
+    {
+      "repo": "optave/ops-codegraph-tool",
+      "pinnedSha": "427c96f6da08fed88559075ef3c3c9eaa2122319",
+      "role": "ops-graph",
+      "upstreamSourcePaths": [
+        "src/domain/graph/builder/incremental.ts",
+        "src/domain/graph/builder/call-resolver.ts"
+      ],
+      "envelopeFiles": [
+        "extensions/envelope/code-index.mjs",
+        "extensions/envelope/architecture-policy.mjs"
+      ],
+      "verificationFiles": [
+        "tests/architecture-policy.test.mjs"
+      ],
+      "coverage": "partial",
+      "completePort": false,
+      "remainingAcceptance": "34-language callable and dataflow graphs, verified static architecture gates, precise change impact."
+    },
+    {
+      "repo": "artk0de/TeaRAGs-MCP",
+      "pinnedSha": "5ba0ac24a02d1b4daf3b4ca1027b13974a66b184",
+      "role": "semantic-rag",
+      "upstreamSourcePaths": [
+        "src/core/adapters/embeddings/onnx.ts",
+        "src/core/api/entry-points/auto-update/trigger.ts"
+      ],
+      "envelopeFiles": [
+        "extensions/envelope/local-embedding-runtime.mjs",
+        "scripts/benchmark-local-embeddings.mjs"
+      ],
+      "verificationFiles": [
+        "tests/semantic-benchmark.test.mjs"
+      ],
+      "coverage": "partial",
+      "completePort": false,
+      "remainingAcceptance": "Real-model held-out benchmarks, complete incremental sync, ownership and historical risk/reuse gates."
+    }
+  ]
+}
