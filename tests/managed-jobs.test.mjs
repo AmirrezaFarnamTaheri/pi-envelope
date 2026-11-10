@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {mkdtempSync, mkdirSync, rmSync, realpathSync, writeFileSync, chmodSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
-import {ManagedJobs, registerManagedJobs, resolveTrustedAgentCommand} from '../extensions/envelope/managed-jobs.mjs';
+import {join, delimiter} from 'node:path';
+import {ManagedJobs, registerManagedJobs, resolveTrustedAgentCommand, resolveTrustedNodeExecutable} from '../extensions/envelope/managed-jobs.mjs';
 
 function fixture(t) {
   const root=mkdtempSync(join(tmpdir(),'envelope-jobs-test-'));
@@ -229,4 +229,47 @@ test('untrusted project-local pi on PATH is never selected for a background agen
   assert.deepEqual(resolveTrustedAgentCommand(a,{pathEnv:a,configured:trusted}),
     {command:process.execPath,prefix:[realpathSync(trusted)]});
   assert.throws(()=>resolveTrustedAgentCommand(a,{pathEnv:a,configured:spoof}),/outside the project/);
+});
+
+
+test('compiled Pi host chooses a trusted external Node binary, not its own executable',t=>{
+  const {root,a}=fixture(t);
+  const trusted=join(root,'trusted-node');
+  mkdirSync(trusted);
+  const name=process.platform==='win32'?'node.exe':'node';
+  const realNode=join(trusted,name);
+  writeFileSync(realNode,'test fixture for selection');
+  if(process.platform!=='win32')chmodSync(realNode,0o755);
+  const forgedNode=join(a,name);
+  writeFileSync(forgedNode,'untrusted project file');
+  if(process.platform!=='win32')chmodSync(forgedNode,0o755);
+  const result=resolveTrustedNodeExecutable(a,{
+    pathEnv:[a,trusted].join(delimiter),
+    compiledBun:true,
+    runtimeExecPath:join(root,'pi.exe')
+  });
+  assert.equal(result,realpathSync(realNode));
+  assert.throws(()=>resolveTrustedNodeExecutable(a,{
+    pathEnv:a,compiledBun:true,runtimeExecPath:join(root,'pi.exe')
+  }),/trusted Node/i);
+});
+
+test('native Node runtime does not require an extra Node executable on PATH',t=>{
+  const {a}=fixture(t);
+  assert.equal(resolveTrustedNodeExecutable(a,{pathEnv:'',compiledBun:false,
+    runtimeExecPath:process.execPath}),realpathSync(process.execPath));
+});
+
+
+test('trusted JavaScript background agents use the external Node runtime in compiled Pi',t=>{
+  const {root,a}=fixture(t);
+  const bin=join(root,'node-bin');mkdirSync(bin);
+  const runtime=join(bin,process.platform==='win32'?'node.exe':'node');
+  writeFileSync(runtime,'trusted node fixture');
+  if(process.platform!=='win32')chmodSync(runtime,0o755);
+  const cli=join(root,'pi-cli.mjs');writeFileSync(cli,'// trusted CLI fixture');
+  const chosen=resolveTrustedAgentCommand(a,{
+    pathEnv:bin,configured:cli,compiledBun:true
+  });
+  assert.deepEqual(chosen,{command:realpathSync(runtime),prefix:[realpathSync(cli)]});
 });
