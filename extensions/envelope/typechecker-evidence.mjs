@@ -52,15 +52,17 @@ export function inspectTypedSource(index,{action='diagnostics',path,line,column,
  const trustedLib=p=>within(compilerLib,p)&&/^lib[.][a-z0-9._-]+[.]d[.]ts$/i.test(basename(p));
  host.readFile=p=>{
    const abs=normalize(p);
-   return sources.has(abs)?sources.get(abs):within(root,abs)&&!trustedLib(abs)?undefined:originalRead(p);
+   return sources.has(abs)?sources.get(abs):trustedLib(abs)?originalRead(p):undefined;
  };
  host.fileExists=p=>{
    const abs=normalize(p);
-   return sources.has(abs)||(!within(root,abs)||trustedLib(abs))&&originalExists(p);
+   return sources.has(abs)||(trustedLib(abs)&&originalExists(p));
  };
  const program=ts.createProgram(rows,options,host),sf=program.getSourceFile(resolve(root,key));
  if(!sf)throw new Error('TypeScript compiler did not load indexed source');
  if(index.lastRefresh?.unavailable?.length)reasons.push('parser-unavailable');
+ if(index.lastRefresh?.discoveryTruncated)reasons.push('discovery-truncated');
+ if(index.lastRefresh?.discoveryReadErrors)reasons.push('discovery-read-errors');
  if(index.files.size>=index.maxFiles)reasons.push('index-file-cap-possibly-reached');
  const diagnostics=ts.getPreEmitDiagnostics(program,sf);
  if(diagnostics.some(d=>d.code===2307||d.code===2792))reasons.push('unresolved-compiler-module');
