@@ -117,3 +117,13 @@ test('navigation never labels stale returned files as current indexed evidence',
  assert.deepEqual(result.locations,[]);
  assert.match(result.reason,/changed|stale|hash|source/i);
 });
+
+test('rename opens all proposed files before validating cross-file diagnostics',async t=>{
+  const h=fixture(t,{mode:'cross-file-rename'});
+  const preview=body(await h.call('envelope_code_rename',req));
+  await h.command('code rename on');
+  const applied=await h.call('envelope_code_rename',{...req,apply:true,planId:preview.planId});
+  assert.equal(applied.isError,false,applied.content[0].text);
+  assert.equal(body(applied).applied,true);
+  h.extension.close();
+});

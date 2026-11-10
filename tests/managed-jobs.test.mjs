@@ -200,3 +200,20 @@ test('the launched command stays in the canonical project directory independent 
   assert.equal(state.status,'completed',JSON.stringify(state));
   assert.equal(jobs.logs(a,started.id).text,realpathSync(a));
 });
+
+test('UTF-8 cursor pages preserve complete multibyte code points',async t=>{
+  const {a,jobs}=fixture(t);
+  const started=await jobs.start({project:a,command:process.execPath,
+    args:['-e',JSON.stringify('process.stdout.write("A🙂B")').slice(1,-1)],maxLogBytes:4096});
+  const state=await jobs.wait(a,started.id,{timeoutMs:5000});
+  assert.equal(state.status,'completed',JSON.stringify(state));
+  const first=jobs.logs(a,started.id,{fromByte:0,maxBytes:4});
+  assert.equal(first.text,'A');
+  assert.equal(first.nextByte,1);
+  const second=jobs.logs(a,started.id,{fromByte:first.nextByte,maxBytes:4});
+  assert.equal(second.text,'🙂');
+  assert.equal(second.nextByte,5);
+  const last=jobs.logs(a,started.id,{fromByte:second.nextByte,maxBytes:4});
+  assert.equal(last.text,'B');
+  assert.equal(last.remainingBytes,0);
+});

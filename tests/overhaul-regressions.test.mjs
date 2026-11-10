@@ -384,3 +384,23 @@ test('LSP-1: envelope_code_rename apply validates diagnostics on post-rename pro
   assert.match(applied.content[0].text, /LSP rename safety check failed/i);
   assert.match(readFileSync(join(repo, 'src', 'a.ts'), 'utf8'), /function add/);
 });
+
+test('review: duplicated policy blocks inside one prompt string are collapsed',()=>{
+  const once=composePolicy('System context',true).systemPrompt;
+  const twice=once+'\n\n'+once.slice(once.indexOf('<ENVELOPE_POLICY>'));
+  const output=composePolicy(twice,true).systemPrompt;
+  assert.equal((output.match(/<ENVELOPE_POLICY>/g)||[]).length,1);
+  assert.equal((output.match(/<\\/ENVELOPE_POLICY>/g)||[]).length,1);
+});
+
+test('review: symlinked Tersio settings read and update the target without replacing the link',t=>{
+  const dir=mkdtempSync(join(tmpdir(),'envelope-linked-config-'));
+  t.after(()=>rmSync(dir,{recursive:true,force:true}));
+  const target=join(dir,'real-settings.json'),link=join(dir,'settings.json');
+  writeFileSync(target,JSON.stringify({envelope:{jobs:{enabled:true,agentEnabled:false}}}));
+  symlinkSync(target,link);
+  assert.equal(readConfig(link).jobs.enabled,true);
+  saveConfig(link,{jobs:{enabled:false,agentEnabled:false}});
+  assert.equal(readConfig(target).jobs.enabled,false);
+  assert.equal(readConfig(link).jobs.enabled,false);
+});

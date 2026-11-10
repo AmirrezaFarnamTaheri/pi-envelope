@@ -113,3 +113,12 @@ test('rename refuses Python/Go files even when the shared index has opted in',t=
  assert.throws(()=>planRename({index,workspaceEdit:pythonEdit,request:{path:'src/unexpected.py',line:1,column:7,newName:'multiply'}}),/JS\/TS|JavaScript|TypeScript|unsupported/i);
  assert.throws(()=>planRename({index,workspaceEdit:{changes:{...edits.changes,...pythonEdit.changes}},request:req}),/JS\/TS|JavaScript|TypeScript|unsupported/i);
 });
+
+test('rejects expanded LSP text at a normal variable identifier even if TS parses it',t=>{
+  const {root,index,uri,range}=setup(t);
+  writeFileSync(join(root,'src','unsafe.ts'),'export const add = 1;\n');
+  index.refresh();
+  assert.throws(()=>planRename({index,request:{path:'src/unsafe.ts',line:1,column:14,newName:'multiply'},
+    workspaceEdit:{changes:{[uri('unsafe.ts')]:[{range:range(0,13,16),newText:'add: multiply'}]}}}),
+    /shorthand|identifier|replacement/i);
+});

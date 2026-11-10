@@ -80,3 +80,15 @@ goTest('offline go/types resolves available fmt standard-library export data',t=
  assert.equal(result.errors,0,JSON.stringify(result));
  assert.equal(result.complete,true);
 });
+
+goTest('external _test.go package is isolated from the ordinary package for go/types',t=>{
+  const f=fixture(t);
+  f.write('external_test.go','package pkg_test\nfunc External() int { return 3 }\n');
+  f.index.refresh();
+  const normal=inspectGoTypes(f.index,{action:'diagnostics',path:'pkg/api.go'});
+  assert.equal(normal.errors,0,JSON.stringify(normal));
+  assert.equal(normal.complete,true,JSON.stringify(normal));
+  const external=inspectGoTypes(f.index,{action:'diagnostics',path:'pkg/external_test.go'});
+  assert.equal(external.errors,0,JSON.stringify(external));
+  assert.equal(external.complete,true,JSON.stringify(external));
+});
