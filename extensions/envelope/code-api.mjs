@@ -38,7 +38,7 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
     persistentSymbolHistory??=new PersistentSymbolHistoryLedger(join(home,'envelope-symbol-history'));
     return persistentSymbolHistory;
   }
-  const versions=new GraphVersionStore(join(home||join(homedir(),'.pi'),'envelope-graph-versions'));
+  const versions=new GraphVersionStore(join(home||join(homedir(),'.tersio'),'envelope-graph-versions'));
   function graphReader(index) {
     if(!graphReaders.has(index.root))graphReaders.set(index.root,new ExternalGraphReader(index.root,{...(watchGraphFactory?{watchFactory:watchGraphFactory}:{})}));
     return graphReaders.get(index.root);
