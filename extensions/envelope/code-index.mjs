@@ -75,9 +75,13 @@ function discoverFromGit(root,maxFiles){
   return {paths:candidates.slice(0,maxFiles),truncated:candidates.length>=maxFiles,readErrors:0};
 }
 
+function isFunctionLikeScope(ts,node){
+  return Boolean(ts.isFunctionDeclaration?.(node)||ts.isMethodDeclaration?.(node)||ts.isConstructorDeclaration?.(node)||ts.isFunctionExpression?.(node)||ts.isArrowFunction?.(node)||ts.isGetAccessorDeclaration?.(node)||ts.isSetAccessorDeclaration?.(node));
+}
+
 function scanSymbols(ts,sf,path) {
   const symbols=[];
-  function visit(node,container='') {
+  function visit(node,container='',inFunction=false) {
     let kind=null,name=null;
     if(ts.isFunctionDeclaration(node)) kind='function';
     else if(ts.isClassDeclaration(node)) kind='class';
@@ -86,14 +90,15 @@ function scanSymbols(ts,sf,path) {
     else if(ts.isEnumDeclaration(node)) kind='enum';
     else if(ts.isMethodDeclaration(node)) kind='method';
     else if(ts.isConstructorDeclaration(node)) {kind='constructor';name='constructor';}
-    else if(ts.isVariableDeclaration(node)) kind='variable';
+    else if(!inFunction && ts.isVariableDeclaration(node)) kind='variable';
     if (!name && kind && node.name && ts.isIdentifier(node.name)) name=node.name.text;
     const nextContainer=(kind==='class'||kind==='interface') && name ? name:container;
+    const nextInFunction=inFunction||isFunctionLikeScope(ts,node);
     if(kind && name){
       const start=sf.getLineAndCharacterOfPosition(node.getStart(sf));
       symbols.push({path,name,kind,container:kind==='method'||kind==='constructor' ? container : '',line:start.line+1,column:start.character+1});
     }
-    ts.forEachChild(node,child=>visit(child,nextContainer));
+    ts.forEachChild(node,child=>visit(child,nextContainer,nextInFunction));
   }
   visit(sf);
   return symbols;
@@ -116,15 +121,16 @@ function resolveModule(from,spec,available){
   if(!spec.startsWith('.')) return null;
   const base=posix.normalize(posix.join(posix.dirname(from),spec));
   if (base === '..' || base.startsWith('../') || posix.isAbsolute(base)) return null;
-  const ext=extname(base);
+  const ext=extname(base).toLowerCase();
   const candidates=[];
-  if (ext) {
+  if (ext && SOURCE_SET.has(ext)) {
     candidates.push(base);
     if(['.js','.jsx','.mjs','.cjs'].includes(ext)){
       const without=base.slice(0,-ext.length);
       candidates.push(`${without}.ts`,`${without}.tsx`,`${without}.mts`,`${without}.cts`);
     }
   } else {
+    if (ext) candidates.push(base);
     for(const suffix of SOURCE_SUFFIXES) candidates.push(base+suffix);
     for(const suffix of SOURCE_SUFFIXES) candidates.push(base+'/index'+suffix);
   }
@@ -278,8 +284,9 @@ export class CodeIndex {
         pending[language].push({path:key,content:source,signature,contentSha256});
         continue;
       }
-      const mode=['.tsx','.jsx'].includes(extname(key))?this.ts.ScriptKind.TSX:
-        ['.js','.mjs','.cjs'].includes(extname(key))?this.ts.ScriptKind.JS:this.ts.ScriptKind.TS;
+      const ext=extname(key).toLowerCase();
+      const mode=ext==='.tsx'?this.ts.ScriptKind.TSX:ext==='.jsx'?(this.ts.ScriptKind.JSX??this.ts.ScriptKind.JS):
+        ['.js','.mjs','.cjs'].includes(ext)?this.ts.ScriptKind.JS:this.ts.ScriptKind.TS;
       const sf=this.ts.createSourceFile(key,source,this.ts.ScriptTarget.Latest,true,mode);
       const diagnostics=parseDiagnostics(this.ts,sf);
       const callFacts=diagnostics.length?{declarations:[],bindings:[],calls:[],omittedCalls:0}:scanTsCallFacts(this.ts,sf);
@@ -412,8 +419,8 @@ export class CodeIndex {
       const diagnostics=response.records[0].diagnostics;
       return {path:key,ok:diagnostics.length===0,mode:'syntax-only',parser:language,diagnostics};
     }
-    const ext=extname(key);
-    const mode=['.tsx','.jsx'].includes(ext)?this.ts.ScriptKind.TSX:
+    const ext=extname(key).toLowerCase();
+    const mode=ext==='.tsx'?this.ts.ScriptKind.TSX:ext==='.jsx'?(this.ts.ScriptKind.JSX??this.ts.ScriptKind.JS):
       ['.js','.mjs','.cjs'].includes(ext)?this.ts.ScriptKind.JS:this.ts.ScriptKind.TS;
     const sf=this.ts.createSourceFile(key,source,this.ts.ScriptTarget.Latest,true,mode);
     const diagnostics=parseDiagnostics(this.ts,sf);

@@ -14,7 +14,7 @@ const ANCHOR = /(?:\[L\d+\]|\b[0-9a-f]{7,}[:|]\d+\b|(?:^|\n|\r)\s*\d+\s*(?:#\s*[
 const PASS_LINE = /^\s*(?:[✓✔]\s+|ok\s+\d+\s+-\s+|PASS\s+\S+)/iu;
 const TEST_SUMMARY = /(?:^\s*(?:Test (?:Files|Suites)|Tests?:|Tests\s+\d+|Duration\s|Ran \d+ tests?|# (?:tests|pass|fail)|All tests passed|PASS\s*$)|\b(?:warning|error|failed|FAIL)\b)/i;
 const BUILD_PROGRESS = /^\s*(?:Compiling module \d+\s*\/\s*\d+|Building module \d+\s*\/\s*\d+|transforming \(\d+\)|transformed \d+ modules|[✓✔]\s*\d+ modules transformed)/i;
-const GIT_FILE = /^\s*(?:modified:|new file:|deleted:|renamed:|copied:|\?\?|[MADRCU?!]{1,2}\s+)(?:\s+.+)?$/;
+const GIT_FILE = /^\s*(?:modified:|new file:|deleted:|renamed:|copied:|typechange:|\?\?|[MADRCUT?!]{1,2}\s+)(?:\s+.+)?$/;
 const DIAGNOSTIC = /\b(?:warning|error|failed|failure|fatal|timeout|aborted|cancelled|canceled|panic|exception)\b/i;
 
 function unchanged(text, category = 'other') {
@@ -60,13 +60,13 @@ function categoryOf(records) {
 
 /** Deletions, renames and unmerged Git index states are actionable, not noise. */
 function isCriticalGitChange(line) {
-  if (/^\s*(?:deleted:|renamed:|copied:)/i.test(line)) return true;
-  const code = line.match(/^\s*([MADRCU?!]{1,2})\s+/)?.[1];
-  return Boolean(code && (/[UDRC]/.test(code) || code === 'AA'));
+  if (/^\s*(?:deleted:|renamed:|copied:|typechange:)/i.test(line)) return true;
+  const code = line.match(/^\s*([MADRCUT?!]{1,2})\s+/)?.[1];
+  return Boolean(code && (/[UDRCT]/.test(code) || code === 'AA'));
 }
 
 function isProtected(record) {
-  return isAnchorSensitive(record.body) || DIAGNOSTIC.test(record.visible);
+  return isAnchorSensitive(record.visible) || isAnchorSensitive(record.body) || DIAGNOSTIC.test(record.visible);
 }
 
 /** @param {string} text @param {{ minBytes?:number,maxChars?:number,minSavingsRatio?:number }} options */
