@@ -682,7 +682,7 @@ export function registerEnvelope(pi, options = {}) {
         return;
       }
       if ((verb !== 'policy' && verb !== 'output') || !['on', 'off'].includes(value) || extra.length) {
-        notify(ctx, 'Usage: /envelope [status|stats|metrics|observability on/off|output on/off/retention <days>/erase <id>/prune <days>|policy on/off|context status/on/off/restore|graphify status/on/off/binary/timeout/build/update|code status/on/off/languages on/languages off/guard on/guard off/rename on/rename off/lsp status|workflow status/on/off/run on/run off|jobs status/on/off/agent on/agent off]' 'warning');
+        notify(ctx, 'Usage: /envelope [status|stats|metrics|observability on/off|output on/off/retention <days>/erase <id>/prune <days>|policy on/off|context status/on/off/restore|graphify status/on/off/binary/timeout/build/update|code status/on/off/languages on/languages off/guard on/guard off/rename on/rename off/lsp status|workflow status/on/off/run on/run off|jobs status/on/off/agent on/agent off]', 'warning');
         return;
       }
       const next = {
