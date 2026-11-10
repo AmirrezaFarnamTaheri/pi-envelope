@@ -10,6 +10,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   context: Object.freeze({ enabled: false, minBytes: 2400, maxPreviewChars: 650, recentMessages: 8, minSavingsRatio: 0.4 }),
   code: Object.freeze({ enabled: true, languagesEnabled: false, treeEnabled: false, guardEnabled: false, renameEnabled: false, vectorEnabled: false, vectorExecutable: null, lspCommand: null, lspTimeoutMs: 3500 }),
   workflow: Object.freeze({ enabled: true, runEnabled: false }),
+  jobs: Object.freeze({ enabled: false, agentEnabled: false }),
   memory: Object.freeze({ enabled: false }),
   graphify: Object.freeze({ enabled: false, executable: null, timeoutMs: 30000, orientationEnabled: false }),
   graphifyDotnet: Object.freeze({ enabled: false, executable: null, timeoutMs: 30000 }),
@@ -33,6 +34,7 @@ export function normalizeConfig(raw = {}) {
   const context = source.context && typeof source.context === 'object' ? source.context : {};
   const code = source.code && typeof source.code === 'object' ? source.code : {};
   const workflow = source.workflow && typeof source.workflow === 'object' ? source.workflow : {};
+  const jobs = source.jobs && typeof source.jobs === 'object' ? source.jobs : {};
   const memory = source.memory && typeof source.memory === 'object' ? source.memory : {};
   const graphify = source.graphify && typeof source.graphify === 'object' && !Array.isArray(source.graphify) ? source.graphify : {};
   const graphifyDotnet = source.graphifyDotnet && typeof source.graphifyDotnet === 'object' && !Array.isArray(source.graphifyDotnet) ? source.graphifyDotnet : {};
@@ -66,6 +68,7 @@ export function normalizeConfig(raw = {}) {
       lspTimeoutMs: safeInteger(code.lspTimeoutMs, DEFAULT_CONFIG.code.lspTimeoutMs, 100, 10000)
     },
     workflow: { enabled: safeBoolean(workflow.enabled, DEFAULT_CONFIG.workflow.enabled), runEnabled: safeBoolean(workflow.runEnabled, DEFAULT_CONFIG.workflow.runEnabled) },
+    jobs: { enabled: safeBoolean(jobs.enabled, DEFAULT_CONFIG.jobs.enabled), agentEnabled: safeBoolean(jobs.agentEnabled, DEFAULT_CONFIG.jobs.agentEnabled) },
     memory: { enabled: safeBoolean(memory.enabled, DEFAULT_CONFIG.memory.enabled) },
     graphify: {
       enabled: safeBoolean(graphify.enabled, DEFAULT_CONFIG.graphify.enabled),
