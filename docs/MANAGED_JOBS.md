@@ -23,7 +23,7 @@ The two switches are independent from `/envelope workflow run on`; no workflow, 
 | `start` | `command` (executable) and optional `args` array | Returns a UUID, starting state, kind and creation time without waiting for completion |
 | `list` | none | Up to 30 recent jobs for the current canonical project |
 | `status` | `jobId` | Persistent state, process identifiers, exit code and timestamps |
-| `logs` | `jobId` and optional `maxBytes` (up to 32,000) | Last bounded log bytes, whether the view was truncated, and current stored length |
+| `logs` | `jobId`, optional `maxBytes` (up to 32,000) and optional `fromByte` cursor | Tail by default, or read sequential bounded pages with `fromByte`, `nextByte` and `remainingBytes` for resumable log inspection |
 | `wait` | `jobId`, optional `waitMs` (at most 10,000) | Poll for a terminal state or return the latest state at the deadline |
 | `cancel` | `jobId` | Request process-tree termination through a private cancellation marker |
 | `prune` | optional `retentionDays` (0–365) | Remove only terminal jobs older than the age threshold |
