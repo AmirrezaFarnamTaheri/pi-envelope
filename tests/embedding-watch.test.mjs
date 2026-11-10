@@ -118,3 +118,16 @@ test('ambiguous file event aborts an already running automatic encoder update',a
  release();await current;
  await f.coordinator.stopAndWait(f.root);
 });
+
+
+test('a language absent from the current embedding index cannot masquerade as a clean sync',async t=>{
+ const f=setup(t);
+ await f.coordinator.start(f.root,{refresh:f.refresh,preflight:f.preflight,
+  update:f.update,checkEnabled:f.checkEnabled,debounceMs:250});
+ f.emit('unindexed.rs');
+ assert.equal(f.coordinator.status(f.root).manualRebuildRequired,true,
+   'unsupported source languages must require review, not a successful no-op');
+ await f.coordinator.flush(f.root);
+ assert.equal(f.changes.length,0,'no encoder work should run for unsupported language changes');
+ await f.coordinator.stopAndWait(f.root);
+});
