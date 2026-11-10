@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -35,6 +35,7 @@ function onMessage(msg){
  }
  if(msg.method==='textDocument/definition'||msg.method==='textDocument/references'){
    if(mode==='nav-unsupported')return reply(msg.id,null);
+   if(mode==='nav-stale')writeFileSync(join(process.cwd(),'src','b.ts'),'export const replacement=42;\n');
    const a=pathToFileURL(join(process.cwd(),'src','a.ts')).href;
    const b=pathToFileURL(join(process.cwd(),'src','b.ts')).href;
    const outside=pathToFileURL(join(process.cwd(),'..','private.ts')).href;
