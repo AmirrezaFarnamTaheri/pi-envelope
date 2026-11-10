@@ -95,9 +95,10 @@ function watchSnapshot(session){
     automaticLLM:false,sessionScoped:true};
 }
 export class GraphifyWatchCoordinator {
-  constructor({watchFactory=fsWatch}={}){
-    if(typeof watchFactory!=='function')throw new TypeError('watch factory required');
+  constructor({watchFactory=fsWatch,markStale=markGraphStale}={}){
+    if(typeof watchFactory!=='function'||typeof markStale!=='function')throw new TypeError('watch factory and stale reporter required');
     this.watchFactory=watchFactory;
+    this.markStale=markStale;
     this.sessions=new Map();
   }
   status(root){
@@ -106,7 +107,7 @@ export class GraphifyWatchCoordinator {
   }
   flagManual(session){
     session.manual=true;
-    try{markGraphStale(session.root);}catch{session.lastOutcome='failed';}
+    try{this.markStale(session.root);}catch{session.lastOutcome='failed';}
   }
   start(root,{runUpdate,debounceMs=1200}={}){
     if(typeof runUpdate!=='function')throw new TypeError('Graphify watch requires an authorized code update runner');

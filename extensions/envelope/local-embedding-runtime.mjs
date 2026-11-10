@@ -283,6 +283,27 @@ export class LocalEmbeddingRuntime {
     notes:'Vectors originate from the operator-pinned executable. Offline settings do not sandbox the trusted encoder; retrieval quality is unmeasured.'};
   });}finally{this.activeRoots.delete(root);}
  }
+ /** Read-only preflight for explicit, consented session-scoped sync watching.
+  * Never executes an encoder, creates a manifest, repairs a stale source or
+  * silently accepts a changed/deleted or previously unindexed source.
+  */
+ inspect(index,{executable}={}){
+  const root=rootOf(index);
+  checkedEncoder(executable,root);
+  const scope=checkedIndexScope(index);
+  const {data,manifestHash}=readManifest(root);
+  checkScopeEqual(data.indexScope,scope);
+  const {provenance,verifiedBytes,truncatedTexts}=readSource(index,root,{include:()=>false});
+  const old=new Map(data.entries.map(row=>[row.path,row.sha256]));
+  if(old.size!==provenance.length||provenance.some(({path,sha256})=>old.get(path)!==sha256))
+    throw new Error('embedding watch requires a current verified manifest; run manual vectors sync first');
+  checkUnchanged(index,root,provenance);
+  checkScopeEqual(scope,checkedIndexScope(index));
+  return {ready:true,files:provenance.length,model:data.model,
+    dimensions:data.dimensions,manifestHash,verifiedSourceBytes:verifiedBytes,truncatedTexts,
+    notes:'Read-only watch preflight; no model executed. External encoder still requires explicit session consent.'};
+ }
+
  async sync(index,{executable,timeoutMs=30000,signal}={}){
   const root=rootOf(index),binary=checkedEncoder(executable,root);
   if(!Number.isInteger(timeoutMs)||timeoutMs<50||timeoutMs>120000)throw new RangeError('invalid encoder timeout');
