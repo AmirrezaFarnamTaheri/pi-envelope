@@ -55,26 +55,27 @@ test('F-01: live recapture refreshes timestamp and never self-prunes identical b
   assert.equal(hits[0].id, saved2.id);
 });
 
-test('F-02: MetricsLedger accepts all 27 registered code_query tools without dropping telemetry', t => {
+test('F-02: MetricsLedger accepts all 29 registered code_query tools without dropping telemetry', t => {
   const dir = mkdtempSync(join(tmpdir(), 'envelope-f02-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const ledger = new MetricsLedger(join(dir, 'metrics'));
   t.after(() => ledger.close());
-  const all27 = [
+  const all29 = [
     'envelope_code_overview', 'envelope_code_graph', 'envelope_code_external_graph', 'envelope_code_history',
     'envelope_code_context_card', 'envelope_code_retrieve', 'envelope_code_policy', 'envelope_code_languages',
     'envelope_code_tree_status', 'envelope_code_tree_query', 'envelope_code_tree_capture', 'envelope_code_lookup',
     'envelope_code_calls', 'envelope_code_impact', 'envelope_code_change_impact', 'envelope_code_verify',
     'envelope_code_delta', 'envelope_code_symbol_history', 'envelope_code_slice', 'envelope_code_coupling',
     'envelope_code_versions', 'envelope_code_vector', 'envelope_code_invariant', 'envelope_code_typecheck',
-    'envelope_code_go_types', 'envelope_code_lsp_verify', 'envelope_code_rename'
+    'envelope_code_go_types', 'envelope_code_lsp_verify', 'envelope_code_rename',
+    'envelope_code_definition', 'envelope_code_references'
   ];
-  for (const action of all27) {
+  for (const action of all29) {
     ledger.record('/repo', 'code_query', { action, outcome: 'ok', durationMs: 1.5 });
   }
   const snap = ledger.snapshot('/repo');
-  assert.equal(snap.totalEvents, 27);
-  assert.equal(snap.byKind.code_query.count, 27);
+  assert.equal(snap.totalEvents, 29);
+  assert.equal(snap.byKind.code_query.count, 29);
 });
 
 test('F-03: capability cockpit detects symlinked PATH executables and reports full capability surface', t => {
