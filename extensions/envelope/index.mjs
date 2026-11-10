@@ -5,8 +5,9 @@
  * RTK alone owns shell rewrites; RTK's filter owns grep/glob output; envelope
  * owns conservative bash-result compaction and exact local retrieval.
  */
+import { realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, isAbsolute } from 'node:path';
+import { join, isAbsolute, resolve } from 'node:path';
 import { compactOutput } from './compactor.mjs';
 import { OutputStore } from './store.mjs';
 import { readConfig, saveConfig } from './config.mjs';
@@ -34,6 +35,12 @@ import {formatEnvelopeDashboard,formatEmbeddingFooter} from './tui-dashboard.mjs
 function homePath() {
   if (process.env.ENVELOPE_HOME) return process.env.ENVELOPE_HOME;
   return process.env.TERSIO_HOME || join(process.env.HOME || process.env.USERPROFILE || homedir(), '.tersio');
+}
+
+function canonicalProject(raw) {
+  const target = String(raw || process.cwd());
+  try { return realpathSync(resolve(target)); }
+  catch { return resolve(target); }
 }
 
 /** Native bash completion metadata varies by Pi host. Any uncertain terminal
@@ -88,7 +95,7 @@ export function registerEnvelope(pi, options = {}) {
   let frontier;
   try {frontier=new ContextFrontier(join(home,'envelope-context'));}
   catch(err){frontier=null;pi.logger?.warn?.(`[envelope] context replay frontier unavailable; pruning stays disabled: ${err.message}`);}
-  const project = (ctx) => ctx?.cwd || pi.cwd || process.cwd();
+  const project = (ctx) => canonicalProject(ctx?.cwd || pi.cwd || process.cwd());
   let metricLedger;
   try { metricLedger = new MetricsLedger(join(home,'envelope-metrics'),{retentionDays:config.observability.retentionDays}); }
   catch(err) { metricLedger = null; pi.logger?.warn?.(`[envelope] metrics unavailable; continuing without telemetry: ${err.message}`); }
@@ -133,18 +140,19 @@ export function registerEnvelope(pi, options = {}) {
     if (!reduced.changed) return;
 
     try {
+      const scope = project(ctx);
       const saved = store.save({
         text: original,
-        project: project(ctx),
+        project: scope,
         tool: event.toolName,
         command: typeof event.input?.command === 'string' ? event.input.command : ''
       });
       // Expiry is opt-in and opportunistic; never prune the output just captured.
       if (config.output.retentionDays > 0) {
-        const scope=project(ctx), now=Date.now();
+        const now=Date.now();
         if ((lastOutputPrune.get(scope)??0) + 60_000 < now) {
           lastOutputPrune.set(scope,now);
-          try {store.prune({project:scope,before:new Date(now-config.output.retentionDays*86_400_000).toISOString()});}
+          try {store.prune({project:scope,before:new Date(now-config.output.retentionDays*86_400_000).toISOString(),skipId:saved.id});}
           catch(err){pi.logger?.warn?.(`[envelope] retention sweep failed: ${err.message}`);}
         }
       }
@@ -214,8 +222,23 @@ export function registerEnvelope(pi, options = {}) {
     const policy=composePolicy(event?.systemPrompt,config.policy.enabled);
     return composeGraphifyOrientation(policy?.systemPrompt??event?.systemPrompt,project(ctx),config.graphify.orientationEnabled) || policy || undefined;
   });
-  pi.on('session_shutdown', (_event,ctx) => { if(dashboardVisible)ctx?.ui?.setWidget?.('envelope-dashboard',undefined);
-    ctx?.ui?.setStatus?.('envelope-vectors',undefined);dashboardVisible=false;embeddingWatcher.close?.(); localEmbeddingRuntime.close?.(); graphifyDotnet.close?.(); graphifyCli.close?.(); codeApi.close?.(); store?.close(); store = null; frontier?.close(); frontier=null; workflowLedger?.close(); metricLedger?.close(); metricLedger=null; });
+  /** Close every session-owned resource, including project memory, exactly once per shutdown. */
+  const shutdownAll=(ctx)=>{
+    if(dashboardVisible)ctx?.ui?.setWidget?.('envelope-dashboard',undefined);
+    ctx?.ui?.setStatus?.('envelope-vectors',undefined);
+    dashboardVisible=false;
+    embeddingWatcher.close?.();
+    localEmbeddingRuntime.close?.();
+    graphifyDotnet.close?.();
+    graphifyCli.close?.();
+    codeApi.close?.();
+    store?.close();store=null;
+    frontier?.close();frontier=null;
+    projectMemory?.close();projectMemory=null;
+    workflowLedger?.close();workflowLedger=null;
+    metricLedger?.close();metricLedger=null;
+  };
+  pi.on('session_shutdown',(_event,ctx)=>shutdownAll(ctx));
 
   pi.registerTool?.({
     name: 'envelope_recall_output',
@@ -348,7 +371,7 @@ export function registerEnvelope(pi, options = {}) {
         return;
       }
       if (verb === 'stats') {
-        const local = store?.stats();
+        const local = store?.stats({ project: project(ctx) });
         notify(ctx, `Envelope: ${metrics.compacted}/${metrics.calls} results compacted; original ${metrics.rawBytes} B -> model ${metrics.renderedBytes} B; context ${metrics.contextCompacted} results compacted (${metrics.contextRawBytes} B -> ${metrics.contextRenderedBytes} B); ${local?.items ?? 0} stored outputs; workflows ${metrics.workflowRuns} spawned, ${metrics.workflowSubmitted} submitted, ${metrics.workflowFailed} failed`);
         return;
       }
@@ -358,7 +381,7 @@ export function registerEnvelope(pi, options = {}) {
           return;
         }
         if(!['on','off'].includes(value)||extra.length){notify(ctx,'Usage: /envelope memory [status|on|off]','warning');return;}
-        try{config=saveConfig(settingsPath,{...config,memory:{enabled:value==='on'}});notify(ctx,`Envelope project memory ${value}`);}
+        try{config=saveConfig(settingsPath,{...config,memory:{enabled:value==='on'}});if(value==='off'){projectMemory?.close();projectMemory=null;}notify(ctx,`Envelope project memory ${value}`);}
         catch(err){notify(ctx,`Envelope memory settings failed: ${err.message}`,'warning');}
         return;
       }
@@ -798,7 +821,7 @@ export function registerEnvelope(pi, options = {}) {
     }
   });
 
-  return { metrics, getConfig: () => config, close: () => {dashboardVisible=false;embeddingWatcher.close?.();localEmbeddingRuntime.close?.();graphifyDotnet.close?.();graphifyCli.close?.();codeApi.close?.(); store?.close(); frontier?.close(); projectMemory?.close(); workflowLedger?.close(); metricLedger?.close();} };
+  return { metrics, getConfig: () => config, close: shutdownAll };
 }
 
 export default registerEnvelope;
