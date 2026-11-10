@@ -8,7 +8,7 @@ const read=p=>readFileSync(new URL(p,root),'utf8');
 
 test('one native Pi package exposes lazy WASM tooling with exact optional packages',()=>{
   const manifest=JSON.parse(read('package.json'));
-  assert.equal(manifest.version,'0.22.0');
+  assert.equal(manifest.version,'0.22.1');
   assert.equal(manifest.optionalDependencies?.['web-tree-sitter'],'0.25.3');
   assert.equal(manifest.optionalDependencies?.['tree-sitter-wasm'],'2.0.4');
   assert.equal(manifest.dependencies?.['typescript'],'5.8.3');
