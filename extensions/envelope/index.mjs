@@ -19,6 +19,7 @@ import { registerLspFeature } from './lsp-api.mjs';
 import { guardMutation } from './mutation-guard.mjs';
 import { WorkflowLedger } from './workflow-ledger.mjs';
 import { registerWorkflowFeature } from './workflow-api.mjs';
+import { registerManagedJobs } from './managed-jobs.mjs';
 import { MetricsLedger } from './metrics-ledger.mjs';
 import {ProjectMemory, registerProjectMemoryFeature} from './project-memory.mjs';
 import {registerCapabilityCockpit} from './capability-cockpit.mjs';
@@ -192,6 +193,7 @@ export function registerEnvelope(pi, options = {}) {
   const workflowApi = registerWorkflowFeature(pi, {
     ledger:workflowLedger, getStore:()=>store, getConfig:()=>config, project, metrics, home, observe
   });
+  registerManagedJobs(pi,{home,project,allowStarts:()=>config.jobs.enabled,allowAgentRuns:()=>config.jobs.agentEnabled});
 
   pi.on('before_agent_start', (event,ctx) => {
     const policy=composePolicy(event?.systemPrompt,config.policy.enabled);
@@ -278,12 +280,12 @@ export function registerEnvelope(pi, options = {}) {
   });
 
   pi.registerCommand?.('envelope', {
-    description: 'Manage Envelope modes and private local metrics; /envelope status|stats|metrics|observability|output|policy|context|code|graphify|workflow',
+    description: 'Manage Envelope modes and private local metrics; /envelope status|stats|metrics|observability|output|policy|context|code|graphify|workflow|jobs',
     async handler(args, ctx) {
       const rawArgs = String(args ?? '').trim();
       const [verb, value, ...extra] = rawArgs.toLowerCase().split(/\s+/);
       if (!verb || verb === 'status') {
-        notify(ctx, `Envelope: output ${config.output.enabled ? 'on' : 'off'}; policy ${config.policy.enabled ? 'on' : 'off'}; context ${config.context.enabled ? 'on' : 'off'}; code ${config.code.enabled ? 'on' : 'off'}; workflow ${config.workflow.enabled ? 'on' : 'off'} (child ${config.workflow.runEnabled ? 'on' : 'off'}); ${metrics.compacted} results compacted`);
+        notify(ctx, `Envelope: output ${config.output.enabled ? 'on' : 'off'}; policy ${config.policy.enabled ? 'on' : 'off'}; context ${config.context.enabled ? 'on' : 'off'}; code ${config.code.enabled ? 'on' : 'off'}; workflow ${config.workflow.enabled ? 'on' : 'off'} (child ${config.workflow.runEnabled ? 'on' : 'off'}); jobs ${config.jobs.enabled ? 'on' : 'off'} (agent ${config.jobs.agentEnabled ? 'on' : 'off'}); ${metrics.compacted} results compacted`);
         return;
       }
       if (verb === 'observability') {
@@ -642,6 +644,24 @@ export function registerEnvelope(pi, options = {}) {
         catch(err){notify(ctx,`Envelope prune failed: ${err.message}`,'warning');}
         return;
       }
+      if (verb === 'jobs') {
+        if ((!value || value==='status') && extra.length===0) {
+          notify(ctx,`Envelope jobs ${config.jobs.enabled?'on':'off'}, background single-agent ${config.jobs.agentEnabled?'on':'off'}; disabled by default; read with envelope_job`);
+          return;
+        }
+        const agent=value==='agent';
+        const selected=agent?extra[0]:value;
+        if(!['on','off'].includes(selected)||(agent?extra.length!==1:extra.length!==0)) {
+          notify(ctx,'Usage: /envelope jobs [status|on|off|agent on|agent off]','warning');
+          return;
+        }
+        try {
+          const next={...config.jobs,...(agent?{agentEnabled:selected==='on'}:{enabled:selected==='on'})};
+          config=saveConfig(settingsPath,{...config,jobs:next});
+          notify(ctx,`Envelope ${agent?'background agent sessions':'background job starts'} ${selected}`);
+        }catch(err){notify(ctx,`Envelope jobs settings failed: ${err.message}`,'warning');}
+        return;
+      }
       if (verb === 'workflow') {
         if ((!value || value === 'status') && !extra.length) {
           try {const state=workflowApi.status(ctx);notify(ctx,`Envelope workflow ${config.workflow.enabled?'on':'off'}, child ${config.workflow.runEnabled?'on':'off'}; ${state.workflow?.name??'no workflow'}; ready ${state.ready.length}`);}
@@ -662,7 +682,7 @@ export function registerEnvelope(pi, options = {}) {
         return;
       }
       if ((verb !== 'policy' && verb !== 'output') || !['on', 'off'].includes(value) || extra.length) {
-        notify(ctx, 'Usage: /envelope [status|stats|metrics|observability on/off|output on/off/retention <days>/erase <id>/prune <days>|policy on/off|context status/on/off/restore|graphify status/on/off/binary/timeout/build/update|code status/on/off/languages on/languages off/guard on/guard off/rename on/rename off/lsp status|workflow status/on/off/run on/run off]', 'warning');
+        notify(ctx, 'Usage: /envelope [status|stats|metrics|observability on/off|output on/off/retention <days>/erase <id>/prune <days>|policy on/off|context status/on/off/restore|graphify status/on/off/binary/timeout/build/update|code status/on/off/languages on/languages off/guard on/guard off/rename on/rename off/lsp status|workflow status/on/off/run on/run off|jobs status/on/off/agent on/agent off]' 'warning');
         return;
       }
       const next = {
