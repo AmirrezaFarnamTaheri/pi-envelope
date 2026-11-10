@@ -53,11 +53,14 @@ export function rankFragments(chunks,query,{limit=10,maxPreviewChars=320}={}) {
   const triRank=new Map(tri.map((x,i)=>[x,i+1]));
   return candidates.map(part=>({part,rank:1/(60+lexRank.get(part))+1/(60+triRank.get(part))}))
     .sort((a,b)=>b.rank-a.rank||a.part.lineStart-b.part.lineStart)
-    .slice(0,limit).map(({part})=>({
-      lineStart:part.lineStart,lineEnd:part.lineEnd,
-      preview:part.text.length>maxPreviewChars?`${part.text.slice(0,maxPreviewChars)}…`:part.text,
-      previewTruncated:part.text.length>maxPreviewChars
-    }));
+    .slice(0,limit).map(({part})=>{
+      const points=Array.from(part.text);
+      return {
+        lineStart:part.lineStart,lineEnd:part.lineEnd,
+        preview:points.length>maxPreviewChars?`${points.slice(0,maxPreviewChars).join('')}…`:part.text,
+        previewTruncated:points.length>maxPreviewChars
+      };
+    });
 }
 
 /** Bounded indexing segments; long individual lines are split with overlap.

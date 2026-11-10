@@ -92,7 +92,7 @@ export function buildContextSlice(index,{query,path,direction='both',depth=1,lim
     const candidate=queue[i];
     // projectContextCard verifies source against the current CodeIndex SHA before
     // producing any card, including a conditional ETag-only reference.
-    const card=projectContextCard(index,{path:candidate.path,limit:2,includeSnippet:false});
+    const card=projectContextCard(index,{path:candidate.path,limit:3,includeSnippet:false});
     const etag=sha(JSON.stringify(card));
     const common={path:candidate.path,distance:candidate.distance,
       ...(candidate.via?{via:candidate.via}:{}),etag};
@@ -101,8 +101,8 @@ export function buildContextSlice(index,{query,path,direction='both',depth=1,lim
       {...common,tier:'skeleton',skeleton:skeleton(card)},
       {...common,tier:'ref',reason:'budget'}
     ];
-    // For very small budgets prefer a compact rung over a one-card response.
-    if(!known.has(etag)&&maxChars<=1200){const full=variants.shift();variants.push(full);}
+    // For very small budgets prefer a compact skeleton rung before falling back to card or ref.
+    if(!known.has(etag)&&maxChars<=1200){const full=variants.shift();variants.splice(1,0,full);}
     let chosen=null;
     for(const item of variants){
       const more=i+1<queue.length;

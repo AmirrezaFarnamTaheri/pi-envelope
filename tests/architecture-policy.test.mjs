@@ -77,3 +77,17 @@ test('optional architecture CI gate reads a project-local manifest and exits non
  assert.equal(passing.status,0,passing.stderr);
  assert.equal(JSON.parse(passing.stdout).pass,true);
 });
+
+test('fan-in limit 1 reports a bounded sample and fails closed with two violators',t=>{
+ const {root,index}=fixture(t);
+ writeFileSync(join(root,'src','second.ts'),'import {database} from "./infra/db";export const second=database;\n');
+ writeFileSync(join(root,'src','third.ts'),'import {database} from "./infra/db";export const third=database;\n');
+ index.refresh();
+ const result=evaluateArchitecturePolicy(index,{maxIncomingFiles:1,relation:'imports',limit:1,requireComplete:true});
+ assert.equal(result.fanIn.knownViolations,1);
+ assert.equal(result.fanIn.potentiallyMore,true);
+ assert.equal(result.fanIn.truncated,true);
+ assert.equal(result.complete,false);
+ assert.equal(result.pass,false);
+ assert.ok(result.reasons.includes('fan-in-report-limit'));
+});

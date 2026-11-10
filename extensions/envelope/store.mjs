@@ -2,7 +2,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { createHash, randomUUID } from 'node:crypto';
 import {
-  chmodSync, closeSync, constants, existsSync, fstatSync, mkdirSync, openSync, readFileSync, renameSync,
+  chmodSync, closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync,
   rmSync, writeFileSync
 } from 'node:fs';
 import { join } from 'node:path';
@@ -52,7 +52,7 @@ function verifiedSearchExcerpt(text, words) {return previewAt(text,words).previe
 
 /** @param {string} query */
 function matchExpression(query) {
-  const words = String(query ?? '').match(SEARCH_TERM)?.slice(0, 8) || [];
+  const words = normalizedTerms(query ?? '').slice(0, 8);
   return words.map((word) => `"${word.replaceAll('"', '""')}"`).join(' AND ');
 }
 
@@ -85,13 +85,21 @@ export class OutputStore {
   /** @param {string} home */
   constructor(home) {
     if (!home || typeof home !== 'string') throw new TypeError('store home path required');
+    if (lstatSync(home, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error('store home may not be a symlink');
     this.home = home;
     this.objects = join(home, 'objects');
+    if (lstatSync(this.objects, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error('store objects directory may not be a symlink');
     mkdirSync(this.objects, { recursive: true, mode: 0o700 });
+    chmodSync(this.home, 0o700);
+    chmodSync(this.objects, 0o700);
     const dbPath = join(home, 'index.sqlite');
+    const existingDb = lstatSync(dbPath, { throwIfNoEntry: false });
+    if (existingDb && (!existingDb.isFile() || existingDb.isSymbolicLink())) throw new Error('store index database may not be a symlink');
     this.db = new DatabaseSync(dbPath);
     chmodSync(dbPath, 0o600);
     this.db.exec(`
+      PRAGMA busy_timeout=2500;
+      PRAGMA journal_mode=WAL;
       PRAGMA foreign_keys=ON;
       PRAGMA secure_delete=ON;
       CREATE TABLE IF NOT EXISTS outputs (
@@ -111,6 +119,9 @@ export class OutputStore {
     this.lookup = this.db.prepare('SELECT id, project, tool, command, bytes, created_at FROM outputs WHERE id = ?');
     this.insertMeta = this.db.prepare(
       'INSERT OR IGNORE INTO outputs (id, project, tool, command, bytes, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    );
+    this.touchMeta = this.db.prepare(
+      'UPDATE outputs SET created_at = ?, tool = ?, command = ? WHERE id = ? AND project = ?'
     );
     this.insertSearch = this.db.prepare(
       'INSERT INTO outputs_fts (id, project, tool, command, text) VALUES (?, ?, ?, ?, ?)'
@@ -240,9 +251,19 @@ export class OutputStore {
     this.db.exec('BEGIN IMMEDIATE');
     try {
       if(data.historical && this.isErased(id,project))throw new Error('historical output was erased');
+      const existing = this.lookup.get(id);
       const inserted = this.insertMeta.run(id, project, tool, command, bytes, createdAt);
       if(!data.historical && this.erasureAvailable)this.erasureClear.run(id,project);
-      if (inserted.changes) this.insertSearch.run(id, project, tool, command, data.text);
+      if (inserted.changes) {
+        this.insertSearch.run(id, project, tool, command, data.text);
+      } else if (!data.historical) {
+        const nextCommand = command || existing?.command || '';
+        this.touchMeta.run(createdAt, tool, nextCommand, id, project);
+        if (existing && (existing.command !== nextCommand || existing.tool !== tool)) {
+          this.deleteIndex.run(id, project);
+          this.insertSearch.run(id, project, tool, nextCommand, data.text);
+        }
+      }
       this.db.exec('COMMIT');
     } catch (error) {
       this.db.exec('ROLLBACK');
@@ -286,9 +307,17 @@ export class OutputStore {
       let original;
       try {original=this.retrieve(row.id);}catch{integritySkipped++;continue;}
       if(original?.project!==project){integritySkipped++;continue;}
-      const sourceWords=new Set(normalizedTerms(original.text));
+      const sourceWords=new Set([
+        ...normalizedTerms(original.text),
+        ...normalizedTerms(original.command),
+        ...normalizedTerms(original.tool)
+      ]);
       if(!words.every(w=>sourceWords.has(w))){integritySkipped++;continue;}
-      const excerpt=verifiedSearchExcerpt(original.text,words);
+      // Metadata-only matches are not body snippets. Do not leak command argv
+      // (which may carry secrets), or display an unrelated source prefix.
+      const bodyWords=new Set(normalizedTerms(original.text));
+      const excerpt=words.every(w=>bodyWords.has(w))?
+        verifiedSearchExcerpt(original.text,words):'[metadata match: command/tool]';
       hits.push({...row,excerpt});
       if(hits.length>=limit)break;
     }
@@ -304,7 +333,7 @@ export class OutputStore {
 
   /** Deletes metadata and FTS rows as one SQLite transaction. The object file is
    * removed afterwards; an interrupted process may leave an unindexed file. */
-  deleteRecords(ids, project) {
+  deleteRecords(ids, project, { skipId = null } = {}) {
     if (this.closed) throw new Error('store is closed');
     if (typeof project !== 'string' || !project) throw new TypeError('project scope is required');
     if(!this.erasureAvailable)throw new Error('durable erasure protection unavailable');
@@ -313,6 +342,7 @@ export class OutputStore {
     try {
       for (const id of ids) {
         if (!ID.test(id)) throw new TypeError('invalid output identifier');
+        if (skipId && id === skipId) continue;
         const row = this.lookup.get(id);
         if (!row || row.project !== project) continue;
         if(this.chunkAvailable){this.chunkDelete.run(id);this.chunkStateDelete.run(id, project);}
@@ -336,7 +366,7 @@ export class OutputStore {
 
   /** Bounded cleanup; caller must repeatedly invoke this while hasMore is true.
    * before is an explicit ISO 8601 UTC cutoff, not a search query. */
-  prune({project, before, limit=100} = {}) {
+  prune({project, before, limit=100, skipId=null} = {}) {
     if (typeof project !== 'string' || !project) throw new TypeError('project scope is required');
     if (typeof before !== 'string' || !Number.isFinite(Date.parse(before)) || new Date(before).toISOString() !== before) {
       throw new TypeError('before must be a UTC ISO 8601 date');
@@ -344,7 +374,7 @@ export class OutputStore {
     if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new RangeError('limit must be 1..100');
     if (this.closed) throw new Error('store is closed');
     const rows = this.findOld.all(project, before, limit+1);
-    const deleted = this.deleteRecords(rows.slice(0,limit).map(row=>row.id),project);
+    const deleted = this.deleteRecords(rows.slice(0,limit).map(row=>row.id), project, { skipId });
     return {deleted, hasMore:rows.length > limit};
   }
 

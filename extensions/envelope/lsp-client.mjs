@@ -1,7 +1,7 @@
 /** Bounded, one-shot LSP/JSON-RPC client. No server autodetection or shell. */
 import { spawn } from 'node:child_process';
 import { resolve, relative, isAbsolute, basename } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 
 const MAX_MESSAGE_BYTES=4_000_000;
 const MAX_HEADER_BYTES=8192;
@@ -118,7 +118,7 @@ export class StdioLspSession {
   async initialize(){
     const result=await this.request('initialize',{
       processId:process.pid,rootUri:pathToFileURL(this.root).href,rootPath:this.root,
-      capabilities:{textDocument:{diagnostic:{},rename:{prepareSupport:false}},workspace:{workspaceEdit:{documentChanges:true}}},
+      capabilities:{textDocument:{diagnostic:{},rename:{prepareSupport:false},definition:{linkSupport:true},references:{}},workspace:{workspaceEdit:{documentChanges:true}}},
       workspaceFolders:[{uri:pathToFileURL(this.root).href,name:basename(this.root)}],trace:'off'
     });
     if(!result?.capabilities||typeof result.capabilities!=='object')throw protocolError('invalid initialize result');
@@ -127,9 +127,14 @@ export class StdioLspSession {
   }
   async open(path,text){
     if(typeof text!=='string'||Buffer.byteLength(text)>512_000)throw new Error('LSP file is too large');
-    const uri=this.uri(path);this.opened.set(uri,1);this.published.delete(uri);
+    const uri=this.uri(path);
+    const nextVersion=(this.opened.get(uri)||0)+1;
+    if(this.opened.has(uri)){
+      this.send({jsonrpc:'2.0',method:'textDocument/didClose',params:{textDocument:{uri}}});
+    }
+    this.opened.set(uri,nextVersion);this.published.delete(uri);
     const languageId=lspLanguageId(path);
-    this.send({jsonrpc:'2.0',method:'textDocument/didOpen',params:{textDocument:{uri,languageId,version:1,text}}});
+    this.send({jsonrpc:'2.0',method:'textDocument/didOpen',params:{textDocument:{uri,languageId,version:nextVersion,text}}});
   }
   async diagnostics(path){
     const uri=this.uri(path);
@@ -151,6 +156,41 @@ export class StdioLspSession {
     });
     if(!data)return {status:'unverified',reason:'LSP did not publish diagnostics for this document'};
     return {status:'verified',source:'push',diagnostics:data.diagnostics};
+  }
+  /** Query a configured LSP for local definitions or references; no semantic claim beyond the response. */
+  async locations(kind,path,line,column){
+    if(kind!=='definition'&&kind!=='references')throw new Error('Unsupported LSP navigation kind');
+    if(!Number.isInteger(line)||!Number.isInteger(column)||line<1||column<1)throw new Error('LSP navigation requires one-based positive coordinates');
+    const uri=this.uri(path);
+    if(!this.opened.has(uri))throw new Error('LSP document not open');
+    if(!(kind==='definition'?this.capabilities.definitionProvider:this.capabilities.referencesProvider))
+      return {status:'unverified',reason:'LSP server does not advertise '+kind+' support',locations:[]};
+    const method=kind==='definition'?'textDocument/definition':'textDocument/references';
+    let raw;
+    try{raw=await this.request(method,{textDocument:{uri},position:{line:line-1,character:column-1},
+      ...(kind==='references'?{context:{includeDeclaration:true}}:{})});}
+    catch{return {status:'unverified',reason:'LSP navigation request failed or timed out',locations:[]};}
+    const items=raw===null?[]:Array.isArray(raw)?raw:[raw];
+    if(items.length>256)return {status:'unverified',reason:'LSP navigation exceeded the 256-location input cap',locations:[]};
+    const locations=[];
+    for(const item of items){
+      const target=item?.targetUri??item?.uri;
+      const range=item?.targetSelectionRange??item?.range??item?.targetRange;
+      if(typeof target!=='string'||!target.startsWith('file:')||!range?.start||!range?.end)
+        return {status:'unverified',reason:'LSP returned an invalid or non-file location',locations:[]};
+      const points=[range.start,range.end];
+      if(points.some(p=>!Number.isInteger(p.line)||!Number.isInteger(p.character)||p.line<0||p.character<0)
+        ||range.end.line<range.start.line||(range.end.line===range.start.line&&range.end.character<range.start.character))
+        return {status:'unverified',reason:'LSP returned an invalid source range',locations:[]};
+      let absolute;
+      try{absolute=fileURLToPath(target);}catch{return {status:'unverified',reason:'LSP returned an invalid source URI',locations:[]};}
+      if(!inside(this.root,absolute))
+        return {status:'unverified',reason:'LSP returned a location outside the project root',locations:[]};
+      locations.push({uri:target,range});
+    }
+    const truncated=locations.length>64;
+    return {status:truncated?'partial':'verified',locations:locations.slice(0,64),
+      ...(truncated?{reason:'LSP navigation capped at 64 returned locations'}:{})};
   }
   async rename(path,line,column,newName){
     if(!this.capabilities.renameProvider)throw new Error('LSP server does not advertise rename support');

@@ -106,3 +106,13 @@ test('unrelated stale files do not poison attested compiler evidence for selecte
  const r=inspectTypedSource(f.index,{action:'diagnostics',path:'src/entry.ts'});
  assert.equal(r.errors,0);assert.equal(r.filesLoaded,2);
 });
+
+test('bare package imports fail closed when package declarations are outside the restricted compiler host',t=>{
+ const f=fixture(t);
+ f.write('entry.ts',"import {thing} from 'unindexed-package';\nexport const answer=thing;\n");
+ f.index.refresh();
+ const r=inspectTypedSource(f.index,{action:'diagnostics',path:'src/entry.ts'});
+ assert.equal(r.complete,false);
+ assert.ok(r.reasons.includes('unresolved-compiler-module'),JSON.stringify(r));
+ assert.ok(r.diagnostics.some(d=>d.code===2307||d.code===2792),JSON.stringify(r));
+});

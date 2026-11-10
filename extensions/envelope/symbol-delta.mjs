@@ -26,15 +26,18 @@ function assertIndex(index){
   if(root!==index.root)throw new Error('project root changed since index construction');
   return root;
 }
+function isFunctionLikeScope(ts,node){
+  return Boolean(ts.isFunctionDeclaration?.(node)||ts.isMethodDeclaration?.(node)||ts.isConstructorDeclaration?.(node)||ts.isFunctionExpression?.(node)||ts.isArrowFunction?.(node)||ts.isGetAccessorDeclaration?.(node)||ts.isSetAccessorDeclaration?.(node));
+}
 function typeScriptNodes(index,source,path){
   const ts=index.ts;
   if(!ts?.createSourceFile)throw new Error('TypeScript AST unavailable for symbol delta');
   const ext=extname(path).toLowerCase();
-  const mode=['.tsx','.jsx'].includes(ext)?ts.ScriptKind.TSX:
+  const mode=ext==='.tsx'?ts.ScriptKind.TSX:ext==='.jsx'?(ts.ScriptKind.JSX??ts.ScriptKind.JS):
     ['.js','.mjs','.cjs'].includes(ext)?ts.ScriptKind.JS:ts.ScriptKind.TS;
   const sf=ts.createSourceFile(path,source,ts.ScriptTarget.Latest,true,mode);
   const nodes=[];
-  function visit(node,container=''){
+  function visit(node,container='',inFunction=false){
     let kind=null,name=null;
     if(ts.isFunctionDeclaration(node))kind='function';
     else if(ts.isClassDeclaration(node))kind='class';
@@ -43,16 +46,17 @@ function typeScriptNodes(index,source,path){
     else if(ts.isEnumDeclaration(node))kind='enum';
     else if(ts.isMethodDeclaration(node))kind='method';
     else if(ts.isConstructorDeclaration(node)){kind='constructor';name='constructor';}
-    else if(ts.isVariableDeclaration(node))kind='variable';
+    else if(!inFunction&&ts.isVariableDeclaration(node))kind='variable';
     if(!name&&kind&&node.name&&ts.isIdentifier(node.name))name=node.name.text;
     const next=(kind==='class'||kind==='interface')&&name?name:container;
+    const nextInFunction=inFunction||isFunctionLikeScope(ts,node);
     if(kind&&name){
       const point=sf.getLineAndCharacterOfPosition(node.getStart(sf));
       nodes.push({name,kind,container:(kind==='method'||kind==='constructor')?container:'',
         line:point.line+1,column:point.character+1,
         fingerprint:hash(source.slice(node.getStart(sf),node.getEnd()))});
     }
-    ts.forEachChild(node,child=>visit(child,next));
+    ts.forEachChild(node,child=>visit(child,next,nextInFunction));
   }
   visit(sf);
   return nodes;

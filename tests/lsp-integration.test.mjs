@@ -85,3 +85,45 @@ test('rename apply is blocked when a different affected file has LSP errors',asy
  assert.match(readFileSync(join(h.repo,'src','a.ts'),'utf8'),/function add/);
  assert.match(readFileSync(join(h.repo,'src','b.ts'),'utf8'),/result=add/);
 });
+
+
+test('namespaced LSP navigation returns source locations without modifying code',async t=>{
+ const h=fixture(t);
+ const before=readFileSync(join(h.repo,'src','a.ts'),'utf8');
+ const loc=body(await h.call('envelope_code_definition',{path:'src/a.ts',line:1,column:17}));
+ assert.equal(loc.verdict,'PASS');assert.equal(loc.locations[0].path,'src/a.ts');
+ assert.equal(loc.locations[0].line,1);
+ const refs=body(await h.call('envelope_code_references',{path:'src/a.ts',line:1,column:17}));
+ assert.equal(refs.verdict,'PASS');assert.deepEqual(refs.locations.map(l=>l.path),['src/a.ts','src/b.ts']);
+ assert.equal(readFileSync(join(h.repo,'src','a.ts'),'utf8'),before);
+});
+
+test('LSP navigation reports UNVERIFIED for missing servers, unsupported methods and out-of-root locations',async t=>{
+ const absent=fixture(t,{configured:false});
+ const missing=body(await absent.call('envelope_code_definition',{path:'src/a.ts',line:1,column:17}));
+ assert.equal(missing.verdict,'UNVERIFIED');
+ const unsupported=fixture(t,{mode:'nav-unsupported'});
+ assert.equal(body(await unsupported.call('envelope_code_references',{path:'src/a.ts',line:1,column:17})).verdict,'UNVERIFIED');
+ const foreign=fixture(t,{mode:'nav-outside'});
+ const result=body(await foreign.call('envelope_code_definition',{path:'src/a.ts',line:1,column:17}));
+ assert.equal(result.verdict,'UNVERIFIED');assert.deepEqual(result.locations,[]);
+});
+
+
+test('navigation never labels stale returned files as current indexed evidence',async t=>{
+ const h=fixture(t,{mode:'nav-stale'});
+ const result=body(await h.call('envelope_code_references',{path:'src/a.ts',line:1,column:17}));
+ assert.equal(result.verdict,'UNVERIFIED');
+ assert.deepEqual(result.locations,[]);
+ assert.match(result.reason,/changed|stale|hash|source/i);
+});
+
+test('rename opens all proposed files before validating cross-file diagnostics',async t=>{
+  const h=fixture(t,{mode:'cross-file-rename'});
+  const preview=body(await h.call('envelope_code_rename',req));
+  await h.command('code rename on');
+  const applied=await h.call('envelope_code_rename',{...req,apply:true,planId:preview.planId});
+  assert.equal(applied.isError,false,applied.content[0].text);
+  assert.equal(body(applied).applied,true);
+  h.extension.close();
+});

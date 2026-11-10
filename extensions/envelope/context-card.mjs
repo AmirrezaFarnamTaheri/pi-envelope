@@ -18,14 +18,19 @@ export function projectContextCard(index,{path,symbol,limit=8,includeSnippet=fal
  if(typeof includeSnippet!=='boolean')throw new TypeError('includeSnippet must be boolean');
  const source=readFileSync(join(index.root,key),'utf8');
  if(sha256(source)!==record.contentSha256)throw new Error('source changed since CodeIndex refresh; retry the query');
- const available=(record.symbols||[]).filter(s=>s.name===symbol||symbol===undefined);
+ const qualifiedName=s=>s.container?`${s.container}.${s.name}`:s.name;
+ const available=(record.symbols||[]).filter(s=>symbol===undefined||s.name===symbol||qualifiedName(s)===symbol);
  if(symbol&&!available.length)throw new Error('symbol not indexed at this path');
  const symbols=available.sort((a,b)=>a.line-b.line||a.name.localeCompare(b.name));
+ // A qualified method and a top-level function can share the same bare name.
+ // Retain only exact declaration identities, including the source line.
+ const callerMatches=x=>available.some(s=>x.caller?.name===qualifiedName(s)&&x.caller?.line===s.line);
+ const targetMatches=x=>available.some(s=>x.target?.path===key&&x.target?.name===s.name&&x.target?.line===s.line);
  const importerPaths=[...(index.importers.get(key)||[])].sort();
  const importPaths=[...(index.edges.get(key)||[])].sort();
- const outgoing=(index.callGraph?.outgoing.get(key)||[]).filter(x=>!symbol||x.caller?.name===symbol);
- const incoming=(index.callGraph?.incoming.get(key)||[]).filter(x=>!symbol||x.target?.name===symbol);
- const unresolved=(index.callGraph?.unresolved.get(key)||[]).filter(x=>!symbol||x.caller?.name===symbol);
+ const outgoing=(index.callGraph?.outgoing.get(key)||[]).filter(x=>!symbol||callerMatches(x));
+ const incoming=(index.callGraph?.incoming.get(key)||[]).filter(x=>!symbol||targetMatches(x));
+ const unresolved=(index.callGraph?.unresolved.get(key)||[]).filter(x=>!symbol||callerMatches(x));
  const reasons=[];
  if(record.diagnostics?.length)reasons.push('source-diagnostics');
  if(record.omittedCalls)reasons.push('call-fact-limit');

@@ -2,13 +2,14 @@
 
 This document is the current, user-facing release assessment. It replaces the historic execution plans and avoids retaining obsolete command and package examples.
 
-## v0.21.0 unmerged candidate: implemented locally
+## v0.22.0 candidate: implemented locally
 
 - Namespaced `pi-envelope` package, `envelope` command and `envelope_*` tools, `extensions/envelope` and `skills/envelope`. No `upper` command or extension is shipped.
 - Default-safe bash output compactor with exact recall, byte checks, durable FTS5 chunk search and bounded lexical/BM25 reciprocal-rank fusion, and optional retention/erasure, all project scoped. Raw output can contain secrets and no filesystem erasure claim covers backups/snapshots.
 - Manual checkpoints, reversible context projections and versioned, transactional replay blocks, conservative JS/TS/Python/Go code intelligence, optional Tree-sitter and LSP tools, preview-first rename.
 - Fingerprint-reviewed detached Git worktree child runner (opt-in); `isolated:false` rejected; git worktrees are not OS sandboxes.
 - Project-scoped numeric observability, offline benchmarks and commit-pinned static impact reports.
+- Default-off managed background command jobs with durable capped logs, status, cancellation, and an independently authorized read-only background agent session. Inline Pi remains the default. See [Managed jobs](MANAGED_JOBS.md) for permissions and limitations.
 
 ## Required before distributing as a bundled Pi release
 

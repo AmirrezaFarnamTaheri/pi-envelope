@@ -1,6 +1,6 @@
 /** Versioned, local settings. Independent of Tersio's existing mode state. */
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, lstatSync, statSync, realpathSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute } from 'node:path';
 
 export const DEFAULT_CONFIG = Object.freeze({
@@ -10,6 +10,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   context: Object.freeze({ enabled: false, minBytes: 2400, maxPreviewChars: 650, recentMessages: 8, minSavingsRatio: 0.4 }),
   code: Object.freeze({ enabled: true, languagesEnabled: false, treeEnabled: false, guardEnabled: false, renameEnabled: false, vectorEnabled: false, vectorExecutable: null, lspCommand: null, lspTimeoutMs: 3500 }),
   workflow: Object.freeze({ enabled: true, runEnabled: false }),
+  jobs: Object.freeze({ enabled: false, agentEnabled: false }),
   memory: Object.freeze({ enabled: false }),
   graphify: Object.freeze({ enabled: false, executable: null, timeoutMs: 30000, orientationEnabled: false }),
   graphifyDotnet: Object.freeze({ enabled: false, executable: null, timeoutMs: 30000 }),
@@ -33,6 +34,7 @@ export function normalizeConfig(raw = {}) {
   const context = source.context && typeof source.context === 'object' ? source.context : {};
   const code = source.code && typeof source.code === 'object' ? source.code : {};
   const workflow = source.workflow && typeof source.workflow === 'object' ? source.workflow : {};
+  const jobs = source.jobs && typeof source.jobs === 'object' ? source.jobs : {};
   const memory = source.memory && typeof source.memory === 'object' ? source.memory : {};
   const graphify = source.graphify && typeof source.graphify === 'object' && !Array.isArray(source.graphify) ? source.graphify : {};
   const graphifyDotnet = source.graphifyDotnet && typeof source.graphifyDotnet === 'object' && !Array.isArray(source.graphifyDotnet) ? source.graphifyDotnet : {};
@@ -66,6 +68,7 @@ export function normalizeConfig(raw = {}) {
       lspTimeoutMs: safeInteger(code.lspTimeoutMs, DEFAULT_CONFIG.code.lspTimeoutMs, 100, 10000)
     },
     workflow: { enabled: safeBoolean(workflow.enabled, DEFAULT_CONFIG.workflow.enabled), runEnabled: safeBoolean(workflow.runEnabled, DEFAULT_CONFIG.workflow.runEnabled) },
+    jobs: { enabled: safeBoolean(jobs.enabled, DEFAULT_CONFIG.jobs.enabled), agentEnabled: safeBoolean(jobs.agentEnabled, DEFAULT_CONFIG.jobs.agentEnabled) },
     memory: { enabled: safeBoolean(memory.enabled, DEFAULT_CONFIG.memory.enabled) },
     graphify: {
       enabled: safeBoolean(graphify.enabled, DEFAULT_CONFIG.graphify.enabled),
@@ -86,11 +89,36 @@ export function normalizeConfig(raw = {}) {
   };
 }
 
-function readSettingsRoot(path) {
+function readSettingsRoot(path, { strict = false } = {}) {
+  let text, linked=false;
   try {
-    const raw = JSON.parse(readFileSync(path, 'utf8'));
-    return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
-  } catch { return {}; }
+    const stat = lstatSync(path, { throwIfNoEntry: false });
+    if (!stat) return {};
+    linked=stat.isSymbolicLink();
+    const target=linked?statSync(path):stat;
+    if (!target.isFile()) {
+      if (strict||linked) throw new Error('settings path must resolve to a regular file');
+      return {};
+    }
+    text = readFileSync(path, 'utf8');
+  } catch (err) {
+    // A broken or unsafe link must not silently discard saved opt-in/opt-out
+    // policy. Ordinary missing nonlinked files still use safe defaults.
+    if (linked) throw new Error('settings symlink must resolve to an accessible regular file');
+    if (strict && err?.code !== 'ENOENT') throw err;
+    return {};
+  }
+  try {
+    const raw = JSON.parse(text);
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      if (strict || linked) throw new Error('existing settings.json root must be a JSON object');
+      return {};
+    }
+    return raw;
+  } catch (err) {
+    if (strict || linked) throw new Error(`refusing to overwrite malformed settings.json: ${err.message}`);
+    return {};
+  }
 }
 
 export function readConfig(path) {
@@ -101,14 +129,22 @@ export function readConfig(path) {
 
 export function saveConfig(path, config) {
   const normalized = normalizeConfig(config);
-  const previous = readSettingsRoot(path);
+  const previous = readSettingsRoot(path, { strict: true });
   const combined = { ...previous, envelope: normalized };
-  const folder = dirname(path);
+  // Write the resolved regular target of an explicitly configured symlink.
+  // Renaming the symlink itself would silently break dotfile-manager setups.
+  const linked=lstatSync(path,{throwIfNoEntry:false})?.isSymbolicLink()??false;
+  const destination=linked?realpathSync(path):path;
+  const folder = dirname(destination);
+  if (lstatSync(folder, { throwIfNoEntry: false })?.isSymbolicLink()) {
+    throw new Error('settings directory may not be a symlink');
+  }
   mkdirSync(folder, { recursive: true, mode: 0o700 });
-  const temp = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  if(!linked)chmodSync(folder, 0o700);
+  const temp = `${destination}.${process.pid}.${randomUUID()}.tmp`;
   try {
     writeFileSync(temp, `${JSON.stringify(combined, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
-    renameSync(temp, path);
+    renameSync(temp, destination);
   } finally { rmSync(temp, { force: true }); }
   return normalized;
 }

@@ -1,6 +1,8 @@
 # 16-source graph, memory and workflow integration audit
 
-**Audit date:** 2026-11-08. **Baseline:** Envelope v0.16.0 commit `0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64`. **Candidate:** v0.21.0 on the unmerged review stack.
+**Initial audit:** 2026-11-08. **Pinned-source refresh:** 2026-11-10. Three source heads were repinned after checking their reference paths: AxiomCodeGraph, TeaRAGs-MCP, and repo-harness (the last is now hosted at `aimpact-inc/repo-harness`). This updates provenance only, not functional parity.
+
+**Original audit date:** 2026-11-08. **Baseline:** Envelope v0.16.0 commit `0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64`. **Candidate:** v0.22.0 follow-up under review in PR #26 (not merged into main).
 
 The user supplied an assumption that licensing clearance will be resolved separately. It is not a legal opinion. This implementation uses independently written graph code; retain upstream attribution if later copying actual source.
 
@@ -19,11 +21,11 @@ The repositories represent distinct *engines*, *host adapters*, *watchers*, *vie
 | [crafter-station/graphify-visualizer](https://github.com/crafter-station/graphify-visualizer) (`15c67d7e5a3c`) | Obsidian bridge that embeds Graphify HTML, not a graph extractor | v0.21 bounded static SVG and Obsidian-safe Mermaid Markdown exports; no untrusted graph.html embedding or automatic vault writes |
 | [m4t0t0/cmd-mod-graphify](https://github.com/m4t0t0/cmd-mod-graphify) (`474ecaecbf18`) | CommandCode Graphify adapter with architecture exploration and god nodes | Native degree hubs/paths plus v0.21 static SVG/Obsidian export; no competing CommandCode host adapter |
 | [colbymchenry/codegraph](https://github.com/colbymchenry/codegraph) (`f72c9d2efb14`) | Rust/TS codegraph kernel, typed traversal, auto-sync, impact and agent tools | Typed native graph BFS plus v0.19 bounded Git co-change evidence; advanced multi-language backends later |
-| [AxiomCodeAI/axiomcodegraph](https://github.com/AxiomCodeAI/axiomcodegraph) (`29f7ecf05297`) | IR and formal-methods oriented call analysis with asserted links | Explicit uncertainty; no false proof claim; optional IR link adapters later |
+| [AxiomCodeAI/axiomcodegraph](https://github.com/AxiomCodeAI/axiomcodegraph) (`45ee8b1b9d42`) | IR and formal-methods oriented call analysis with asserted links | Explicit uncertainty; no false proof claim; optional IR link adapters later |
 | [GlitterKill/sdl-mcp](https://github.com/GlitterKill/sdl-mcp) (`2a20acbd283a`) | Symbol delta ledger, compact context cards, graph slices, memory and policies | Existing replay/FTS and graph plus v0.19 source-hash-verified context cards and opt-in notes; stacked delta candidate adds **session-only** source-verified TS/JS declaration fingerprints, bounded version-checked pages and static importer hints. New stacked slice candidate also adds exact/lexical task seeds, bounded static import neighborhoods, verified card/skeleton/ref rungs and conditional ETags; no independent SDL engine, persisted multi-version slice store, provider facts or semantic graph |
-| [Ancienttwo/repo-harness](https://github.com/Ancienttwo/repo-harness) (`6b3c8def0a5b`) | Repo-local task state, review proof, Pi hook bridge and capability contracts | Reuse Envelope workflow ledger; no second task scheduler |
+| [Ancienttwo/repo-harness (now aimpact-inc/repo-harness)](https://github.com/aimpact-inc/repo-harness) (`c2bfe28bf495`) | Repo-local task state, review proof, Pi hook bridge and capability contracts | Reuse Envelope workflow ledger; no second task scheduler |
 | [optave/ops-codegraph-tool](https://github.com/optave/ops-codegraph-tool) (`427c96f6da08`) | Dependency/impact graph, weak/semantic communities, boundaries, CI and co-change | v0.20 explicit native static boundary/fan-in policy and opt-in CI gate plus v0.19 Git co-change; no automatic policy activation |
-| [artk0de/TeaRAGs-MCP](https://github.com/artk0de/TeaRAGs-MCP) (`5ba0ac24a02d`) | Semantic retrieval, call graph, Git trajectory, architecture and naming lexicon | Existing FTS/calls, graph navigation, verified retrieval and Git/card evidence; new stacked co-edit review combines Git co-occurrence with direct static imports for explicitly advisory candidate detection. Embeddings/vector and full trajectory/architecture engines absent |
+| [artk0de/TeaRAGs-MCP](https://github.com/artk0de/TeaRAGs-MCP) (`c921c47d76c7`) | Semantic retrieval, call graph, Git trajectory, architecture and naming lexicon | Existing FTS/calls, graph navigation, verified retrieval and Git/card evidence; new stacked co-edit review combines Git co-occurrence with direct static imports for explicitly advisory candidate detection. Embeddings/vector and full trajectory/architecture engines absent |
 
 ## Architecture decisions
 

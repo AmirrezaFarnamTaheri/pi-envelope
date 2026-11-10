@@ -167,3 +167,10 @@ test('unresolved dynamic calls prevent claims of exhaustive call connectivity',t
  // Unresolved calls do not affect the separate static import relation.
  assert.equal(inspectCodeGraph(index,{action:'status',relation:'imports'}).complete,true);
 });
+
+test('graph hubs accept every schema-valid limit up to 100 without throwing',t=>{
+ const {index}=fixture(t,chain);
+ const out=inspectCodeGraph(index,{action:'hubs',relation:'imports',limit:100});
+ assert.equal(out.action,'hubs');
+ assert.ok(out.hubs.length<=100);
+});

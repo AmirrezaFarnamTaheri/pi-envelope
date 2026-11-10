@@ -26,7 +26,8 @@ const result = (value,isError=false) => ({
 const intProp = (description,min,max) => ({type:'integer',minimum:min,maximum:max,description});
 function schema(properties,required=[]) {return {type:'object',properties,required,additionalProperties:false};}
 
-export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>import('typescript'),observe,home,loadTreeRuntime,getTreeGrammarPath,watchGraphFactory,watchGraphStatus}={}) {
+/** Register bounded, source-index-backed code tools; vector watch state remains advisory and opt-in. */
+export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>import('typescript'),observe,home,loadTreeRuntime,getTreeGrammarPath,watchGraphFactory,watchGraphStatus,watchVectorStatus}={}) {
   const indices=new Map();
   const treeBrokers=new Map();
   const graphReaders=new Map();
@@ -37,7 +38,7 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
     persistentSymbolHistory??=new PersistentSymbolHistoryLedger(join(home,'envelope-symbol-history'));
     return persistentSymbolHistory;
   }
-  const versions=new GraphVersionStore(join(home||join(homedir(),'.pi'),'envelope-graph-versions'));
+  const versions=new GraphVersionStore(join(home||join(homedir(),'.tersio'),'envelope-graph-versions'));
   function graphReader(index) {
     if(!graphReaders.has(index.root))graphReaders.set(index.root,new ExternalGraphReader(index.root,{...(watchGraphFactory?{watchFactory:watchGraphFactory}:{})}));
     return graphReaders.get(index.root);
@@ -166,11 +167,14 @@ export function registerCodeFeature(pi,{project,getConfig,loadCompiler=()=>impor
       maxChars:intProp('Maximum JSON output bytes 900-16000',900,16000)}),
     (index,params)=>{
       const action=params.action||'status';
+      const watch=watchVectorStatus?.(index.root);
       if(action==='status')return {enabled:getConfig().code.vectorEnabled===true,
         artifact:'.envelope/embeddings.json',modelExecution:false,automaticNetwork:false,
+        ...(watch?{watch}:{}),
         note:'Manifest supplies external numeric vectors, not verified semantic quality.'};
       if(action!=='search')throw new TypeError('unsupported vector action');
       if(getConfig().code.vectorEnabled!==true)throw new Error('Local vector retrieval disabled; use /envelope code vectors on');
+      if(watch?.manualRebuildRequired)throw new Error('Embedding watch requires explicit manual sync; stale reads refused');
       return searchLocalVectors(index,params);
     });
   tool('envelope_code_versions','Envelope: Persistent Verified Graph Versions',

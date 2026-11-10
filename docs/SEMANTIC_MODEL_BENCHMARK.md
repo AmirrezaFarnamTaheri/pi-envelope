@@ -4,11 +4,11 @@ This evaluation runner is inspired by the local-retrieval and hybrid-search dire
 
 ## Prerequisites and invocation
 
-Use a trusted, operator-installed executable that implements the [existing local embedding JSON stdin/stdout protocol](LOCAL_EMBEDDING_RUNTIME.md): \`schema:1\`, \`embed-documents\` and \`embed-query\` tasks, self-declared \`model\`, \`dimensions\`, and matching vectors. Pin model weights and tokenizer hashes separately; the executable-provided model string cannot prove which model actually ran. The launcher forwards no provider secrets and requests offline operation, but **cannot enforce network isolation**. Choose your own offline model and use operating-system network controls when needed.
+Use a trusted, operator-installed executable that implements the [existing local embedding JSON stdin/stdout protocol](LOCAL_EMBEDDING_RUNTIME.md): `schema:1`, `embed-documents` and `embed-query` tasks, self-declared `model`, `dimensions`, and matching vectors. Pin model weights and tokenizer hashes separately; the executable-provided model string cannot prove which model actually ran. The launcher forwards no provider secrets and requests offline operation, but **cannot enforce network isolation**. Choose your own offline model and use operating-system network controls when needed.
 
 Prepare a held-out JSON fixture with at least two source documents and independently judged relevance labels:
 
-\`\`\`json
+```json
 {
   "schema": 1,
   "documents": [
@@ -20,11 +20,11 @@ Prepare a held-out JSON fixture with at least two source documents and independe
     {"id":"database-save","text":"database record","relevant":["src/store.ts"]}
   ]
 }
-\`\`\`
+```
 
-\`\`\`sh
+```sh
 npm run benchmark:semantic -- --dataset /absolute/corpus.json --encoder /absolute/trusted-local-encoder --k 5
-\`\`\`
+```
 
 The runner validates bounded paths, files, labels and per-query limits; copies only the explicitly supplied source fixture into an owner-private temporary project; uses **one shared CodeIndex**, the regular source-hash-verified vector manifest, and one invocation of the encoder for source documents plus one for each query; compares vector-only, hybrid and lexical rankings. Temporary source bytes and vector manifests are removed on completion. It returns aggregate **hit@k**, **recall@k**, **MRR@k**, document/query counts, an input SHA-256, the self-reported model label and measured process elapsed time. It omits source bodies, full query strings and vectors from the JSON output.
 

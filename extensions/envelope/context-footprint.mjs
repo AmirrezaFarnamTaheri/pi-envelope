@@ -1,6 +1,6 @@
 /** Read-only, privacy-preserving size accounting for Pi's exposed prompt inputs.
  * No injected content is returned, logged, persisted or modified. */
-const bytes=(value)=>typeof value==='string'?Buffer.byteLength(value):0;
+const bytes=(value)=>typeof value==='string'?Buffer.byteLength(value):Array.isArray(value)?value.reduce((n,item)=>n+(typeof item==='string'?Buffer.byteLength(item):typeof item?.text==='string'?Buffer.byteLength(item.text):0),0):0;
 const count=(value)=>Array.isArray(value)?value.length:0;
 
 export function contextFootprint(ctx){

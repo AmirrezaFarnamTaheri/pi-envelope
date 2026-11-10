@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -17,7 +17,7 @@ function editsFor(file){let text;try{text=readFileSync(join(process.cwd(),file),
 function onMessage(msg){
  if(msg.method==='initialize'){
    if(mode==='hang-init')return;
-   reply(msg.id,{capabilities:{renameProvider:true,...(['push','push-stale'].includes(mode)?{}:{diagnosticProvider:{interFileDependencies:false,workspaceDiagnostics:false}})}});return;
+   reply(msg.id,{capabilities:{renameProvider:true,definitionProvider:mode!=='nav-unsupported',referencesProvider:mode!=='nav-unsupported',...(['push','push-stale'].includes(mode)?{}:{diagnosticProvider:{interFileDependencies:false,workspaceDiagnostics:false}})}});return;
  }
  if(msg.method==='initialized')return;
  if(msg.method==='textDocument/didOpen'){
@@ -28,10 +28,30 @@ function onMessage(msg){
  if(msg.method==='textDocument/diagnostic'){
    if(mode==='hang-diagnostics')return;
    if(mode==='unchanged')return reply(msg.id,{kind:'unchanged',resultId:'none'});
-   let items=mode==='errors'||(mode==='errors-in-b'&&msg.params.textDocument.uri.endsWith('/b.ts'))?[{range:{start:{line:0,character:1},end:{line:0,character:4}},severity:1,code:'TS999',message:'Example error'}]:[];
+   const docText=opened.get(msg.params.textDocument.uri)?.text||'';
+   if(mode==='cross-file-rename'&&msg.params.textDocument.uri.endsWith('/a.ts')){
+     // Real servers see all unsaved workspace documents, not only the queried file.
+     const dependent=[...opened.values()].find(doc=>doc.uri.endsWith('/b.ts'));
+     if(!dependent?.text.includes('multiply'))return reply(msg.id,{kind:'full',items:[{
+       range:{start:{line:0,character:0},end:{line:0,character:3}},severity:1,
+       code:'TS2305',message:'Dependent source has not been updated'
+     }]});
+   }
+   let items=mode==='errors'||(mode==='errors-in-b'&&msg.params.textDocument.uri.endsWith('/b.ts'))||(mode==='error-after-rename'&&docText.includes('multiply'))?[{range:{start:{line:0,character:1},end:{line:0,character:4}},severity:1,code:'TS999',message:'Post-rename error'}]:[];
    if(mode==='infra')items=[1,2,3].map(n=>({range:{start:{line:0,character:n},end:{line:0,character:n+1}},severity:1,message:'Cannot find module dependency'}));
    if(mode==='bad-range')items=[{severity:1,message:'bad range'}];
    return reply(msg.id,{kind:'full',items,...(mode==='related'?{relatedDocuments:{'file:///other.ts':{kind:'full',items:[]}}}:{})});
+ }
+ if(msg.method==='textDocument/definition'||msg.method==='textDocument/references'){
+   if(mode==='nav-unsupported')return reply(msg.id,null);
+   if(mode==='nav-stale')writeFileSync(join(process.cwd(),'src','b.ts'),'export const replacement=42;\n');
+   const a=pathToFileURL(join(process.cwd(),'src','a.ts')).href;
+   const b=pathToFileURL(join(process.cwd(),'src','b.ts')).href;
+   const outside=pathToFileURL(join(process.cwd(),'..','private.ts')).href;
+   const location=(uri,line,character)=>({uri,range:{start:{line,character},end:{line,character:character+3}}});
+   const result=mode==='nav-outside'?[location(outside,0,0)]:
+     msg.method==='textDocument/references'?[location(a,0,16),location(b,1,20)]:[location(a,0,16)];
+   return reply(msg.id,result);
  }
  if(msg.method==='textDocument/rename'){
    if(mode==='hang-rename')return;

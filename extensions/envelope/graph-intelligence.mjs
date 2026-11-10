@@ -53,6 +53,8 @@ function nativeGraph(index,relation){
   const reasons=[];
   if(omitted)reasons.push('graph-edge-limit');
   if(index.lastRefresh?.unavailable?.length)reasons.push('parser-unavailable');
+  if(index.lastRefresh?.discoveryTruncated)reasons.push('discovery-truncated');
+  if(index.lastRefresh?.discoveryReadErrors)reasons.push('discovery-read-errors');
   if(index.lastRefresh?.files>=index.maxFiles)reasons.push('index-file-limit-may-be-reached');
   if(relation!=='imports'&&index.callGraph?.omittedCalls)reasons.push('call-fact-limit');
   if(relation!=='imports'&&index.callGraph?.unresolvedCalls)reasons.push('unresolved-call-sites');
@@ -144,14 +146,16 @@ function neighbors(index,graph,args){
     truncated:found.length>limit,complete:graph.reasons.length===0,reasons:graph.reasons};
 }
 function hubs(graph,args){
-  const limit=boundedInteger(args.limit,12,1,30,'limit');
+  const limit=boundedInteger(args.limit,12,1,100,'limit');
   const numbers=new Map(graph.nodes.map(path=>[path,{path,incomingFiles:0,outgoingFiles:0,callSitesIn:0,callSitesOut:0,importsIn:0,importsOut:0}]));
   const inbound=new Map(graph.nodes.map(path=>[path,new Set()]));
   const outbound=new Map(graph.nodes.map(path=>[path,new Set()]));
   for(const edge of graph.edges){
     if(!numbers.has(edge.source)||!numbers.has(edge.target))continue;
-    inbound.get(edge.target).add(edge.source);
-    outbound.get(edge.source).add(edge.target);
+    if(edge.source!==edge.target){
+      inbound.get(edge.target).add(edge.source);
+      outbound.get(edge.source).add(edge.target);
+    }
     numbers.get(edge.target)[edge.type==='imports'?'importsIn':'callSitesIn']+=edge.sites;
     numbers.get(edge.source)[edge.type==='imports'?'importsOut':'callSitesOut']+=edge.sites;
   }

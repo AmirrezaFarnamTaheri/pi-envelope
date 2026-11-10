@@ -55,6 +55,9 @@ function checkScopeEqual(saved,current){
     saved.maxFiles!==current.maxFiles||saved.maxBytesPerFile!==current.maxBytesPerFile)
    throw new Error('embedding indexing scope mismatch; explicit replace required');
 }
+function ensureNotCancelled(signal){
+ if(signal?.aborted)throw new Error('embedding operation cancelled');
+}
 function checkedEncoder(executable,root){
  if(typeof executable!=='string'||!isAbsolute(executable)||executable.length>1024||/[\u0000-\u001f\u007f]/.test(executable))throw new Error('pinned absolute encoder executable required');
  let file,st;
@@ -263,6 +266,7 @@ export class LocalEmbeddingRuntime {
   const root=rootOf(index),binary=checkedEncoder(executable,root);
   if(typeof replace!=='boolean')throw new TypeError('replace must be boolean');
   if(!Number.isInteger(timeoutMs)||timeoutMs<50||timeoutMs>120000)throw new RangeError('invalid encoder timeout');
+  ensureNotCancelled(signal);
   const target=privateManifestPath(root,{create:false});
   if(existsSync(target)&&!replace)throw new Error('embeddings manifest already exists; explicit replace required');
   if(this.activeRoots.has(root))throw new Error('embedding build already running for project');
@@ -277,18 +281,42 @@ export class LocalEmbeddingRuntime {
    const payload={...outputResponse(response,provenance),indexScope:scope};
    checkUnchanged(index,root,provenance);
    checkScopeEqual(scope,checkedIndexScope(index));
+   ensureNotCancelled(signal);
    const result=writeManifest(root,payload,{replace,expectedManifestHash});
    return {created:true,replaced:oldExists,files:provenance.length,model:payload.model,dimensions:payload.dimensions,
     manifestHash:result.manifestHash,verifiedSourceBytes:verifiedBytes,truncatedTexts,
     notes:'Vectors originate from the operator-pinned executable. Offline settings do not sandbox the trusted encoder; retrieval quality is unmeasured.'};
   });}finally{this.activeRoots.delete(root);}
  }
+ /** Read-only preflight for explicit, consented session-scoped sync watching.
+  * Never executes an encoder, creates a manifest, repairs a stale source or
+  * silently accepts a changed/deleted or previously unindexed source.
+  */
+ inspect(index,{executable}={}){
+  const root=rootOf(index);
+  checkedEncoder(executable,root);
+  const scope=checkedIndexScope(index);
+  const {data,manifestHash}=readManifest(root);
+  checkScopeEqual(data.indexScope,scope);
+  const {provenance,verifiedBytes,truncatedTexts}=readSource(index,root,{include:()=>false});
+  const old=new Map(data.entries.map(row=>[row.path,row.sha256]));
+  if(old.size!==provenance.length||provenance.some(({path,sha256})=>old.get(path)!==sha256))
+    throw new Error('embedding watch requires a current verified manifest; run manual vectors sync first');
+  checkUnchanged(index,root,provenance);
+  checkScopeEqual(scope,checkedIndexScope(index));
+  return {ready:true,files:provenance.length,model:data.model,
+    dimensions:data.dimensions,manifestHash,verifiedSourceBytes:verifiedBytes,truncatedTexts,
+    notes:'Read-only watch preflight; no model executed. External encoder still requires explicit session consent.'};
+ }
+
  async sync(index,{executable,timeoutMs=30000,signal}={}){
   const root=rootOf(index),binary=checkedEncoder(executable,root);
   if(!Number.isInteger(timeoutMs)||timeoutMs<50||timeoutMs>120000)throw new RangeError('invalid encoder timeout');
+  ensureNotCancelled(signal);
   if(this.activeRoots.has(root))throw new Error('embedding operation already running for project');
   this.activeRoots.add(root);
   try{return await withManifestWriter(root,async()=>{
+   ensureNotCancelled(signal);
    const scope=checkedIndexScope(index);
    const {data:previous,manifestHash:expectedManifestHash}=readManifest(root);
    checkScopeEqual(previous.indexScope,scope);
@@ -305,6 +333,7 @@ export class LocalEmbeddingRuntime {
    if(!changedProvenance.length&&!removed){
      checkUnchanged(index,root,provenance);
      checkScopeEqual(scope,checkedIndexScope(index));
+     ensureNotCancelled(signal);
      return {unchanged:true,files:provenance.length,embedded:0,reused,removed:0,
        model:previous.model,dimensions:previous.dimensions,manifestHash:expectedManifestHash,
        verifiedSourceBytes:verifiedBytes,truncatedTexts,
@@ -320,9 +349,11 @@ export class LocalEmbeddingRuntime {
    }
    checkUnchanged(index,root,provenance);
    checkScopeEqual(scope,checkedIndexScope(index));
+   ensureNotCancelled(signal);
    const entries=provenance.map(({path})=>updates.get(path)||prior.get(path));
    if(entries.some(row=>!row))throw new Error('incomplete embeddings sync manifest');
    const payload={schema:1,model:previous.model,dimensions:previous.dimensions,entries,indexScope:scope};
+   ensureNotCancelled(signal);
    const written=writeManifest(root,payload,{replace:true,expectedManifestHash});
    return {unchanged:false,files:provenance.length,embedded:changedProvenance.length,reused,removed,
      model:payload.model,dimensions:payload.dimensions,manifestHash:written.manifestHash,

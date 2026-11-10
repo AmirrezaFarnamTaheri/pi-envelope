@@ -12,6 +12,26 @@ const SHA=/^[a-f0-9]{64}$/;
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const hash=(bytes)=>createHash('sha256').update(bytes).digest('hex');
 const projectKey=(project)=>hash(realpathSync(project));
+function clampUtf8(text,maxBytes){
+  const chars=Array.from(String(text??'').replace(/[\r\n\u0000-\u001f\u007f]/gu,' ').replace(/\s+/gu,' ').trim());
+  let out='',used=0;
+  for(const ch of chars){
+    const b=Buffer.byteLength(ch,'utf8');
+    if(used+b>maxBytes)break;
+    out+=ch;used+=b;
+  }
+  return out.trim();
+}
+function extractMarkdownTitle(body,fallback){
+  let fenced=false;
+  for(const line of String(body).split(/\r?\n/)){
+    if(/^\s*(?:```|~~~)/.test(line)){fenced=!fenced;continue;}
+    if(fenced)continue;
+    const m=/^#\s+(.+)$/.exec(line);
+    if(m){const candidate=clampUtf8(m[1],160);if(candidate)return candidate;}
+  }
+  return clampUtf8(fallback,160)||'Untitled';
+}
 function textField(value,label,max){
   if(typeof value!=='string'||!value.trim()||Buffer.byteLength(value)>max||(label==='title'&&/[\r\n]/.test(value))||/[\u0000-\u001f\u007f]/u.test(value.replaceAll('\n','').replaceAll('\t','')))
     throw new TypeError(`${label} must be nonempty, valid, and within ${max} bytes`);
@@ -67,7 +87,7 @@ export class ProjectMemory {
       chmodSync(path,0o600);
       const version=this.db.prepare('PRAGMA user_version').get().user_version;
       if(version!==0&&version!==VERSION)throw new Error('unsupported memory schema version');
-      this.db.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;');
+      this.db.exec('PRAGMA busy_timeout=2500; PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;');
       if(version===0){this.db.exec(`BEGIN IMMEDIATE;
         CREATE TABLE IF NOT EXISTS notes (id TEXT PRIMARY KEY,scope TEXT NOT NULL,kind TEXT NOT NULL,title TEXT NOT NULL,
           body TEXT NOT NULL,tags TEXT NOT NULL,source_path TEXT,source_sha TEXT,created_at TEXT NOT NULL);
@@ -103,7 +123,7 @@ export class ProjectMemory {
     textField(body,'body',MAX_BODY);
     const scope=projectKey(project),sha=hash(bytes),old=this.imported.get(scope,path,sha);
     if(old)return {id:old.id,added:false};
-    const title=/^#\s+(.+)$/m.exec(body)?.[1]?.trim()||basename(path,'.md');
+    const title=extractMarkdownTitle(body,basename(path,'.md'));
     return {...this.save(project,{kind:'reference',title,body,sourcePath:path,sourceSha:sha}),added:true};
   }
   /** Explicit Claude Code JSONL fact import; no automatic hook, no raw tool
@@ -130,10 +150,10 @@ export class ProjectMemory {
       const role=message.role||entry.type;
       const content=message.content;
       if(role==='user'){
-        const text=typeof content==='string'?content:
-          Array.isArray(content)?content.find(block=>block&&block.type==='text'&&typeof block.text==='string')?.text:null;
-        const value=clean(text);
-        if(value&&!value.startsWith('<')){
+        const candidates=typeof content==='string'?[content]:
+          Array.isArray(content)?content.filter(block=>block&&block.type==='text'&&typeof block.text==='string').map(b=>b.text):[];
+        const value=candidates.map(clean).find(v=>v&&!v.startsWith('<'))||'';
+        if(value){
           userMessages++;
           if(!firstPrompt)firstPrompt=Array.from(value).slice(0,280).join('');
         }
@@ -160,7 +180,7 @@ export class ProjectMemory {
       '## Counts',`User messages: ${userMessages}`,`Tool calls: ${toolCalls}`,
       '', `${Math.min(inputLines.length,600)} input lines examined${incomplete?' (incomplete session evidence; remaining lines omitted)':''}`,
       'Extracted mechanically from an explicitly selected local JSONL file. Commands and assistant bodies are deliberately not retained.'].join('\n');
-    return {...this.save(project,{kind:'reference',title:`Claude session: ${firstPrompt.slice(0,110)}`,
+    return {...this.save(project,{kind:'reference',title:clampUtf8(`Claude session: ${firstPrompt}`,160),
       body,sourcePath:path,sourceSha:sha,tags:['claude-code','session']}),added:true};
   }
   read(project,id){this.assertOpen();const note=this.single.get(projectKey(project),idField(id));return note?{...summary(note,project),body:note.body}:null;}
@@ -182,10 +202,10 @@ export class ProjectMemory {
       const title=normalize(note.title),body=normalize(note.body),tags=normalize(note.tags);
       if(!terms.every(t=>title.includes(t)||body.includes(t)||tags.includes(t)))continue;
       const score=terms.reduce((sum,t)=>sum+(title.includes(t)?4:0)+(tags.includes(t)?2:0)+(body.includes(t)?1:0),0);
-      scored.push({...summary(note,project),score});
+      scored.push({note,score});
     }
-    scored.sort((a,b)=>b.score-a.score||b.createdAt.localeCompare(a.createdAt)||a.id.localeCompare(b.id));
-    return {total:scored.length,truncated:scored.length>limit,hits:scored.slice(0,limit)};
+    scored.sort((a,b)=>b.score-a.score||b.note.created_at.localeCompare(a.note.created_at)||a.note.id.localeCompare(b.note.id));
+    return {total:scored.length,truncated:scored.length>limit,hits:scored.slice(0,limit).map(({note,score})=>({...summary(note,project),score}))};
   }
   forget(project,id){this.assertOpen();return this.delete.run(projectKey(project),idField(id)).changes===1;}
   exportMarkdown(project,id){const note=this.read(project,id);if(!note)throw new Error('memory note not found');

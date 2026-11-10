@@ -1,12 +1,12 @@
 /** Local-only, payload-free event accounting. This never replaces Tersio's own usage ledger. */
 import { createHash } from 'node:crypto';
-import { chmodSync, mkdirSync } from 'node:fs';
+import { chmodSync, lstatSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 const KINDS=new Set(['output_compaction','context_projection','model_usage','code_query','workflow_action','graphify_cli']);
 const ACTIONS={
-  code_query:new Set(['envelope_code_overview','envelope_code_languages','envelope_code_tree_status','envelope_code_tree_query','envelope_code_tree_capture','envelope_code_lookup','envelope_code_calls','envelope_code_impact','envelope_code_change_impact','envelope_code_verify','envelope_code_delta','envelope_code_symbol_history','envelope_code_slice','envelope_code_coupling','envelope_code_versions','envelope_code_vector','envelope_code_invariant','envelope_code_typecheck','envelope_code_go_types']),
+  code_query:new Set(['envelope_code_overview','envelope_code_graph','envelope_code_external_graph','envelope_code_history','envelope_code_context_card','envelope_code_retrieve','envelope_code_policy','envelope_code_languages','envelope_code_tree_status','envelope_code_tree_query','envelope_code_tree_capture','envelope_code_lookup','envelope_code_calls','envelope_code_impact','envelope_code_change_impact','envelope_code_verify','envelope_code_delta','envelope_code_symbol_history','envelope_code_slice','envelope_code_coupling','envelope_code_versions','envelope_code_vector','envelope_code_invariant','envelope_code_typecheck','envelope_code_go_types','envelope_code_lsp_verify','envelope_code_rename','envelope_code_definition','envelope_code_references']),
   graphify_cli:new Set(['status','query','path','explain','build','update']),
   workflow_action:new Set(['envelope_workflow_create','envelope_workflow_status','envelope_workflow_claim','envelope_workflow_finish','envelope_workflow_review','envelope_workflow_retry','envelope_workflow_events','envelope_workflow_handoff','envelope_workflow_run'])
 };
@@ -50,9 +50,12 @@ export class MetricsLedger {
     if(typeof now!=='function') throw new TypeError('now must be a function');
     if(!Number.isInteger(maxEvents)||maxEvents<1||maxEvents>100000) throw new TypeError('maxEvents must be 1-100000');
     if(!Number.isInteger(retentionDays)||retentionDays<1||retentionDays>365) throw new TypeError('retentionDays must be 1-365');
+    if(lstatSync(home,{throwIfNoEntry:false})?.isSymbolicLink()) throw new Error('metrics home may not be a symlink');
     this.now=now;this.maxEvents=maxEvents;this.retentionMs=retentionDays*86400000;
     mkdirSync(home,{recursive:true,mode:0o700});chmodSync(home,0o700);
     const filename=join(home,'envelope-metrics.sqlite');
+    const existing=lstatSync(filename,{throwIfNoEntry:false});
+    if(existing&&(!existing.isFile()||existing.isSymbolicLink())) throw new Error('metrics database may not be a symlink');
     this.db=new DatabaseSync(filename);chmodSync(filename,0o600);
     this.db.exec(`
       PRAGMA busy_timeout=2000;

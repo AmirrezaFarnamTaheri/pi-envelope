@@ -61,3 +61,12 @@ test('Pi tool exposes the card on the existing code API without another event ho
  assert.equal(JSON.parse(result.content[0].text).source.path,'src/a.ts');
  assert.equal(events.length,0);feat.close();
 });
+
+test('qualified method card excludes an unrelated top-level function of the same name',t=>{
+  const {index,put}=repo(t);
+  put('src/a.ts',`import {b} from "./b";\nexport class Service { run(){return b();} }\nexport function run(){return b();}\n`);
+  index.refresh();
+  const card=projectContextCard(index,{path:'src/a.ts',symbol:'Service.run'});
+  assert.deepEqual(card.symbols.map(x=>x.container),['Service']);
+  assert.equal(card.calls.totalOutgoing,1,JSON.stringify(card.calls));
+});

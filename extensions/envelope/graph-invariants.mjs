@@ -21,6 +21,8 @@ function load(index,maxNodes){
  }
  const reasons=[];
  if(index.lastRefresh?.unavailable?.length)reasons.push('parser-unavailable');
+ if(index.lastRefresh?.discoveryTruncated)reasons.push('discovery-truncated');
+ if(index.lastRefresh?.discoveryReadErrors)reasons.push('discovery-read-errors');
  if(index.files.size>=index.maxFiles)reasons.push('index-file-cap-possibly-reached');
  const version=sha(JSON.stringify(files.map(p=>[p,index.files.get(p).contentSha256,edges.get(p)])));
  return {ready:true,files,edges,version,reasons};
@@ -81,17 +83,28 @@ export function verifyGraphInvariant(index,{action='acyclic',source,target,maxNo
 }
 export function checkGraphCertificate(index,result){
  try{
-   if(!result||!['holds','violated'].includes(result.verdict)||!result.certificate)return false;
+   if(!result||!['holds','violated'].includes(result.verdict)||!result.certificate||typeof result.certificate!=='object')return false;
    const g=load(index,500);if(!g.ready||g.version!==result.version)return false;
-   const c=result.certificate;
-   if(c.cycle){return c.cycle.length>=2&&c.cycle[0]===c.cycle.at(-1)&&c.cycle.slice(0,-1).every((x,i)=>g.edges.get(x)?.includes(c.cycle[i+1]));}
-   if(c.order){
+   const c=result.certificate,keys=Object.keys(c);
+   if(keys.length!==1)return false;
+   if(result.property==='acyclic-static-file-imports'){
+     if(result.verdict==='violated'){
+       if(!Array.isArray(c.cycle))return false;
+       return c.cycle.length>=2&&c.cycle[0]===c.cycle.at(-1)&&c.cycle.slice(0,-1).every((x,i)=>g.edges.get(x)?.includes(c.cycle[i+1]));
+     }
+     if(!Array.isArray(c.order)||g.reasons.length>0||result.complete!==true)return false;
      if(c.order.length!==g.files.length||new Set(c.order).size!==g.files.length)return false;
      const position=new Map(c.order.map((p,i)=>[p,i]));
      return g.files.every(p=>position.has(p)&&g.edges.get(p).every(x=>position.get(x)<position.get(p)));
    }
-   if(c.path){return c.path[0]===result.source&&c.path.at(-1)===result.target&&c.path.slice(0,-1).every((p,i)=>g.edges.get(p)?.includes(c.path[i+1]));}
-   if(c.explored){
+   if(result.property==='reachable-in-static-file-imports'||result.property==='no-path-in-static-file-imports'){
+     const expectsPath=(result.property==='reachable-in-static-file-imports'&&result.verdict==='holds')||
+       (result.property==='no-path-in-static-file-imports'&&result.verdict==='violated');
+     if(expectsPath){
+       if(!Array.isArray(c.path)||!c.path.length)return false;
+       return c.path[0]===result.source&&c.path.at(-1)===result.target&&c.path.slice(0,-1).every((p,i)=>g.edges.get(p)?.includes(c.path[i+1]));
+     }
+     if(!Array.isArray(c.explored)||g.reasons.length>0||result.complete!==true)return false;
      const actual=reachable(g,result.source,result.target);
      return !actual.path&&JSON.stringify(actual.seen)===JSON.stringify(c.explored);
    }
