@@ -189,3 +189,12 @@ test('log cursors allow resumed bounded reading without losing or repeating byte
   assert.equal(tail.truncated,true);
   assert.equal(tail.text,'B'.repeat(100));
 });
+
+test('the launched command stays in the canonical project directory independent of the supervisor',async t=>{
+  const {a,jobs}=fixture(t);
+  const started=await jobs.start({project:a,command:process.execPath,
+    args:['-e','process.stdout.write(process.cwd())']});
+  const state=await jobs.wait(a,started.id,{timeoutMs:5000});
+  assert.equal(state.status,'completed',JSON.stringify(state));
+  assert.equal(jobs.logs(a,started.id).text,realpathSync(a));
+});
