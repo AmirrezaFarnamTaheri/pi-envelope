@@ -52,14 +52,14 @@ export function resolveTrustedNodeExecutable(project,{
  * Windows .cmd npm shims are not supported by shell:false: select a trusted
  * absolute .js/.mjs CLI entrypoint with ENVELOPE_PI_CLI_ENTRYPOINT instead.
  */
-export function resolveTrustedAgentCommand(project,{pathEnv=process.env.PATH||'',configured=process.env.ENVELOPE_PI_CLI_ENTRYPOINT||''}={}){
+export function resolveTrustedAgentCommand(project,{pathEnv=process.env.PATH||'',configured=process.env.ENVELOPE_PI_CLI_ENTRYPOINT||'',compiledBun=Boolean(process.versions.bun)}={}){
   const root=realpathSync(resolve(project));
   const choose=(entry,explicit)=>{
     if(!isAbsolute(entry)||inside(root,resolve(entry)))return null;
     let file,stat;
     try{file=realpathSync(entry);stat=statSync(file);}catch{return null;}
     if(!stat.isFile()||inside(root,file))return null;
-    if(/\.[cm]?js$/i.test(file))return {command:resolveTrustedNodeExecutable(root,{pathEnv}),prefix:[file]};
+    if(/\.[cm]?js$/i.test(file))return {command:resolveTrustedNodeExecutable(root,{pathEnv,compiledBun}),prefix:[file]};
     if(process.platform==='win32'){
       if(/\.exe$/i.test(file))return {command:file,prefix:[]};
       return null;
