@@ -165,3 +165,27 @@ test('job control never returns launch arguments to model responses, including a
   assert.doesNotMatch(status.content[0].text,/private-user-input-should-not-appear/);
   assert.match(JSON.parse((await tool.execute('job-logs',{action:'logs',jobId:id},undefined,undefined,ctx)).content[0].text).text,/OK/);
 });
+
+
+test('log cursors allow resumed bounded reading without losing or repeating bytes',async t=>{
+  const {a,jobs}=fixture(t);
+  const expected='A'.repeat(3500)+'B'.repeat(2800);
+  const started=await jobs.start({project:a,command:process.execPath,args:['-e','process.stdout.write("A".repeat(3500)+"B".repeat(2800))'],maxLogBytes:8000});
+  const status=await jobs.wait(a,started.id,{timeoutMs:5000});
+  assert.equal(status.status,'completed');
+  let offset=0,assembled='';
+  for(let i=0;i<5;i++){
+    const page=jobs.logs(a,started.id,{fromByte:offset,maxBytes:2048});
+    assert.equal(page.fromByte,offset);
+    assembled+=page.text;
+    offset=page.nextByte;
+    assert.ok(page.nextByte<=page.bytes);
+    if(page.remainingBytes===0)break;
+  }
+  assert.equal(assembled,expected);
+  assert.equal(offset,Buffer.byteLength(expected));
+  assert.equal(jobs.logs(a,started.id,{fromByte:offset,maxBytes:2048}).text,'');
+  const tail=jobs.logs(a,started.id,{maxBytes:100});
+  assert.equal(tail.truncated,true);
+  assert.equal(tail.text,'B'.repeat(100));
+});
