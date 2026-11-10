@@ -83,3 +83,12 @@ test('Pi whole-output search reports incomplete verification without exposing st
   assert.equal(found.details.searchCoverage.partial,true);
   assert.doesNotMatch(JSON.stringify(found),/success row 1/);
 });
+
+test('metadata-only match does not display an unrelated body prefix or disclose argv',t=>{
+ const store=fixture(t);
+ store.save({text:'unrelated captured body',project:'/repo/a',tool:'bash',command:'private-secret-needle'});
+ const hits=store.search('needle',{project:'/repo/a'});
+ assert.equal(hits.length,1);
+ assert.match(hits[0].excerpt,/metadata match/);
+ assert.doesNotMatch(hits[0].excerpt,/unrelated|private-secret-needle/);
+});

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, symlinkSync, chmodSync, utimesSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, symlinkSync, lstatSync, chmodSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
@@ -403,4 +403,5 @@ test('review: symlinked Tersio settings read and update the target without repla
   saveConfig(link,{jobs:{enabled:false,agentEnabled:false}});
   assert.equal(readConfig(target).jobs.enabled,false);
   assert.equal(readConfig(link).jobs.enabled,false);
+  assert.equal(lstatSync(link).isSymbolicLink(),true);
 });
