@@ -44,3 +44,31 @@ test('stale push version and related documents cannot produce verified clean rep
  const related=await withLspSession(opts(root,'related'),async s=>{await s.open('src/a.ts','x');return s.diagnostics('src/a.ts');});
  assert.equal(related.status,'unverified');
 });
+
+
+test('definition and references return bounded local source locations from an advertised LSP provider',async t=>{
+ const root=setup(t),text=readFileSync(join(root,'src','a.ts'),'utf8');
+ const result=await withLspSession(opts(root),async s=>{
+   await s.open('src/a.ts',text);
+   return {definition:await s.locations('definition','src/a.ts',1,17),
+     references:await s.locations('references','src/a.ts',1,17)};
+ });
+ assert.equal(result.definition.status,'verified');
+ assert.equal(result.definition.locations.length,1);
+ assert.equal(result.references.status,'verified');
+ assert.equal(result.references.locations.length,2);
+ assert.equal(result.definition.locations[0].range.start.line,0);
+});
+
+test('unsupported or foreign LSP navigation remains unverified rather than implying a complete graph',async t=>{
+ const root=setup(t),text=readFileSync(join(root,'src','a.ts'),'utf8');
+ const unsupported=await withLspSession(opts(root,'nav-unsupported'),async s=>{
+   await s.open('src/a.ts',text);return s.locations('references','src/a.ts',1,17);
+ });
+ assert.equal(unsupported.status,'unverified');
+ const foreign=await withLspSession(opts(root,'nav-outside'),async s=>{
+   await s.open('src/a.ts',text);return s.locations('definition','src/a.ts',1,17);
+ });
+ assert.equal(foreign.status,'unverified');
+ assert.deepEqual(foreign.locations,[]);
+});
