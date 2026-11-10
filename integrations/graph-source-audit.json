@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "auditDate": "2026-11-08",
+  "auditDate": "2026-11-10",
   "baseCommit": "0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64",
   "candidateVersion": "0.22.0",
   "licenseAssumption": "User assumes compatibility; independent legal review not performed",
@@ -85,7 +85,7 @@
     },
     {
       "repo": "AxiomCodeAI/axiomcodegraph",
-      "commit": "29f7ecf052973b4c79574cc54b61fcd9f55b3b9f",
+      "commit": "45ee8b1b9d422409e93caed9a123d9c7b7998a8e",
       "capabilities": "IR and formal-methods oriented call analysis with asserted links",
       "adoption": "Explicit uncertainty; no false proof claim; optional IR link adapters later Stacked static import graph certificate checks: source-attested topology/cycle/reachability with independent witness verifier and unknown on incomplete coverage. No formal program IR or proofs. Stacked real TypeScript 5.8.3 compiler diagnostics and module/declaration type resolution over SHA-attested JS/TS files (no cross-language typed IR, CFG, formal proof or full upstream language matrix). Stacked real Go standard go/types offline compiler checks over source-hash-verified same-package Go files, with local typed declarations and error diagnostics, not full Go dependency/module resolution, runtime or unified cross-language IR.",
       "completePort": false
@@ -99,10 +99,11 @@
     },
     {
       "repo": "Ancienttwo/repo-harness",
-      "commit": "6b3c8def0a5b394087506d7ccc7ecae822306b8f",
+      "commit": "c2bfe28bf495b1c2366148c4826b967c5ba04db6",
       "capabilities": "Repo-local task state, review proof, Pi hook bridge and capability contracts",
       "adoption": "Existing reviewed workflow ledger plus manual project memory; no secondary autonomous task scheduler.",
-      "completePort": false
+      "completePort": false,
+      "transferredTo": "aimpact-inc/repo-harness"
     },
     {
       "repo": "optave/ops-codegraph-tool",
@@ -113,7 +114,7 @@
     },
     {
       "repo": "artk0de/TeaRAGs-MCP",
-      "commit": "5ba0ac24a02d1b4daf3b4ca1027b13974a66b184",
+      "commit": "c921c47d76c7178ccd0f07d26538fca82bf8e259",
       "capabilities": "Semantic retrieval, call graph, Git trajectory, architecture and naming lexicon",
       "adoption": "v0.20 local hash-verified AST symbol/path rank fusion and bounded graph navigation; no embedding engine or provider calls Stacked delta candidate adds source-verified changed-declaration metadata for code review; no semantic embeddings, vector index, owner inference or evidence of automatic test coverage. Next staged candidate adds bounded task-shaped lexical context with importer navigation; no semantic/vector ranking, historical trajectory risk, ownership or test-coverage proof. New stacked advisory cochange diagnostic counts repeated co-edits without detected direct static imports; root/byte verified and history bounded. No causal claim or trajectory engine. Staged opt-in numeric vector/hybrid search over source SHA-bound user-provided embeddings; no encoder, semantic quality guarantee, vector database or full upstream runtime. New staged human-only, operator-pinned local embedding subprocess with source-hash verified excerpt windows, private manifest and model-matched query vector generation; no model weights, network sandbox, auto-indexing or semantic relevance benchmark.",
       "completePort": false
