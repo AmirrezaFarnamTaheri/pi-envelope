@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync, mkdirSync, rmSync} from 'node:fs';
+import {mkdtempSync, mkdirSync, rmSync, realpathSync, writeFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {ManagedJobs, registerManagedJobs} from '../extensions/envelope/managed-jobs.mjs';
@@ -133,4 +134,16 @@ test('exactly full log is not falsely reported as truncated',async t=>{
   assert.equal(state.status,'completed');
   assert.equal(state.outputTruncated,false);
   assert.equal(jobs.logs(a,started.id).bytes,4096);
+});
+
+test('an uncertain stale supervisor never becomes an automatically prunable completed job',t=>{
+  const {root,a,jobs}=fixture(t);
+  const key=createHash('sha256').update(realpathSync(a)).digest('hex').slice(0,32);
+  const id='00000000-0000-0000-0000-000000000001';
+  const dir=join(root,'state','envelope-jobs',key,id);
+  mkdirSync(dir,{recursive:true});
+  writeFileSync(join(dir,'state.json'),JSON.stringify({id,status:'running',updatedAt:Date.now()-3600000}));
+  assert.equal(jobs.status(a,id).status,'interrupted');
+  assert.equal(jobs.prune(a,{olderThanDays:0}).removed,0);
+  assert.equal(jobs.status(a,id).status,'interrupted');
 });
