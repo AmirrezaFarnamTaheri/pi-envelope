@@ -20,7 +20,9 @@ export function inspectGoTypes(index,{action='diagnostics',path,line,column,limi
  if(!chosen||chosen.language!=='go'||!selected.endsWith('.go'))throw new Error('indexed Go source required');
  const directory=dirname(selected),includeTests=selected.endsWith('_test.go'),rows=[];let total=0;
  for(const [p,record] of [...index.files].sort(([a],[b])=>a.localeCompare(b))){
-  if(record.language!=='go'||dirname(p)!==directory||(!includeTests&&p.endsWith('_test.go')))continue;
+  // Never send foo and its external foo_test package into one go/types unit.
+  if(record.language!=='go'||dirname(p)!==directory||record.package!==chosen.package||
+    (!includeTests&&p.endsWith('_test.go')))continue;
   if(p!==index.checkedPath(p)||!SHA.test(record.contentSha256||''))throw new Error('unverified indexed Go source path');
   const absolute=resolve(root,p),st=lstatSync(absolute),canonical=realpathSync(absolute);
   if(!inside(root,absolute)||!inside(root,canonical)||st.isSymbolicLink()||!st.isFile())throw new Error('unsafe Go source symlink');

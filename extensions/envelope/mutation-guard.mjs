@@ -70,11 +70,18 @@ export function guardMutation(toolName,input,cwd,ts) {
    const stat=lstatSync(file);
    if(!stat.isFile()||stat.isSymbolicLink()||!within(root,realpathSync(file)))return;
    if(toolName==='edit'){if(stat.size>MAX_BYTES)return;old=readFileSync(file,'utf8');}
-  }catch{
-   if(toolName==='edit')return;
+  }catch(err){
+   if(toolName==='edit'||err?.code!=='ENOENT')return;
    let parent=dirname(file);
    while(within(root,parent)){
-    try{if(!within(root,realpathSync(parent)))return;break;}catch{parent=dirname(parent);}
+    try{
+     const ancestor=lstatSync(parent);
+     if(ancestor.isSymbolicLink()||!ancestor.isDirectory()||!within(root,realpathSync(parent)))return;
+     break;
+    }catch(parentError){
+     if(parentError?.code!=='ENOENT'||parent===root)return;
+     parent=dirname(parent);
+    }
    }
   }
   let proposed;

@@ -22,13 +22,15 @@ export function projectContextCard(index,{path,symbol,limit=8,includeSnippet=fal
  const available=(record.symbols||[]).filter(s=>symbol===undefined||s.name===symbol||qualifiedName(s)===symbol);
  if(symbol&&!available.length)throw new Error('symbol not indexed at this path');
  const symbols=available.sort((a,b)=>a.line-b.line||a.name.localeCompare(b.name));
- const matchNames=new Set(available.flatMap(s=>[s.name,qualifiedName(s)]));
- if(symbol)matchNames.add(symbol);
+ // A qualified method and a top-level function can share the same bare name.
+ // Retain only exact declaration identities, including the source line.
+ const callerMatches=x=>available.some(s=>x.caller?.name===qualifiedName(s)&&x.caller?.line===s.line);
+ const targetMatches=x=>available.some(s=>x.target?.path===key&&x.target?.name===s.name&&x.target?.line===s.line);
  const importerPaths=[...(index.importers.get(key)||[])].sort();
  const importPaths=[...(index.edges.get(key)||[])].sort();
- const outgoing=(index.callGraph?.outgoing.get(key)||[]).filter(x=>!symbol||matchNames.has(x.caller?.name));
- const incoming=(index.callGraph?.incoming.get(key)||[]).filter(x=>!symbol||matchNames.has(x.target?.name));
- const unresolved=(index.callGraph?.unresolved.get(key)||[]).filter(x=>!symbol||matchNames.has(x.caller?.name));
+ const outgoing=(index.callGraph?.outgoing.get(key)||[]).filter(x=>!symbol||callerMatches(x));
+ const incoming=(index.callGraph?.incoming.get(key)||[]).filter(x=>!symbol||targetMatches(x));
+ const unresolved=(index.callGraph?.unresolved.get(key)||[]).filter(x=>!symbol||callerMatches(x));
  const reasons=[];
  if(record.diagnostics?.length)reasons.push('source-diagnostics');
  if(record.omittedCalls)reasons.push('call-fact-limit');

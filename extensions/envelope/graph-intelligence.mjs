@@ -146,7 +146,7 @@ function neighbors(index,graph,args){
     truncated:found.length>limit,complete:graph.reasons.length===0,reasons:graph.reasons};
 }
 function hubs(graph,args){
-  const limit=boundedInteger(args.limit,12,1,50,'limit');
+  const limit=boundedInteger(args.limit,12,1,100,'limit');
   const numbers=new Map(graph.nodes.map(path=>[path,{path,incomingFiles:0,outgoingFiles:0,callSitesIn:0,callSitesOut:0,importsIn:0,importsOut:0}]));
   const inbound=new Map(graph.nodes.map(path=>[path,new Set()]));
   const outbound=new Map(graph.nodes.map(path=>[path,new Set()]));

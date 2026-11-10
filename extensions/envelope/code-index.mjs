@@ -130,7 +130,6 @@ function resolveModule(from,spec,available){
       candidates.push(`${without}.ts`,`${without}.tsx`,`${without}.mts`,`${without}.cts`);
     }
   } else {
-    if (ext) candidates.push(base);
     for(const suffix of SOURCE_SUFFIXES) candidates.push(base+suffix);
     for(const suffix of SOURCE_SUFFIXES) candidates.push(base+'/index'+suffix);
   }

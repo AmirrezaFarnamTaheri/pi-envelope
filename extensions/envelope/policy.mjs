@@ -30,9 +30,13 @@ function dropStale(text) {
 export function composePolicy(prompt, enabled) {
   if (typeof prompt !== 'string' && !Array.isArray(prompt)) return null;
   const parts = Array.isArray(prompt) ? prompt : [prompt];
-  const hasComplete = parts.some((p) => typeof p === 'string' && p.includes(START) && p.includes(END));
-  const hasAny = parts.some((p) => typeof p === 'string' && (p.includes(START) || p.includes(END)));
-  if (enabled && hasComplete && parts.filter((p) => typeof p === 'string' && p.includes(START)).length === 1) {
+  const strings=parts.filter(p=>typeof p==='string');
+  const count=(value,tag)=>value.split(tag).length-1;
+  const starts=strings.reduce((n,p)=>n+count(p,START),0);
+  const ends=strings.reduce((n,p)=>n+count(p,END),0);
+  const hasAny=starts>0||ends>0;
+  const wellFormed=strings.some(p=>p.indexOf(START)>=0&&p.indexOf(END)>p.indexOf(START));
+  if (enabled && starts===1 && ends===1 && wellFormed) {
     return { systemPrompt: prompt };
   }
   if (!enabled && !hasAny) return null;

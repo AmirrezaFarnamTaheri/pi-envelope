@@ -105,11 +105,18 @@ export function planRename({index,workspaceEdit,request}){
     if(bytes>index.maxBytesPerFile||text.includes('\0')||total>MAX_TOTAL_BYTES)throw new Error('LSP rename source exceeds safe limit');
     if(hasSyntaxErrors(index,key,text))throw new Error(`source ${key} already has syntax errors; refusing rename`);
     const lines=lineStarts(text);
+    const sf=index.ts.createSourceFile(key,text,index.ts.ScriptTarget.Latest,true,sourceKind(index.ts,key));
     const allowedReplacements=new Set([newName,`${oldName}: ${newName}`,`${oldName}:${newName}`]);
     const normalized=edits.map(edit=>{
       if(!edit||typeof edit.newText!=='string'||!allowedReplacements.has(edit.newText))throw new Error('LSP rename contains a non-identifier replacement');
       const start=toOffset(text,edit.range?.start,lines),end=toOffset(text,edit.range?.end,lines);
       if(end<=start||text.slice(start,end)!==oldName)throw new Error('LSP rename span is not the expected identifier');
+      if(edit.newText!==newName){
+        const token=index.ts.getTokenAtPosition(sf,start);
+        if(!token||!index.ts.isIdentifier(token)||token.getStart(sf)!==start||token.getEnd()!==end||
+          !index.ts.isShorthandPropertyAssignment(token.parent)||token.parent.name!==token)
+          throw new Error('LSP expanded replacement requires a genuine shorthand property identifier');
+      }
       return {start,end,newText:edit.newText,line:edit.range.start.line+1,column:edit.range.start.character+1};
     }).sort((a,b)=>a.start-b.start||a.end-b.end);
     for(let i=1;i<normalized.length;i++)if(normalized[i].start<normalized[i-1].end||normalized[i].start===normalized[i-1].start)throw new Error('LSP rename edits overlap or duplicate');

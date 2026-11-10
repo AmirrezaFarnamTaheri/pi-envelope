@@ -126,8 +126,9 @@ export function registerLspFeature(pi,{indexOf,getConfig,home,observe}={}) {
         if(params.apply===true){
           // Check every touched source with its post-rename proposed text, not pre-rename originalText.
           // A single missing or unreliable report blocks the entire file transaction.
+          // Cross-file LSP diagnostics require a coherent proposed workspace.
+          for(const file of planned.files)await session.open(file.path,file.proposedText);
           for(const file of planned.files){
-            await session.open(file.path,file.proposedText);
             const diagnostic=diagnosticReport(await session.diagnostics(file.path));
             if(diagnostic.verdict==='UNVERIFIED'||diagnostic.verdict==='FAIL')throw new Error(`LSP rename safety check failed in ${file.path}: ${diagnostic.verdict}`);
           }
