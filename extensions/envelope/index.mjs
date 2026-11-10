@@ -28,6 +28,8 @@ import {GraphifyWatchCoordinator} from './graphify-watch.mjs';
 import { registerGraphifyDotnetFeature, normalizeGraphifyDotnetExecutable } from './graphify-dotnet-runtime.mjs';
 import { registerMetricsFeature } from './metrics-api.mjs';
 import {LocalEmbeddingRuntime} from './local-embedding-runtime.mjs';
+import {EmbeddingWatchCoordinator} from './local-embedding-watch.mjs';
+import {formatEnvelopeDashboard,formatEmbeddingFooter} from './tui-dashboard.mjs';
 
 function homePath() {
   if (process.env.ENVELOPE_HOME) return process.env.ENVELOPE_HOME;
@@ -166,11 +168,24 @@ export function registerEnvelope(pi, options = {}) {
   });
 
   const localEmbeddingRuntime = options.localEmbeddingRuntime || new LocalEmbeddingRuntime();
+  const embeddingWatcher = options.embeddingWatcher || new EmbeddingWatchCoordinator({watchFactory:options.embeddingWatchFactory});
   const graphifyWatcher=options.graphifyWatcher || new GraphifyWatchCoordinator();
-  const codeApi = registerCodeFeature(pi, {project, getConfig:()=>config, loadCompiler:options.loadCompiler, loadTreeRuntime:options.loadTreeRuntime, getTreeGrammarPath:options.getTreeGrammarPath, watchGraphFactory:options.watchGraphFactory, watchGraphStatus:root=>graphifyWatcher.status(root), home, observe});
+  const codeApi = registerCodeFeature(pi, {project, getConfig:()=>config, loadCompiler:options.loadCompiler, loadTreeRuntime:options.loadTreeRuntime, getTreeGrammarPath:options.getTreeGrammarPath, watchGraphFactory:options.watchGraphFactory, watchGraphStatus:root=>graphifyWatcher.status(root), watchVectorStatus:root=>embeddingWatcher.status(root), home, observe});
   registerLspFeature(pi,{indexOf:codeApi.indexOf,getConfig:()=>config,home,observe});
   const graphifyCli = registerGraphifyCliFeature(pi,{project,getConfig:()=>config,observe,cli:options.graphifyCliBridge,watcher:graphifyWatcher});
   const graphifyDotnet = registerGraphifyDotnetFeature(pi,{project,getConfig:()=>config,bridge:options.graphifyDotnetBridge});
+
+  // The terminal panel is opt-in; the footer only shows an active watcher or
+  // a source-coverage warning. RPC and TUI clients share bounded plain text.
+  let dashboardVisible=false;
+  const refreshDashboard=(ctx)=>{
+    const root=project(ctx),vectorWatch=embeddingWatcher.status(root);
+    const lines=formatEnvelopeDashboard(config,{
+      vectorWatch,graphWatch:graphifyWatcher.status(root),loaded:codeApi.loaded()});
+    if(dashboardVisible)ctx?.ui?.setWidget?.('envelope-dashboard',lines,{placement:'aboveEditor'});
+    ctx?.ui?.setStatus?.('envelope-vectors',formatEmbeddingFooter(vectorWatch));
+    return lines;
+  };
 
   // One read-only preflight stage for write/edit; Tersio only rewrites bash.
   // Deliberately disabled until the user opts in, and never writes to disk.
@@ -199,7 +214,8 @@ export function registerEnvelope(pi, options = {}) {
     const policy=composePolicy(event?.systemPrompt,config.policy.enabled);
     return composeGraphifyOrientation(policy?.systemPrompt??event?.systemPrompt,project(ctx),config.graphify.orientationEnabled) || policy || undefined;
   });
-  pi.on('session_shutdown', () => { localEmbeddingRuntime.close?.(); graphifyDotnet.close?.(); graphifyCli.close?.(); codeApi.close?.(); store?.close(); store = null; frontier?.close(); frontier=null; workflowLedger?.close(); metricLedger?.close(); metricLedger=null; });
+  pi.on('session_shutdown', (_event,ctx) => { if(dashboardVisible)ctx?.ui?.setWidget?.('envelope-dashboard',undefined);
+    ctx?.ui?.setStatus?.('envelope-vectors',undefined);dashboardVisible=false;embeddingWatcher.close?.(); localEmbeddingRuntime.close?.(); graphifyDotnet.close?.(); graphifyCli.close?.(); codeApi.close?.(); store?.close(); store = null; frontier?.close(); frontier=null; workflowLedger?.close(); metricLedger?.close(); metricLedger=null; });
 
   pi.registerTool?.({
     name: 'envelope_recall_output',
@@ -280,10 +296,33 @@ export function registerEnvelope(pi, options = {}) {
   });
 
   pi.registerCommand?.('envelope', {
-    description: 'Manage Envelope modes and private local metrics; /envelope status|stats|metrics|observability|output|policy|context|code|graphify|workflow|jobs',
+    description: 'Manage Envelope modes and local TUI; /envelope status|dashboard|stats|metrics|observability|output|policy|context|code|graphify|workflow|jobs',
     async handler(args, ctx) {
       const rawArgs = String(args ?? '').trim();
       const [verb, value, ...extra] = rawArgs.toLowerCase().split(/\s+/);
+      if(verb==='dashboard'){
+        const action=value||'show';
+        if(extra.length||!['show','hide','status'].includes(action)){
+          notify(ctx,'Usage: /envelope dashboard [show|status|hide]','warning');return;
+        }
+        if(action==='hide'){
+          dashboardVisible=false;
+          ctx?.ui?.setWidget?.('envelope-dashboard',undefined);
+          notify(ctx,'Envelope dashboard hidden; active watch consent is unchanged.');
+          return;
+        }
+        if(action==='status'){
+          notify(ctx,refreshDashboard(ctx).join('\n'));return;
+        }
+        if(typeof ctx?.ui?.setWidget==='function'){
+          dashboardVisible=true;
+          refreshDashboard(ctx);
+          notify(ctx,'Envelope dashboard shown above editor. /envelope dashboard hide to dismiss.');
+        }else{
+          notify(ctx,refreshDashboard(ctx).join('\n'));
+        }
+        return;
+      }
       if (!verb || verb === 'status') {
         notify(ctx, `Envelope: output ${config.output.enabled ? 'on' : 'off'}; policy ${config.policy.enabled ? 'on' : 'off'}; context ${config.context.enabled ? 'on' : 'off'}; code ${config.code.enabled ? 'on' : 'off'}; workflow ${config.workflow.enabled ? 'on' : 'off'} (child ${config.workflow.runEnabled ? 'on' : 'off'}); jobs ${config.jobs.enabled ? 'on' : 'off'} (agent ${config.jobs.agentEnabled ? 'on' : 'off'}); ${metrics.compacted} results compacted`);
         return;
@@ -476,7 +515,8 @@ export function registerEnvelope(pi, options = {}) {
         if(value==='vectors'){
           const mode=extra[0]||'status';
           if(mode==='status'&&extra.length<=1){
-            notify(ctx,`Envelope vectors ${config.code.vectorEnabled?'on':'off'}; encoder ${config.code.vectorExecutable?'pinned':'not configured'}; manual build/sync/find only, no automatic models`);return;
+            const watch=embeddingWatcher.status(project(ctx));
+             notify(ctx,'Envelope vectors '+(config.code.vectorEnabled?'on':'off')+'; encoder '+(config.code.vectorExecutable?'pinned':'not configured')+'; session watch '+(watch.active?'on':'off')+(watch.manualRebuildRequired?' (manual sync required)':'')+'; no unattended models without explicit watch consent');return;
           }
           if(mode==='encoder'){
             const selected=rawArgs.replace(/^code\s+vectors\s+encoder\s*/i,'').trim();
@@ -484,22 +524,70 @@ export function registerEnvelope(pi, options = {}) {
               if(!selected)throw new Error('absolute encoder executable path required');
               const executable=selected.toLowerCase()==='none'?null:selected;
               if(executable&&(!isAbsolute(executable)||executable.length>1024||/[\u0000-\u001f\u007f]/.test(executable)))throw new Error('absolute encoder executable required');
+              await embeddingWatcher.stopAndWait(project(ctx));
               config=saveConfig(settingsPath,{...config,code:{...config.code,vectorExecutable:executable}});
-              localEmbeddingRuntime.close?.();
+              localEmbeddingRuntime.close?.();refreshDashboard(ctx);
               notify(ctx,`Envelope local embedding encoder ${config.code.vectorExecutable?'pinned':'cleared'}; no model installed or started`);
             }catch(err){notify(ctx,`Envelope encoder path rejected: ${err.message}`,'warning');}
+            return;
+          }
+          if(mode==='watch'){
+            const action=extra[1]||'status';
+            if(action==='status'&&extra.length<=2){
+              const status=embeddingWatcher.status(project(ctx));
+              notify(ctx,'Envelope embedding watch '+(status.active?'on':'off')+'; pending '+status.pendingCodeFiles+
+                ', processed batches '+status.batches+'; '+(status.manualRebuildRequired?'manual sync required; no automatic recovery':status.updating?'updating':'no automatic model until a source edit')+'; session-scoped');
+              return;
+            }
+            if(action==='off'&&extra.length===2){
+              try{await embeddingWatcher.stopAndWait(project(ctx));refreshDashboard(ctx);
+                notify(ctx,'Envelope embedding watch off; any in-flight encoder was cancelled and settled');}
+              catch(err){notify(ctx,'Envelope embedding watcher stop failed: '+err.message,'warning');}
+              return;
+            }
+            if(action==='on'&&(extra.length===2||extra.length===3)){
+              try{
+                const debounceMs=extra[2]===undefined?1200:Number(extra[2]);
+                if(!Number.isInteger(debounceMs)||debounceMs<250||debounceMs>10000)
+                  throw new Error('watch debounce must be 250..10000 milliseconds');
+                if(!config.code.enabled||!config.code.vectorEnabled||!config.code.vectorExecutable)
+                  throw new Error('code/vector retrieval and trusted encoder path must be enabled before watching');
+                const root=project(ctx),executable=config.code.vectorExecutable;
+                const checkEnabled=()=>{
+                  if(!config.code.enabled||!config.code.vectorEnabled||config.code.vectorExecutable!==executable)
+                    throw new Error('embedding watch consent revoked; restart explicitly');
+                };
+                const status=await embeddingWatcher.start(root,{
+                  refresh:()=>codeApi.indexOf(ctx),
+                  preflight:index=>localEmbeddingRuntime.inspect(index,{executable}),
+                  update:(index,signal)=>localEmbeddingRuntime.sync(index,{executable,signal}),
+                  checkEnabled,debounceMs,
+                  onStatus:(state)=>{
+                    refreshDashboard(ctx);
+                    if(state.manualRebuildRequired){
+                      notify(ctx,'Envelope vectors paused: uncertain source event or failed sync. Review source coverage, run watch off, then manual sync before watching again.','warning');
+                    }
+                  }
+                });
+                notify(ctx,'Envelope embedding watch on: '+status.watchedDirectories+' bounded source directories; verified existing manifest; only this session may run the pinned local encoder on relevant edits. Use watch off to revoke.');
+              }catch(err){refreshDashboard(ctx);notify(ctx,'Envelope embedding watch not enabled: '+err.message,'warning');}
+              return;
+            }
+            notify(ctx,'Usage: /envelope code vectors watch [on [250..10000 milliseconds]|off|status]','warning');
             return;
           }
           if(mode==='build'||mode==='replace'||mode==='sync'){
             if(extra.length!==1){notify(ctx,'Usage: /envelope code vectors [build|replace|sync]','warning');return;}
             try {
               if(!config.code.enabled||!config.code.vectorEnabled)throw new Error('code vectors disabled; enable explicitly');
+              await embeddingWatcher.stopAndWait(project(ctx));
               const index=await codeApi.indexOf(ctx);
               const result=mode==='sync'?
                 await localEmbeddingRuntime.sync(index,{executable:config.code.vectorExecutable}):
                 await localEmbeddingRuntime.build(index,{executable:config.code.vectorExecutable,replace:mode==='replace'});
               const incremental=mode==='sync'?
                 `embedded ${result.embedded}, reused ${result.reused}, removed ${result.removed}; ${result.unchanged?'no encoder run; ':''}`:'';
+              refreshDashboard(ctx);
               notify(ctx,`Envelope local vector ${mode}: ${incremental}${result.files} verified files, model ${result.model}, ${result.dimensions} dimensions; text windows truncated in ${result.truncatedTexts} files. No semantic-quality claim.`);
             }catch(err){notify(ctx,`Envelope local embedding ${mode} failed: ${err.message}`,'warning');}
             return;
@@ -508,16 +596,20 @@ export function registerEnvelope(pi, options = {}) {
             const query=rawArgs.replace(/^code\s+vectors\s+find\s*/i,'').trim();
             try {
               if(!config.code.enabled||!config.code.vectorEnabled)throw new Error('code vectors disabled; enable explicitly');
+              if(embeddingWatcher.status(project(ctx)).manualRebuildRequired)
+                throw new Error('watcher requires manual sync; watch off, sync and explicitly restart');
               const results=await localEmbeddingRuntime.find(await codeApi.indexOf(ctx),{executable:config.code.vectorExecutable,query});
               const top=results.results.slice(0,5).map(x=>`${x.path}: ${x.score}`).join(', ');
               notify(ctx,`Envelope local vector search (${results.model}): ${top||'no current verified matches'}; stale ${results.skippedStale}. Scores are heuristics.`);
             }catch(err){notify(ctx,`Envelope local vector search failed: ${err.message}`,'warning');}
             return;
           }
-          if(!['on','off'].includes(mode)||extra.length!==1){notify(ctx,'Usage: /envelope code vectors [status|on|off|encoder <absolute path>|encoder none|build|replace|sync|find <text>]','warning');return;}
-          try{config=saveConfig(settingsPath,{...config,code:{...config.code,vectorEnabled:mode==='on'}});
+          if(!['on','off'].includes(mode)||extra.length!==1){notify(ctx,'Usage: /envelope code vectors [status|on|off|encoder <absolute path>|encoder none|build|replace|sync|find <text>|watch on|watch off|watch status]','warning');return;}
+          try{if(mode==='off')await embeddingWatcher.stopAndWait(project(ctx));
+            config=saveConfig(settingsPath,{...config,code:{...config.code,vectorEnabled:mode==='on'}});
+            refreshDashboard(ctx);
             if(mode==='off')localEmbeddingRuntime.close?.();
-            notify(ctx,`Envelope local vector retrieval ${mode}; encoder use requires an explicit human build/find command`);}
+            notify(ctx,`Envelope local vector retrieval ${mode}; encoder use requires an explicit human command or active session watch consent`);}
           catch(err){notify(ctx,`Envelope vector preference not saved: ${err.message}`,'warning');}
           return;
         }
@@ -606,12 +698,13 @@ export function registerEnvelope(pi, options = {}) {
           return;
         }
         if (!['on', 'off'].includes(value) || extra.length) {
-          notify(ctx, 'Usage: /envelope code [status|on|off|vectors on|vectors off|vectors encoder <path>|vectors build|vectors replace|vectors sync|vectors find <text>|history status|history capture|history erase <id>|versions status|versions capture|versions prune <n>|languages on|languages off|tree on|tree off|tree status|guard on|guard off|rename on|rename off|lsp status]', 'warning');
+          notify(ctx, 'Usage: /envelope code [status|on|off|vectors on|vectors off|vectors encoder <path>|vectors build|vectors replace|vectors sync|vectors find <text>|vectors watch on|vectors watch off|vectors watch status|history status|history capture|history erase <id>|versions status|versions capture|versions prune <n>|languages on|languages off|tree on|tree off|tree status|guard on|guard off|rename on|rename off|lsp status]', 'warning');
           return;
         }
         try {
           config = saveConfig(settingsPath, { ...config, code:{...config.code,enabled:value === 'on'} });
-          if(value==='off'){localEmbeddingRuntime.close?.();codeApi.close?.();graphifyCli.close?.();graphifyDotnet.close?.();} // Stop opt-in readers and CLI work on disable.
+          if(value==='off'){await embeddingWatcher.stopAndWait(project(ctx));localEmbeddingRuntime.close?.();codeApi.close?.();graphifyCli.close?.();graphifyDotnet.close?.();} // Stop opt-in readers and CLI work on disable.
+          refreshDashboard(ctx);
           notify(ctx, `Envelope code ${value}`);
         } catch(err) {notify(ctx, `Envelope code settings failed: ${err.message}`, 'warning');}
         return;
@@ -698,7 +791,7 @@ export function registerEnvelope(pi, options = {}) {
     }
   });
 
-  return { metrics, getConfig: () => config, close: () => {localEmbeddingRuntime.close?.();graphifyDotnet.close?.();graphifyCli.close?.();codeApi.close?.(); store?.close(); frontier?.close(); projectMemory?.close(); workflowLedger?.close(); metricLedger?.close();} };
+  return { metrics, getConfig: () => config, close: () => {dashboardVisible=false;embeddingWatcher.close?.();localEmbeddingRuntime.close?.();graphifyDotnet.close?.();graphifyCli.close?.();codeApi.close?.(); store?.close(); frontier?.close(); projectMemory?.close(); workflowLedger?.close(); metricLedger?.close();} };
 }
 
 export default registerEnvelope;
