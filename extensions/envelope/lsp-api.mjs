@@ -1,6 +1,7 @@
 /** LSP-specific tools built over Envelope's existing one-index-per-project service. */
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { withLspSession } from './lsp-client.mjs';
 import { planRename, applyRename } from './rename-transaction.mjs';
 
@@ -62,6 +63,40 @@ export function registerLspFeature(pi,{indexOf,getConfig,home,observe}={}) {
       }catch(err){report={verdict:'UNVERIFIED',reason:short(err.message),diagnostics:[]};}
       return textResult({path:key,...report});
     });
+
+  for(const kind of ['definition','references']){
+    const isDefinition=kind==='definition';
+    tool(isDefinition?'envelope_code_definition':'envelope_code_references',
+      isDefinition?'Envelope: LSP Go to Definition':'Envelope: LSP Find References',
+      'Find verified, source-scoped language-server '+kind+' locations with one-based coordinates. Never edits files. Missing/ambiguous/untrusted results are UNVERIFIED.',
+      schema({path:{type:'string',description:'Indexed project-local source file'},
+        line:{type:'integer',minimum:1,description:'One-based cursor line'},
+        column:{type:'integer',minimum:1,description:'One-based UTF-16 cursor column'}},['path','line','column']),
+      async(ctx,params,signal)=>{
+        const runner=await withIndex(ctx,signal);
+        const key=runner.index.checkedPath(params.path);
+        const empty=(reason)=>textResult({path:key,verdict:'UNVERIFIED',reason:short(reason),locations:[]});
+        if(!runner.configured)return empty('No LSP server configured in envelope.code.lspCommand');
+        const before=readFileSync(join(runner.index.root,key),'utf8');
+        let raw;
+        try{raw=await runner.run(async session=>{
+          await session.open(key,before);
+          return session.locations(kind,key,params.line,params.column);
+        });}catch(err){return empty(err.message);}
+        if(raw.status==='unverified')return empty(raw.reason);
+        if(readFileSync(join(runner.index.root,key),'utf8')!==before)return empty('Source changed during language-server navigation');
+        const locations=[];
+        try{
+          for(const entry of raw.locations){
+            const path=runner.index.checkedPath(relative(runner.index.root,fileURLToPath(entry.uri)));
+            locations.push({path,line:entry.range.start.line+1,column:entry.range.start.character+1,
+              endLine:entry.range.end.line+1,endColumn:entry.range.end.character+1});
+          }
+        }catch{return empty('Language server returned a source outside the indexed project');}
+        return textResult({path:key,verdict:raw.status==='partial'?'PARTIAL':'PASS',source:'lsp-'+kind,
+          locations,...(raw.reason?{reason:raw.reason}:{})});
+      });
+  }
 
   tool('envelope_code_rename','Envelope: LSP Symbol Rename',
     'Preview language-server rename edits in indexed JS/TS files. Applying needs /envelope code rename on AND a matching preview planId; source is rechecked, staged, backed up and rollback is attempted on failure. No cross-file crash-atomicity.',
