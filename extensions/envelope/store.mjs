@@ -313,7 +313,11 @@ export class OutputStore {
         ...normalizedTerms(original.tool)
       ]);
       if(!words.every(w=>sourceWords.has(w))){integritySkipped++;continue;}
-      const excerpt=verifiedSearchExcerpt(original.text,words);
+      // Metadata-only matches are not body snippets. Do not leak command argv
+      // (which may carry secrets), or display an unrelated source prefix.
+      const bodyWords=new Set(normalizedTerms(original.text));
+      const excerpt=words.every(w=>bodyWords.has(w))?
+        verifiedSearchExcerpt(original.text,words):'[metadata match: command/tool]';
       hits.push({...row,excerpt});
       if(hits.length>=limit)break;
     }

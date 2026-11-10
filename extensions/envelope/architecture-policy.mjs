@@ -20,6 +20,8 @@ export function evaluateArchitecturePolicy(index,{rules=[],relation='imports',ma
  const state=inspectCodeGraph(index,{action:'status',relation});
  const boundaries=rules.length ? inspectCodeGraph(index,{action:'boundaries',rules,relation,limit}):
    {action:'boundaries',mode:'advisory-static-dependency-audit',total:0,violations:[],truncated:false,complete:state.complete,reasons:state.reasons};
+ // The policy limit bounds both inspected hub candidates and displayed rows.
+ // Truncation is explicit; requireComplete=true fails closed on an incomplete sample.
  const hubs=maxIncomingFiles===undefined?null:inspectCodeGraph(index,{action:'hubs',relation,limit});
  const violations=hubs?.hubs.filter(x=>x.incomingFiles>maxIncomingFiles)||[];
  const known=violations.length;

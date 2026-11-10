@@ -36,11 +36,11 @@ func sanitize(s string) string {
  return s
 }
 func utf16Col(text string,byteCol int) int {
- if byteCol<1{return 1}; end:=byteCol-1;if end>len(text){end=len(text)}
+ if byteCol<1{return 0}; end:=byteCol-1;if end>len(text){end=len(text)}
  return len(utf16.Encode([]rune(text[:end])))+1
 }
 func fileLineUtf16Col(texts map[string]string,file string,line int,byteCol int) int {
- src,ok:=texts[file];if !ok||line<1||byteCol<1{if byteCol<1{return 1};return byteCol}
+ src,ok:=texts[file];if !ok||line<1||byteCol<1{if byteCol<1{return 0};return byteCol}
  lines:=strings.Split(src,"\n")
  if line>len(lines){return byteCol}
  return utf16Col(lines[line-1],byteCol)

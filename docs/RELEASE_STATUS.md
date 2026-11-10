@@ -9,6 +9,7 @@ This document is the current, user-facing release assessment. It replaces the hi
 - Manual checkpoints, reversible context projections and versioned, transactional replay blocks, conservative JS/TS/Python/Go code intelligence, optional Tree-sitter and LSP tools, preview-first rename.
 - Fingerprint-reviewed detached Git worktree child runner (opt-in); `isolated:false` rejected; git worktrees are not OS sandboxes.
 - Project-scoped numeric observability, offline benchmarks and commit-pinned static impact reports.
+- Default-off managed background command jobs with durable capped logs, status, cancellation, and an independently authorized read-only background agent session. Inline Pi remains the default. See [Managed jobs](MANAGED_JOBS.md) for permissions and limitations.
 
 ## Required before distributing as a bundled Pi release
 

@@ -1,6 +1,6 @@
 /** Versioned, local settings. Independent of Tersio's existing mode state. */
 import { randomUUID } from 'node:crypto';
-import { chmodSync, lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, lstatSync, statSync, realpathSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute } from 'node:path';
 
 export const DEFAULT_CONFIG = Object.freeze({
@@ -90,28 +90,33 @@ export function normalizeConfig(raw = {}) {
 }
 
 function readSettingsRoot(path, { strict = false } = {}) {
-  let text;
+  let text, linked=false;
   try {
     const stat = lstatSync(path, { throwIfNoEntry: false });
     if (!stat) return {};
-    if (stat.isSymbolicLink() || !stat.isFile()) {
-      if (strict) throw new Error('settings path must be a regular file, not a symlink');
+    linked=stat.isSymbolicLink();
+    const target=linked?statSync(path):stat;
+    if (!target.isFile()) {
+      if (strict||linked) throw new Error('settings path must resolve to a regular file');
       return {};
     }
     text = readFileSync(path, 'utf8');
   } catch (err) {
+    // A broken or unsafe link must not silently discard saved opt-in/opt-out
+    // policy. Ordinary missing nonlinked files still use safe defaults.
+    if (linked) throw new Error('settings symlink must resolve to an accessible regular file');
     if (strict && err?.code !== 'ENOENT') throw err;
     return {};
   }
   try {
     const raw = JSON.parse(text);
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-      if (strict) throw new Error('existing settings.json root must be a JSON object');
+      if (strict || linked) throw new Error('existing settings.json root must be a JSON object');
       return {};
     }
     return raw;
   } catch (err) {
-    if (strict) throw new Error(`refusing to overwrite malformed settings.json: ${err.message}`);
+    if (strict || linked) throw new Error(`refusing to overwrite malformed settings.json: ${err.message}`);
     return {};
   }
 }
@@ -126,16 +131,20 @@ export function saveConfig(path, config) {
   const normalized = normalizeConfig(config);
   const previous = readSettingsRoot(path, { strict: true });
   const combined = { ...previous, envelope: normalized };
-  const folder = dirname(path);
+  // Write the resolved regular target of an explicitly configured symlink.
+  // Renaming the symlink itself would silently break dotfile-manager setups.
+  const linked=lstatSync(path,{throwIfNoEntry:false})?.isSymbolicLink()??false;
+  const destination=linked?realpathSync(path):path;
+  const folder = dirname(destination);
   if (lstatSync(folder, { throwIfNoEntry: false })?.isSymbolicLink()) {
     throw new Error('settings directory may not be a symlink');
   }
   mkdirSync(folder, { recursive: true, mode: 0o700 });
-  chmodSync(folder, 0o700);
-  const temp = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  if(!linked)chmodSync(folder, 0o700);
+  const temp = `${destination}.${process.pid}.${randomUUID()}.tmp`;
   try {
     writeFileSync(temp, `${JSON.stringify(combined, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
-    renameSync(temp, path);
+    renameSync(temp, destination);
   } finally { rmSync(temp, { force: true }); }
   return normalized;
 }

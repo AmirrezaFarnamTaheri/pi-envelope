@@ -24,8 +24,8 @@
 
 ## Explicitly incomplete
 
-Hosted v0.16.0 real Pi/Tersio/WASM/clangd gates passed on [run 42479440053](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42479440053). The new v0.17.0 native graph candidate requires its own hosted gates before any release claim. The other partial integration items, rejected duplicates and external adapters remain recorded in the 33-source audit. No live provider-billed savings or complete 33-repository parity is claimed.
+Historically, v0.16.0 real Pi/Tersio/WASM/clangd gates passed on [run 42479440053](https://github.com/AmirrezaFarnamTaheri/pi-envelope/actions/runs/42479440053). v0.17.0 was an earlier graph milestone. The current v0.22.0 candidate requires fresh release/compatibility checks after code changes and operator approval of the safety boundaries. The other partial integration items, rejected duplicates and external adapters remain recorded in the 33-source audit. No live provider-billed savings or complete 33-repository parity is claimed.
 
 ## v0.17.0 native graph source-adoption slice
 
-Sixteen additional repositories are pinned and decomposed in `docs/GRAPH_SOURCE_AUDIT.md`. One read-only CodeIndex-backed graph tool adds status, typed shortest paths, neighbors, degree hubs, weak components, directory-boundary audit, and bounded JSON/Mermaid export. External graph engines, memory, watchers, provider/model work, and UI remain separate follow-on phases.
+Sixteen additional repositories are pinned and decomposed in `docs/GRAPH_SOURCE_AUDIT.md`. One read-only CodeIndex-backed graph tool adds status, typed shortest paths, neighbors, degree hubs, weak components, directory-boundary audit, and bounded JSON/Mermaid export. Optional external graph adapters, local memory, source watchers and the bounded TUI status panel are present in v0.22.0, with explicit consent and partial-evidence limitations. Full 16-source parity, production coding-accuracy benchmarks, and OS-isolated agents remain unverified.

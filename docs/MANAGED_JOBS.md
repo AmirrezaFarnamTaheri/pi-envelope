@@ -38,7 +38,7 @@ The supervisor runs as a detached Node process, so Pi can return without waiting
 
 States include `starting`, `running`, `cancelling`, `completed`, `failed`, `cancelled` and `interrupted`. Exit code 0 alone means the process exited successfully, **not** that code edits or tests were reviewed. A missing supervisor heartbeat after 15 seconds is reported as `interrupted` rather than inventing a successful exit. An interrupted job is not automatically retried: verify its actual processes and output before starting a replacement.
 
-Output has a 2 MB per-job default cap (configurable internally up to 10 MB), and `outputTruncated` reports a full capture. No background stdout/stderr is injected into the conversation. The normal Pi session transcript and Envelope exact-output store remain separate.
+Output has a 2 MB per-job default cap (configurable internally up to 10 MB), and `outputTruncated` is true only if output exceeds the cap and excess bytes are dropped. No background stdout/stderr is injected into the conversation. The normal Pi session transcript and Envelope exact-output store remain separate.
 
 Cancellation is best-effort: the supervisor polls a file, sends termination to the launched process group on POSIX, uses Windows process-tree termination where supported, then escalates to SIGKILL. Descendants that create independent sessions can evade process-group cancellation. The jobs registry is **not an OS sandbox**; commands inherit the invoking environment and the current user's filesystem and network permissions. Restrict credentials and execute untrusted work in an actual sandbox.
 
