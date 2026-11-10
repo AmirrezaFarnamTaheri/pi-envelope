@@ -2,7 +2,7 @@
 import {randomUUID, createHash} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {existsSync, realpathSync, mkdirSync, readFileSync, writeFileSync, renameSync, readdirSync, statSync, openSync, closeSync, writeSync, readSync, rmSync} from 'node:fs';
-import {join, resolve} from 'node:path';
+import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {terminateTree, treeSpawnOptions} from './process-tree.mjs';
 
@@ -54,8 +54,12 @@ export class ManagedJobs {
     const state={version:1,id,kind,project:root,command,args,sessionId,maxLogBytes,status:'starting',createdAt:Date.now(),updatedAt:Date.now(),exitCode:null,workerPid:null,childPid:null};
     atomicJson(join(folder,'state.json'),state);
     try{
-      // Node is a declared Envelope runtime prerequisite, including for standalone Pi builds.
-      const worker=spawn('node',[SELF,'--worker',folder],{cwd:root,detached:true,stdio:'ignore',windowsHide:true});
+      // The supervisor must never hold the project directory as its own cwd:
+      // on Windows, completed jobs can otherwise prevent project cleanup (EBUSY).
+      // The supervised child still runs with cwd=state.project in runWorker().
+      const worker=spawn(process.execPath,[SELF,'--worker',folder],{
+        cwd:dirname(process.execPath),detached:true,stdio:'ignore',windowsHide:true
+      });
       await new Promise((resolve,reject)=>{worker.once('spawn',resolve);worker.once('error',reject);});
       worker.unref();
       return {id,status:'starting',kind,sessionId,createdAt:state.createdAt};
