@@ -390,7 +390,7 @@ test('review: duplicated policy blocks inside one prompt string are collapsed',(
   const twice=once+'\n\n'+once.slice(once.indexOf('<ENVELOPE_POLICY>'));
   const output=composePolicy(twice,true).systemPrompt;
   assert.equal((output.match(/<ENVELOPE_POLICY>/g)||[]).length,1);
-  assert.equal((output.match(/<\\/ENVELOPE_POLICY>/g)||[]).length,1);
+  assert.equal(output.split('</ENVELOPE_POLICY>').length-1,1);
 });
 
 test('review: symlinked Tersio settings read and update the target without replacing the link',t=>{
