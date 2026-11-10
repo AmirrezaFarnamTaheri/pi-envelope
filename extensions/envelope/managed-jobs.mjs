@@ -2,7 +2,7 @@
 import {randomUUID, createHash} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {existsSync, realpathSync, mkdirSync, readFileSync, writeFileSync, renameSync, readdirSync, statSync, openSync, closeSync, writeSync, readSync, rmSync} from 'node:fs';
-import {delimiter, dirname, isAbsolute, join, resolve, sep} from 'node:path';
+import {basename, delimiter, dirname, isAbsolute, join, resolve, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {terminateTree, treeSpawnOptions} from './process-tree.mjs';
 
@@ -12,6 +12,39 @@ const FINISHED=new Set(['completed','failed','cancelled','interrupted']);
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const respond=(data,isError=false)=>({isError,content:[{type:'text',text:typeof data==='string'?data:JSON.stringify(data)}],details:{}});
 const inside=(root,path)=>path===root||path.startsWith(root+sep);
+
+/**
+ * Use a real Node binary for detached workers, even when Pi itself is a Bun
+ * compiled executable. In compiled Bun, process.execPath is pi.exe, not node.
+ * PATH is considered only for absolute directories outside the project root.
+ * The caller controls which trusted Node installation is on PATH.
+ */
+export function resolveTrustedNodeExecutable(project,{
+  pathEnv=process.env.PATH||'',
+  compiledBun=Boolean(process.versions.bun),
+  runtimeExecPath=process.execPath
+}={}){
+  const root=realpathSync(resolve(project));
+  const accept=(candidate,checkName=true)=>{
+    if(typeof candidate!=='string'||!isAbsolute(candidate))return null;
+    let path,stat;
+    try{path=realpathSync(candidate);stat=statSync(path);}catch{return null;}
+    if(!stat.isFile()||inside(root,path))return null;
+    if(checkName&&!/^node(?:\.exe)?$/i.test(basename(path)))return null;
+    if(process.platform!=='win32'&&(stat.mode&0o111)===0)return null;
+    return path;
+  };
+  if(!compiledBun){
+    const native=accept(runtimeExecPath,false);
+    if(native)return native;
+  }
+  for(const dir of pathEnv.split(delimiter)){
+    if(!isAbsolute(dir))continue;
+    const node=accept(join(dir,process.platform==='win32'?'node.exe':'node'));
+    if(node)return node;
+  }
+  throw new Error('A trusted Node.js executable outside the project is required for background jobs (Node.js 22.19+). Add Node to PATH.');
+}
 
 /**
  * Resolve a project-external Pi CLI before spawning it with the project as cwd.
@@ -26,7 +59,7 @@ export function resolveTrustedAgentCommand(project,{pathEnv=process.env.PATH||''
     let file,stat;
     try{file=realpathSync(entry);stat=statSync(file);}catch{return null;}
     if(!stat.isFile()||inside(root,file))return null;
-    if(/\.[cm]?js$/i.test(file))return {command:process.execPath,prefix:[file]};
+    if(/\.[cm]?js$/i.test(file))return {command:resolveTrustedNodeExecutable(root,{pathEnv}),prefix:[file]};
     if(process.platform==='win32'){
       if(/\.exe$/i.test(file))return {command:file,prefix:[]};
       return null;
@@ -82,7 +115,10 @@ export class ManagedJobs {
     if(typeof command!=='string'||!command.trim()||command.length>4096||/\0/.test(command))throw new Error('Invalid executable');
     if(!Array.isArray(args)||args.length>128||args.some(arg=>typeof arg!=='string'||arg.length>16384||arg.includes('\0')))throw new Error('Invalid argv');
     if(!Number.isSafeInteger(maxLogBytes)||maxLogBytes<1024||maxLogBytes>10_000_000)throw new Error('Invalid output byte limit');
-    const {root,dir}=scope(this.home,project),id=randomUUID(),folder=join(dir,id);
+    const {root,dir}=scope(this.home,project);
+    // Validate the detached worker runtime before creating a persistent job record.
+    const nodeExecutable=resolveTrustedNodeExecutable(root);
+    const id=randomUUID(),folder=join(dir,id);
     mkdirSync(folder,{recursive:true,mode:0o700});
     writeFileSync(join(folder,'output.log'),'',{flag:'wx',mode:0o600});
     const state={version:1,id,kind,project:root,command,args,sessionId,maxLogBytes,status:'starting',createdAt:Date.now(),updatedAt:Date.now(),exitCode:null,workerPid:null,childPid:null};
@@ -91,8 +127,8 @@ export class ManagedJobs {
       // The supervisor must never hold the project directory as its own cwd:
       // on Windows, completed jobs can otherwise prevent project cleanup (EBUSY).
       // The supervised child still runs with cwd=state.project in runWorker().
-      const worker=spawn(process.execPath,[SELF,'--worker',folder],{
-        cwd:dirname(process.execPath),detached:true,stdio:'ignore',windowsHide:true
+      const worker=spawn(nodeExecutable,[SELF,'--worker',folder],{
+        cwd:dirname(nodeExecutable),detached:true,stdio:'ignore',windowsHide:true
       });
       await new Promise((resolve,reject)=>{worker.once('spawn',resolve);worker.once('error',reject);});
       worker.unref();
