@@ -2,8 +2,8 @@
  * Detecting an executable does not imply a supported runtime or permission to
  * invoke it. No tool is executed and no PATH/environment values are returned.
  */
-import {accessSync,constants,lstatSync} from 'node:fs';
-import {join} from 'node:path';
+import {accessSync,constants,lstatSync,realpathSync,statSync} from 'node:fs';
+import {delimiter,isAbsolute,join} from 'node:path';
 const CLI=['graphify','jcodemunch','rtk','headroom'];
 const ROUTES={
  orient:['envelope_code_overview','envelope_code_retrieve','envelope_code_graph'],
@@ -13,15 +13,20 @@ const ROUTES={
  evidence:['envelope_code_context_card','envelope_code_history','envelope_metrics_snapshot'],
  jobs:['envelope_job','envelope_agent_start'],
 };
+/** Inspect bounded PATH entries without executing them, resolving ordinary package-manager symlinks. */
 function hasExecutable(name,pathEnv){
  if(typeof pathEnv!=='string'||pathEnv.length>4096)return false;
- const folders=pathEnv.split(':').slice(0,24);
+ const sep=pathEnv.includes(delimiter)?delimiter:':';
+ const folders=pathEnv.split(sep).slice(0,24);
  for(const folder of folders){
-  if(!folder||!folder.startsWith('/')||folder.length>250)continue;
+  if(!folder||!isAbsolute(folder)||folder.length>250)continue;
   try{
-   const path=join(folder,name),st=lstatSync(path);
-   if(st.isSymbolicLink()||!st.isFile())continue;
-   accessSync(path,constants.X_OK);
+   const candidate=join(folder,name),lst=lstatSync(candidate);
+   const target=lst.isSymbolicLink()?realpathSync(candidate):candidate;
+   if(!isAbsolute(target)||target.length>512)continue;
+   const st=statSync(target);
+   if(!st.isFile())continue;
+   accessSync(target,constants.X_OK);
    return true;
   }catch{/* Treat inaccessible commands as absent; do not execute them. */}
  }
@@ -32,17 +37,24 @@ export function inspectCapabilityCockpit(config,{intent='orient',pathEnv=process
  const enabled=(name)=>config?.[name]?.enabled===true;
  const code=enabled('code'),memory=enabled('memory'),workflow=enabled('workflow');
  const graphifyCli=code&&enabled('graphify')&&typeof config?.graphify?.executable==='string'&&config.graphify.executable.length>0;
+ const graphifyDotnet=code&&enabled('graphifyDotnet')&&typeof config?.graphifyDotnet?.executable==='string'&&config.graphifyDotnet.executable.length>0;
  const capabilities={
   code:code?'enabled':'disabled',graph:code?'native-static':'disabled',
   externalGraph:code?'opt-in-local-artifact':'disabled',
   graphifyCli:graphifyCli?'configured-unverified':'disabled',
+  graphifyDotnet:graphifyDotnet?'configured-unverified':'disabled',
   memory:memory?'enabled':'disabled',context:enabled('context')?'enabled':'disabled',
   output:enabled('output')?'enabled':'disabled',
+  policy:enabled('policy')?'enabled':'disabled',
   workflow:workflow?'enabled':'disabled',childRunner:workflow&&config?.workflow?.runEnabled?'opt-in-enabled':'disabled',
   jobs:enabled('jobs')?'enabled':'disabled',backgroundAgent:config?.jobs?.agentEnabled?'opt-in-enabled':'disabled',
   metrics:enabled('observability')?'enabled':'disabled',
+  languages:code&&config?.code?.languagesEnabled?'opt-in-enabled':'disabled',
   optionalTree:code&&config?.code?.treeEnabled?'opt-in-enabled':'disabled',
   syntaxGuard:code&&config?.code?.guardEnabled?'opt-in-enabled':'disabled',
+  rename:code&&config?.code?.renameEnabled?'opt-in-enabled':'disabled',
+  lsp:code&&Array.isArray(config?.code?.lspCommand)&&config.code.lspCommand.length?'configured-unverified':'disabled',
+  vectors:code&&config?.code?.vectorEnabled?'opt-in-enabled':'disabled',
  };
  const externalCli=Object.fromEntries(CLI.map(name=>[name,hasExecutable(name,pathEnv)?'detected-unverified':'not-detected']));
  const tools=intent==='graph'&&graphifyCli ? [ROUTES.graph[0],'envelope_graphify_cli',...ROUTES.graph.slice(1)] : ROUTES[intent];
