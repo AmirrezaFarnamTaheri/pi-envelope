@@ -309,7 +309,8 @@ export class OutputStore {
       if(original?.project!==project){integritySkipped++;continue;}
       const sourceWords=new Set([
         ...normalizedTerms(original.text),
-        ...normalizedTerms(original.command),+        ...normalizedTerms(original.tool)
+        ...normalizedTerms(original.command),
+        ...normalizedTerms(original.tool)
       ]);
       if(!words.every(w=>sourceWords.has(w))){integritySkipped++;continue;}
       const excerpt=verifiedSearchExcerpt(original.text,words);
