@@ -557,17 +557,24 @@ export function registerEnvelope(pi, options = {}) {
                   if(!config.code.enabled||!config.code.vectorEnabled||config.code.vectorExecutable!==executable)
                     throw new Error('embedding watch consent revoked; restart explicitly');
                 };
+                let warnedForManualRecovery=false;
+                /**
+                 * Refresh every UI status report, but alert only when a watch first
+                 * requires manual recovery. A later healthy-to-manual transition
+                 * must be allowed to warn again.
+                 */
+                const onEmbeddingWatchStatus=(state)=>{
+                  refreshDashboard(ctx);
+                  if(!state.manualRebuildRequired){warnedForManualRecovery=false;return;}
+                  if(warnedForManualRecovery)return;
+                  warnedForManualRecovery=true;
+                  notify(ctx,'Envelope vectors paused: uncertain source event or failed sync. Review source coverage, run watch off, then manual sync before watching again.','warning');
+                };
                 const status=await embeddingWatcher.start(root,{
                   refresh:()=>codeApi.indexOf(ctx),
                   preflight:index=>localEmbeddingRuntime.inspect(index,{executable}),
                   update:(index,signal)=>localEmbeddingRuntime.sync(index,{executable,signal}),
-                  checkEnabled,debounceMs,
-                  onStatus:(state)=>{
-                    refreshDashboard(ctx);
-                    if(state.manualRebuildRequired){
-                      notify(ctx,'Envelope vectors paused: uncertain source event or failed sync. Review source coverage, run watch off, then manual sync before watching again.','warning');
-                    }
-                  }
+                  checkEnabled,debounceMs,onStatus:onEmbeddingWatchStatus
                 });
                 notify(ctx,'Envelope embedding watch on: '+status.watchedDirectories+' bounded source directories; verified existing manifest; only this session may run the pinned local encoder on relevant edits. Use watch off to revoke.');
               }catch(err){refreshDashboard(ctx);notify(ctx,'Envelope embedding watch not enabled: '+err.message,'warning');}
