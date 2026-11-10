@@ -1,5 +1,6 @@
 /** LSP-specific tools built over Envelope's existing one-index-per-project service. */
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withLspSession } from './lsp-client.mjs';
@@ -89,6 +90,9 @@ export function registerLspFeature(pi,{indexOf,getConfig,home,observe}={}) {
         try{
           for(const entry of raw.locations){
             const path=runner.index.checkedPath(relative(runner.index.root,fileURLToPath(entry.uri)));
+            const source=readFileSync(join(runner.index.root,path));
+            if(source.length>512_000||createHash('sha256').update(source).digest('hex')!==runner.index.files.get(path).contentSha256)
+              return empty('LSP target source changed or exceeded verification budget');
             locations.push({path,line:entry.range.start.line+1,column:entry.range.start.character+1,
               endLine:entry.range.end.line+1,endColumn:entry.range.end.character+1});
           }
