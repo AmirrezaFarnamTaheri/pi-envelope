@@ -107,16 +107,19 @@ export class GraphifyWatchCoordinator {
   }
   flagManual(session){
     session.manual=true;
+    session.controller?.abort(); // Never accept a running result after source-universe uncertainty.
     try{this.markStale(session.root);}catch{session.lastOutcome='failed';}
   }
-  start(root,{runUpdate,debounceMs=1200}={}){
+  start(root,{runUpdate,debounceMs=1200,codeSuffixes=CODE_SUFFIXES}={}){
     if(typeof runUpdate!=='function')throw new TypeError('Graphify watch requires an authorized code update runner');
+    if(!(codeSuffixes instanceof Set)||[...codeSuffixes].some(s=>typeof s!=='string'||!/^[.][a-z0-9]{1,8}$/.test(s)))
+      throw new TypeError('watch source suffix set is invalid');
     if(!Number.isInteger(debounceMs)||debounceMs<250||debounceMs>10000)throw new RangeError('Graphify watch debounce must be 250..10000 ms');
     const key=normalizeRoot(root);
     const dirs=sourceDirectories(key); // fail before disrupting an existing watch
     if(this.sessions.get(key)?.running)throw new Error('Graphify watch update still running; stop and wait before restart');
     this.stop(key);
-    const session={root:key,debounceMs,runUpdate,handles:[],pending:new Set(),
+    const session={root:key,debounceMs,runUpdate,codeSuffixes:new Set(codeSuffixes),handles:[],pending:new Set(),
       timer:null,running:null,controller:null,manual:false,overflow:false,
       batches:0,lastOutcome:'never',closed:false};
     try{
@@ -152,7 +155,7 @@ export class GraphifyWatchCoordinator {
     if(st?.isDirectory()||st?.isSymbolicLink()){this.flagManual(session);return;}
     if(st&&!st.isFile()){this.flagManual(session);return;}
     const suffix=extname(name).toLowerCase();
-    if(!CODE_SUFFIXES.has(suffix)){
+    if(!session.codeSuffixes.has(suffix)){
       if(MANUAL_SUFFIXES.has(suffix)||suffix||name)this.flagManual(session);
       return;
     }
@@ -189,7 +192,10 @@ export class GraphifyWatchCoordinator {
     try{executing=Promise.resolve(session.runUpdate(key,controller.signal));}
     catch(error){executing=Promise.reject(error);}
     const settled=executing.then(()=>{
-      if(!session.closed){session.batches++;session.lastOutcome='ok';}
+      if(!session.closed){
+        if(session.manual||controller.signal.aborted){session.lastOutcome='manual-required';this.halt(session);}
+        else{session.batches++;session.lastOutcome='ok';}
+      }
     },()=>{
       if(!session.closed){
         session.lastOutcome='failed';this.flagManual(session);

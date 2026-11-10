@@ -7,6 +7,8 @@
 import {realpathSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {GraphifyWatchCoordinator} from './graphify-watch.mjs';
+const EMBEDDING_SUFFIXES=new Set(['.ts','.tsx','.js','.jsx','.mts','.cts','.mjs','.cjs']);
+const EMBEDDING_LANGUAGE_SUFFIXES=['.py','.pyi','.go'];
 
 export class EmbeddingWatchCoordinator {
  constructor({watchFactory}={}){
@@ -28,9 +30,12 @@ export class EmbeddingWatchCoordinator {
    return index;
   };
   checkEnabled();
-  await preflight(await currentIndex()); // No model execution on enable
+  const initial=await currentIndex();
+  await preflight(initial); // No model execution on enable
   checkEnabled();
-  const status=this.watcher.start(canonical,{debounceMs,
+  const codeSuffixes=new Set(EMBEDDING_SUFFIXES);
+  if(initial.languagesEnabled===true)for(const suffix of EMBEDDING_LANGUAGE_SUFFIXES)codeSuffixes.add(suffix);
+  const status=this.watcher.start(canonical,{debounceMs,codeSuffixes,
    runUpdate:async(_root,signal)=>{
     if(signal.aborted)throw new Error('embedding watch cancelled');
     checkEnabled();
