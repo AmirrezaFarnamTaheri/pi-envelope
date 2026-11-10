@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 import {terminateTree, treeSpawnOptions} from './process-tree.mjs';
 
 const SELF=fileURLToPath(import.meta.url);
-const IDENTIFIER=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+const IDENTIFIER=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const FINISHED=new Set(['completed','failed','cancelled','interrupted']);
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const respond=(data,isError=false)=>({isError,content:[{type:'text',text:typeof data==='string'?data:JSON.stringify(data)}],details:{}});
