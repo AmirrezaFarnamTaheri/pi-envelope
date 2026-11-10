@@ -131,3 +131,32 @@ test('a language absent from the current embedding index cannot masquerade as a 
  assert.equal(f.changes.length,0,'no encoder work should run for unsupported language changes');
  await f.coordinator.stopAndWait(f.root);
 });
+
+
+test('watcher pushes bounded active, syncing, recovery and stop states for native Pi status',async t=>{
+ const f=setup(t),events=[];
+ await f.coordinator.start(f.root,{refresh:f.refresh,preflight:f.preflight,
+  update:f.update,checkEnabled:f.checkEnabled,debounceMs:250,
+  onStatus:s=>events.push({...s})});
+ assert.ok(events.some(s=>s.active===true&&!s.updating));
+ f.emit('entry.ts');
+ await f.coordinator.flush(f.root);
+ assert.ok(events.some(s=>s.updating),'visible indicator must distinguish a running encoder');
+ assert.ok(events.some(s=>s.batches===1&&!s.updating),'batch completion must be visible');
+ f.emit('settings.yaml');
+ assert.ok(events.some(s=>s.manualRebuildRequired),'unsafe events must publish recovery state');
+ await f.coordinator.stopAndWait(f.root);
+ assert.equal(events.at(-1).active,false);
+ assert.doesNotMatch(JSON.stringify(events),/settings[.]yaml|entry[.]ts|export const/);
+});
+
+test('UI status callback failures cannot break a source-sync operation or prevent stop',async t=>{
+ const f=setup(t);
+ await f.coordinator.start(f.root,{refresh:f.refresh,preflight:f.preflight,
+  update:f.update,checkEnabled:f.checkEnabled,onStatus:()=>{throw Error('UI unavailable');}});
+ f.emit('entry.ts');
+ await f.coordinator.flush(f.root);
+ assert.equal(f.coordinator.status(f.root).batches,1);
+ await f.coordinator.stopAndWait(f.root);
+ assert.equal(f.coordinator.status(f.root).active,false);
+});
