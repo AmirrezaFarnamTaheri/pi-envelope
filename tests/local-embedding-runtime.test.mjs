@@ -405,8 +405,12 @@ test('Pi vectors watch explicitly synchronizes changed source and refuses unknow
  assert.notEqual(JSON.stringify(changed),baseline);
  assert.equal(changed.entries[0].sha256, (await import('node:crypto')).createHash('sha256').update('export function documentOne(){ return "changed auth retry"; }').digest('hex'));
  assert.equal(embeddingWatcher.status(f.root).batches,1);
+ const pauseWarnings=()=>notices.filter(message=>message.startsWith('Envelope vectors paused:')).length;
  sourceWatcher.callback('rename',null);
+ assert.equal(pauseWarnings(),1,'one ambiguous event must produce one recovery warning');
  assert.equal(embeddingWatcher.status(f.root).manualRebuildRequired,true);
+ sourceWatcher.callback('change','first.ts');
+ assert.equal(pauseWarnings(),1,'additional events in the same paused state must not repeat warnings');
  const vector=tools.get('envelope_code_vector');
  const denied=await vector.execute('watch-test',{action:'search',queryVector:[1,0,0,0,0,0,0,0]},undefined,undefined,ctx);
  assert.equal(denied.isError,true,'agent tool must not bypass manual watcher recovery state');
@@ -416,6 +420,10 @@ test('Pi vectors watch explicitly synchronizes changed source and refuses unknow
  assert.equal(embeddingWatcher.status(f.root).active,false,'human sync revokes prior watch consent');
  await call('code vectors watch on 250');
  assert.equal(embeddingWatcher.status(f.root).active,true,last());
+ const renewedWatcher=handles.find(h=>!h.closed&&h.dir===join(f.root,'src'));
+ assert.ok(renewedWatcher);
+ renewedWatcher.callback('rename',null);
+ assert.equal(pauseWarnings(),2,'new watch must report a fresh manual-recovery transition');
  await call('code vectors watch off');
  assert.equal(embeddingWatcher.status(f.root).active,false);
  assert.ok(handles.every(h=>h.closed));
