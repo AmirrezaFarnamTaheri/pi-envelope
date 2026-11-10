@@ -7,7 +7,10 @@ import { fileURLToPath } from 'node:url';
 import { withLspSession } from '../extensions/envelope/lsp-client.mjs';
 const mock=fileURLToPath(new URL('./fixtures/mock-lsp-server.mjs',import.meta.url));
 function setup(t){const root=realpathSync(mkdtempSync(join(tmpdir(),'envelope-lsp-client-')));t.after(()=>rmSync(root,{recursive:true,force:true}));mkdirSync(join(root,'src'));writeFileSync(join(root,'src','a.ts'),'export function add(n:number) { return n+1; }\n');writeFileSync(join(root,'src','b.ts'),"import { add } from './a';\nexport const result=add(2);\n");return root;}
-const opts=(root,mode='pull',timeoutMs=1200)=>({root,command:[process.execPath,mock,mode],timeoutMs});
+// CI runs many independent test processes concurrently; allow mock-server startup time.
+// The deliberately hung operations still assert a timeout rather than success.
+const boundedMockTimeoutMs=2000;
+const opts=(root,mode='pull',timeoutMs=boundedMockTimeoutMs)=>({root,command:[process.execPath,mock,mode],timeoutMs});
 
 test('pull diagnostics distinguish verified clean and genuine errors',async t=>{
  const root=setup(t),text=readFileSync(join(root,'src','a.ts'),'utf8');
@@ -26,9 +29,9 @@ test('missing diagnostics cannot be reported as clean',async t=>{
 });
 test('timeouts, missing executables and hung initialization fail closed and terminate',async t=>{
  const root=setup(t);
- await assert.rejects(withLspSession(opts(root,'hang-init',160),async s=>s.diagnostics('src/a.ts')),/timeout/i);
+ await assert.rejects(withLspSession(opts(root,'hang-init',boundedMockTimeoutMs),async s=>s.diagnostics('src/a.ts')),/timeout/i);
  await assert.rejects(withLspSession({root,command:['envelope-missing-lsp-executable-xyz'],timeoutMs:200},async s=>s.diagnostics('src/a.ts')),/ENOENT|spawn|not found/i);
- const no=await withLspSession(opts(root,'hang-diagnostics',160),async s=>{await s.open('src/a.ts','x');return s.diagnostics('src/a.ts');});
+ const no=await withLspSession(opts(root,'hang-diagnostics',boundedMockTimeoutMs),async s=>{await s.open('src/a.ts','x');return s.diagnostics('src/a.ts');});
  assert.equal(no.status,'unverified');
 });
 test('LSP rename request returns WorkspaceEdit but never modifies files',async t=>{
@@ -39,7 +42,7 @@ test('LSP rename request returns WorkspaceEdit but never modifies files',async t
 
 test('stale push version and related documents cannot produce verified clean reports',async t=>{
  const root=setup(t);
- const stale=await withLspSession(opts(root,'push-stale',140),async s=>{await s.open('src/a.ts','x');return s.diagnostics('src/a.ts');});
+ const stale=await withLspSession(opts(root,'push-stale',boundedMockTimeoutMs),async s=>{await s.open('src/a.ts','x');return s.diagnostics('src/a.ts');});
  assert.equal(stale.status,'unverified');
  const related=await withLspSession(opts(root,'related'),async s=>{await s.open('src/a.ts','x');return s.diagnostics('src/a.ts');});
  assert.equal(related.status,'unverified');
