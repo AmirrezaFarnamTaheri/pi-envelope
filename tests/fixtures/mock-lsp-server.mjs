@@ -17,7 +17,7 @@ function editsFor(file){let text;try{text=readFileSync(join(process.cwd(),file),
 function onMessage(msg){
  if(msg.method==='initialize'){
    if(mode==='hang-init')return;
-   reply(msg.id,{capabilities:{renameProvider:true,...(['push','push-stale'].includes(mode)?{}:{diagnosticProvider:{interFileDependencies:false,workspaceDiagnostics:false}})}});return;
+   reply(msg.id,{capabilities:{renameProvider:true,definitionProvider:mode!=='nav-unsupported',referencesProvider:mode!=='nav-unsupported',...(['push','push-stale'].includes(mode)?{}:{diagnosticProvider:{interFileDependencies:false,workspaceDiagnostics:false}})}});return;
  }
  if(msg.method==='initialized')return;
  if(msg.method==='textDocument/didOpen'){
@@ -32,6 +32,16 @@ function onMessage(msg){
    if(mode==='infra')items=[1,2,3].map(n=>({range:{start:{line:0,character:n},end:{line:0,character:n+1}},severity:1,message:'Cannot find module dependency'}));
    if(mode==='bad-range')items=[{severity:1,message:'bad range'}];
    return reply(msg.id,{kind:'full',items,...(mode==='related'?{relatedDocuments:{'file:///other.ts':{kind:'full',items:[]}}}:{})});
+ }
+ if(msg.method==='textDocument/definition'||msg.method==='textDocument/references'){
+   if(mode==='nav-unsupported')return reply(msg.id,null);
+   const a=pathToFileURL(join(process.cwd(),'src','a.ts')).href;
+   const b=pathToFileURL(join(process.cwd(),'src','b.ts')).href;
+   const outside=pathToFileURL(join(process.cwd(),'..','private.ts')).href;
+   const location=(uri,line,character)=>({uri,range:{start:{line,character},end:{line,character:character+3}}});
+   const result=mode==='nav-outside'?[location(outside,0,0)]:
+     msg.method==='textDocument/references'?[location(a,0,16),location(b,1,20)]:[location(a,0,16)];
+   return reply(msg.id,result);
  }
  if(msg.method==='textDocument/rename'){
    if(mode==='hang-rename')return;
