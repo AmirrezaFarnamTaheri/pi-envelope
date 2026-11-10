@@ -11,6 +11,7 @@ const ROUTES={
  review:['envelope_code_change_impact','envelope_code_policy','envelope_code_verify'],
  resume:['envelope_memory','envelope_workflow_status','envelope_code_context_card'],
  evidence:['envelope_code_context_card','envelope_code_history','envelope_metrics_snapshot'],
+ jobs:['envelope_job','envelope_agent_start'],
 };
 function hasExecutable(name,pathEnv){
  if(typeof pathEnv!=='string'||pathEnv.length>4096)return false;
@@ -38,6 +39,7 @@ export function inspectCapabilityCockpit(config,{intent='orient',pathEnv=process
   memory:memory?'enabled':'disabled',context:enabled('context')?'enabled':'disabled',
   output:enabled('output')?'enabled':'disabled',
   workflow:workflow?'enabled':'disabled',childRunner:workflow&&config?.workflow?.runEnabled?'opt-in-enabled':'disabled',
+  jobs:enabled('jobs')?'enabled':'disabled',backgroundAgent:config?.jobs?.agentEnabled?'opt-in-enabled':'disabled',
   metrics:enabled('observability')?'enabled':'disabled',
   optionalTree:code&&config?.code?.treeEnabled?'opt-in-enabled':'disabled',
   syntaxGuard:code&&config?.code?.guardEnabled?'opt-in-enabled':'disabled',
@@ -46,8 +48,10 @@ export function inspectCapabilityCockpit(config,{intent='orient',pathEnv=process
  const tools=intent==='graph'&&graphifyCli ? [ROUTES.graph[0],'envelope_graphify_cli',...ROUTES.graph.slice(1)] : ROUTES[intent];
  const plan=tools.map(tool=>{
   const category=tool.startsWith('envelope_code_')?'code':tool==='envelope_memory'?'memory':
-    tool==='envelope_graphify_cli'?'graphify':tool.startsWith('envelope_workflow_')?'workflow':tool.startsWith('envelope_metrics_')?'metrics':null;
-  const available=category==='code'?code:category==='graphify'?graphifyCli:category==='memory'?memory:category==='workflow'?workflow:category==='metrics'?enabled('observability'):true;
+    tool==='envelope_graphify_cli'?'graphify':tool.startsWith('envelope_workflow_')?'workflow':tool.startsWith('envelope_metrics_')?'metrics':
+    tool==='envelope_job'?'jobs':tool==='envelope_agent_start'?'agent':null;
+  const available=category==='code'?code:category==='graphify'?graphifyCli:category==='memory'?memory:category==='workflow'?workflow:category==='metrics'?enabled('observability'):
+    category==='jobs'?enabled('jobs'):category==='agent'?config?.jobs?.agentEnabled===true:true;
   return {tool,state:available?'suggested':'blocked',reason:available?null:`${category}-disabled`};
  });
  const reasons=[...new Set(plan.filter(x=>x.reason).map(x=>x.reason))];
