@@ -91,7 +91,7 @@ export class ManagedJobs {
     const threshold=Date.now()-olderThanDays*86_400_000;
     let removed=0;
     for(const item of items){
-      if(FINISHED.has(item.status)&&(item.finishedAt??item.updatedAt)<threshold){
+      if(['completed','failed','cancelled'].includes(item.status)&&(item.finishedAt??item.updatedAt)<threshold){
         rmSync(jobDir(this.home,project,item.id),{recursive:true,force:true});removed++;
       }
     }
