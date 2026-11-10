@@ -73,15 +73,18 @@ export class ManagedJobs {
       try{return decorate(jobDir(this.home,project,id));}catch{return null;}
     }).filter(Boolean).sort((a,b)=>b.createdAt-a.createdAt).slice(0,limit);
   }
-  logs(project,id,{maxBytes=16000}={}){
+  logs(project,id,{maxBytes=16000,fromByte}={}){
     if(!Number.isInteger(maxBytes)||maxBytes<1||maxBytes>32000)throw new Error('Invalid log byte limit');
+    if(fromByte!==undefined&&(!Number.isSafeInteger(fromByte)||fromByte<0))throw new Error('Invalid log cursor');
     const dir=jobDir(this.home,project,id);
     const file=join(dir,'output.log'),fd=openSync(file,'r');
     try{
-      const length=statSync(file).size,offset=Math.max(0,length-maxBytes),size=length-offset;
-      const data=Buffer.alloc(size);
-      const n=size?readFileChunk(fd,data,offset):0;
-      return {id,text:data.subarray(0,n).toString('utf8'),truncated:offset>0,bytes:length};
+      const length=statSync(file).size;
+      const offset=fromByte===undefined?Math.max(0,length-maxBytes):Math.min(fromByte,length);
+      const size=Math.min(maxBytes,length-offset);
+      const data=Buffer.alloc(size),n=size?readFileChunk(fd,data,offset):0;
+      return {id,text:data.subarray(0,n).toString('utf8'),fromByte:offset,nextByte:offset+n,
+        remainingBytes:Math.max(0,length-offset-n),truncated:fromByte===undefined&&offset>0,bytes:length};
     }finally{closeSync(fd);}
   }
   prune(project,{olderThanDays=30}={}){
@@ -132,7 +135,7 @@ export function registerManagedJobs(pi,{home,project,allowStarts=()=>false,allow
     parameters:schema({
       action:{type:'string',enum:['start','list','status','logs','wait','cancel','prune']},
       jobId:{type:'string'},command:{type:'string'},args:{type:'array',items:{type:'string'},maxItems:128},
-      waitMs:{type:'integer',minimum:0,maximum:10000},maxBytes:{type:'integer',minimum:1,maximum:32000},retentionDays:{type:'integer',minimum:0,maximum:365}
+      waitMs:{type:'integer',minimum:0,maximum:10000},maxBytes:{type:'integer',minimum:1,maximum:32000},fromByte:{type:'integer',minimum:0},retentionDays:{type:'integer',minimum:0,maximum:365}
     },['action']),
     async execute(_callId,p,_signal,_update,ctx){
       const cwd=project(ctx);
@@ -144,7 +147,7 @@ export function registerManagedJobs(pi,{home,project,allowStarts=()=>false,allow
           }
           case 'list':return respond(jobs.list(cwd).map(({command,args,...safe})=>safe));
           case 'status':{const {args,...safe}=jobs.status(cwd,p.jobId);return respond(safe);}
-          case 'logs':return respond(jobs.logs(cwd,p.jobId,{maxBytes:p.maxBytes??16000}));
+          case 'logs':return respond(jobs.logs(cwd,p.jobId,{maxBytes:p.maxBytes??16000,fromByte:p.fromByte}));
           case 'wait':{const {args,...safe}=await jobs.wait(cwd,p.jobId,{timeoutMs:p.waitMs??1000});return respond(safe);}
           case 'cancel':return respond(jobs.cancel(cwd,p.jobId));
           case 'prune':return respond(jobs.prune(cwd,{olderThanDays:p.retentionDays??30}));
