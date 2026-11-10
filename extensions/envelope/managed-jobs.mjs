@@ -145,7 +145,7 @@ export function registerManagedJobs(pi,{home,project,allowStarts=()=>false,allow
           case 'list':return respond(jobs.list(cwd).map(({command,args,...safe})=>safe));
           case 'status':{const {args,...safe}=jobs.status(cwd,p.jobId);return respond(safe);}
           case 'logs':return respond(jobs.logs(cwd,p.jobId,{maxBytes:p.maxBytes??16000}));
-          case 'wait':return respond(await jobs.wait(cwd,p.jobId,{timeoutMs:p.waitMs??1000}));
+          case 'wait':{const {args,...safe}=await jobs.wait(cwd,p.jobId,{timeoutMs:p.waitMs??1000});return respond(safe);}
           case 'cancel':return respond(jobs.cancel(cwd,p.jobId));
           case 'prune':return respond(jobs.prune(cwd,{olderThanDays:p.retentionDays??30}));
           default:return respond('Unknown job action',true);
