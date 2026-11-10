@@ -10,7 +10,9 @@ function fixture(t) {
   const root=mkdtempSync(join(tmpdir(),'envelope-jobs-test-'));
   const a=join(root,'a'),b=join(root,'b');
   mkdirSync(a);mkdirSync(b);
-  t.after(()=>rmSync(root,{recursive:true,force:true}));
+  // Detached Windows supervisors can briefly retain the project directory after state is terminal.
+  // Retry EBUSY/EPERM during fixture cleanup instead of misreporting a completed job as a test failure.
+  t.after(()=>rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:100}));
   return {root,a,b,jobs:new ManagedJobs(join(root,'state'))};
 }
 
