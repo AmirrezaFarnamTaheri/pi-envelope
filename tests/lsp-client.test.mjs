@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withLspSession } from '../extensions/envelope/lsp-client.mjs';
 const mock=fileURLToPath(new URL('./fixtures/mock-lsp-server.mjs',import.meta.url));
-function setup(t){const root=mkdtempSync(join(tmpdir(),'envelope-lsp-client-'));t.after(()=>rmSync(root,{recursive:true,force:true}));mkdirSync(join(root,'src'));writeFileSync(join(root,'src','a.ts'),'export function add(n:number) { return n+1; }\n');writeFileSync(join(root,'src','b.ts'),"import { add } from './a';\nexport const result=add(2);\n");return root;}
+function setup(t){const root=realpathSync(mkdtempSync(join(tmpdir(),'envelope-lsp-client-')));t.after(()=>rmSync(root,{recursive:true,force:true}));mkdirSync(join(root,'src'));writeFileSync(join(root,'src','a.ts'),'export function add(n:number) { return n+1; }\n');writeFileSync(join(root,'src','b.ts'),"import { add } from './a';\nexport const result=add(2);\n");return root;}
 const opts=(root,mode='pull',timeoutMs=1200)=>({root,command:[process.execPath,mock,mode],timeoutMs});
 
 test('pull diagnostics distinguish verified clean and genuine errors',async t=>{

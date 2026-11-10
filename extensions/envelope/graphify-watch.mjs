@@ -117,17 +117,18 @@ export class GraphifyWatchCoordinator {
     this.report(session);
   }
   /** Create a bounded, nonpersistent watch only after source and callback checks succeed. */
-  start(root,{runUpdate,debounceMs=1200,codeSuffixes=CODE_SUFFIXES,onStatus}={}){
+  start(root,{runUpdate,debounceMs=1200,codeSuffixes=CODE_SUFFIXES,onStatus,retryStaleSource=false}={}){
     if(typeof runUpdate!=='function')throw new TypeError('Graphify watch requires an authorized code update runner');
     if(!(codeSuffixes instanceof Set)||[...codeSuffixes].some(s=>typeof s!=='string'||!/^[.][a-z0-9]{1,8}$/.test(s)))
       throw new TypeError('watch source suffix set is invalid');
     if(onStatus!==undefined&&typeof onStatus!=='function')throw new TypeError('watch status callback must be a function');
+    if(typeof retryStaleSource!=='boolean')throw new TypeError('invalid stale-source retry setting');
     if(!Number.isInteger(debounceMs)||debounceMs<250||debounceMs>10000)throw new RangeError('Graphify watch debounce must be 250..10000 ms');
     const key=normalizeRoot(root);
     const dirs=sourceDirectories(key); // fail before disrupting an existing watch
     if(this.sessions.get(key)?.running)throw new Error('Graphify watch update still running; stop and wait before restart');
     this.stop(key);
-    const session={root:key,debounceMs,runUpdate,onStatus,codeSuffixes:new Set(codeSuffixes),handles:[],pending:new Set(),
+    const session={root:key,debounceMs,runUpdate,onStatus,retryStaleSource,codeSuffixes:new Set(codeSuffixes),handles:[],pending:new Set(),
       timer:null,running:null,controller:null,manual:false,overflow:false,
       batches:0,lastOutcome:'never',closed:false};
     try{
@@ -203,7 +204,17 @@ export class GraphifyWatchCoordinator {
     let executing;
     try{executing=Promise.resolve(session.runUpdate(key,controller.signal));}
     catch(error){executing=Promise.reject(error);}
-    const settled=executing.then(()=>{
+    // Only embedding watch is allowed one bounded retry for a source edit
+    // that occurred during the encoder run. Every other failure halts closed.
+    const bounded=executing.catch(error=>{
+      if(!session.retryStaleSource||session.closed||session.manual||session.overflow||
+        controller.signal.aborted||!session.pending.size||
+        error?.message!=='source changed during embedding; retry after index refresh')throw error;
+      session.pending.clear();
+      if(session.timer){clearTimeout(session.timer);session.timer=null;}
+      return session.runUpdate(key,controller.signal); // exactly one retry
+    });
+    const settled=bounded.then(()=>{
       if(!session.closed){
         if(session.manual||controller.signal.aborted){session.lastOutcome='manual-required';this.halt(session);}
         else{session.batches++;session.lastOutcome='ok';}

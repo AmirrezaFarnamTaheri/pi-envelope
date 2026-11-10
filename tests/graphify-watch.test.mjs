@@ -164,3 +164,33 @@ test('watch activation refuses a directory replaced by a symlink during handle c
  assert.throws(()=>coordinator.start(f.repo,{runUpdate:async()=>{}}),/unsafe|replaced|setup failed|symlink/i);
  assert.equal(coordinator.status(f.repo).active,false);
 });
+
+test('embedding-only stale-source retry runs once when fresh changes are pending',async t=>{
+  const f=fixture(t);let rejectFirst,calls=0;
+  f.coordinator.start(f.repo,{debounceMs:250,retryStaleSource:true,
+    runUpdate:()=>{calls++;return calls===1?new Promise((_,reject)=>{rejectFirst=reject;}):Promise.resolve({action:'ok'});}});
+  f.emit('src','base.ts');
+  const pending=f.coordinator.flush(f.repo);
+  f.emit('src','base.ts');
+  rejectFirst(new Error('source changed during embedding; retry after index refresh'));
+  await pending;
+  assert.equal(calls,2);
+  assert.equal(f.coordinator.status(f.repo).lastOutcome,'ok');
+  assert.equal(f.coordinator.status(f.repo).active,true);
+  f.coordinator.close();
+});
+
+test('stale-source error may retry only once; a second failure always halts',async t=>{
+  const f=fixture(t);let rejectFirst,calls=0;
+  f.coordinator.start(f.repo,{debounceMs:250,retryStaleSource:true,
+    runUpdate:()=>{calls++;return calls===1?new Promise((_,reject)=>{rejectFirst=reject;}):Promise.reject(new Error('source changed during embedding; retry after index refresh'));}});
+  f.emit('src','base.ts');
+  const pending=f.coordinator.flush(f.repo);
+  f.emit('src','base.ts');
+  rejectFirst(new Error('source changed during embedding; retry after index refresh'));
+  await pending;
+  assert.equal(calls,2);
+  const s=f.coordinator.status(f.repo);
+  assert.equal(s.lastOutcome,'failed');assert.equal(s.manualRebuildRequired,true);
+  f.coordinator.close();
+});

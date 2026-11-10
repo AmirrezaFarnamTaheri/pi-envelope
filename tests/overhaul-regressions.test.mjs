@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, symlinkSync, chmodSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { OutputStore } from '../extensions/envelope/store.mjs';
 import { MetricsLedger } from '../extensions/envelope/metrics-ledger.mjs';
@@ -355,7 +355,7 @@ test('LSP-1: envelope_code_rename apply validates diagnostics on post-rename pro
   mkdirSync(home, { recursive: true });
   writeFileSync(join(repo, 'src', 'a.ts'), 'export function add(n:number) { return n+1; }\n');
   writeFileSync(join(repo, 'src', 'b.ts'), "import { add } from './a';\nexport const result=add(2);\n");
-  const mock = new URL('./fixtures/mock-lsp-server.mjs', import.meta.url).pathname;
+  const mock = fileURLToPath(new URL('./fixtures/mock-lsp-server.mjs', import.meta.url));
   writeFileSync(join(home, 'settings.json'), JSON.stringify({
     envelope: { code: { renameEnabled: true, lspCommand: [process.execPath, mock, 'error-after-rename'] } }
   }));

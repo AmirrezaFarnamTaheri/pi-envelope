@@ -1,4 +1,7 @@
-/** Bounded TypeScript/JavaScript compiler facts, not execution or formal proof. */
+/** Bounded TypeScript/JavaScript compiler facts, not execution or formal proof.
+ * Only indexed source and trusted compiler lib files are loaded; bare package imports,
+ * including @types, can yield unresolved-module diagnostics and incomplete evidence.
+ */
 import {createHash} from 'node:crypto';
 import {lstatSync,realpathSync,readFileSync} from 'node:fs';
 import {basename,dirname,resolve,relative,sep} from 'node:path';

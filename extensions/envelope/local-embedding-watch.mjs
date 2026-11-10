@@ -37,7 +37,7 @@ export class EmbeddingWatchCoordinator {
   checkEnabled();
   const codeSuffixes=new Set(EMBEDDING_SUFFIXES);
   if(initial.languagesEnabled===true)for(const suffix of EMBEDDING_LANGUAGE_SUFFIXES)codeSuffixes.add(suffix);
-  const status=this.watcher.start(canonical,{debounceMs,codeSuffixes,onStatus,
+  const status=this.watcher.start(canonical,{debounceMs,codeSuffixes,onStatus,retryStaleSource:true,
    runUpdate:async(_root,signal)=>{
     if(signal.aborted)throw new Error('embedding watch cancelled');
     checkEnabled();
