@@ -1,0 +1,96 @@
+# Publish only a reviewed, CI-verified main commit; no npm namespace publication.
+name: Envelope GitHub Release
+
+on:
+  push:
+    branches:
+      - "release/envelope-v*"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: envelope-github-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'AmirrezaFarnamTaheri/pi-envelope' && startsWith(github.ref, 'refs/heads/release/envelope-v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Check out exact release commit
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Setup supported Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+      - name: Verify main ancestry, package version and exact successful release gates
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Release commit must belong to main"; exit 1
+          fi
+          version="$(node -p 'JSON.parse(require("node:fs").readFileSync("package.json","utf8")).version')"
+          if [ "$GITHUB_REF_NAME" != "release/envelope-v$version" ]; then
+            echo "::error::Release ref must match package.json version"; exit 1
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/release-gates.yml/runs?head_sha=$GITHUB_SHA&per_page=100" \
+            | jq -e --arg sha "$GITHUB_SHA" '[.workflow_runs[] | select(.head_sha == $sha and .head_branch == "main" and .event == "push" and .status == "completed" and .conclusion == "success")] | length > 0'
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$version" --silent >/dev/null 2>&1; then
+            echo "::error::Release tag already exists"; exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Verify and package installable Envelope
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The source repo has no lockfile: exact direct pins, no generated lock.
+          npm install --include=optional --no-save --package-lock=false --no-audit --no-fund
+          npm run check
+          npm run doctor:bundle
+          npm run pack:check
+          mkdir -p release-assets
+          npm pack --ignore-scripts --json --pack-destination release-assets > release-assets/pack-metadata.json
+          tarball="$(node -p 'JSON.parse(require("node:fs").readFileSync("release-assets/pack-metadata.json","utf8"))[0].filename')"
+          test "$tarball" = "pi-envelope-$VERSION.tgz"
+          tar -tzf "release-assets/$tarball" | grep -qx 'package/extensions/envelope/index.js'
+          node -e 'const fs=require("node:fs");fs.writeFileSync("release-assets/BUILD_MANIFEST.json",JSON.stringify({sourceCommit:process.env.GITHUB_SHA,packageVersion:process.env.VERSION,channel:"github-release-only",dependencyInstall:"exact-direct-pins-no-lockfile",node:process.version},null,2)+"\n")'
+          (cd release-assets && sha256sum "pi-envelope-$VERSION.tgz" BUILD_MANIFEST.json > SHA256SUMS)
+          (cd release-assets && sha256sum -c SHA256SUMS)
+          cat > release-assets/RELEASE_NOTES.md <<EOF
+          Envelope v$VERSION — source/installed Pi package tarball built from $GITHUB_SHA.
+
+          Install with: pi install /path/to/pi-envelope-$VERSION.tgz
+          Requires Node.js 22+, a compatible Pi CLI and npm; bundled Tersio/TypeScript dependencies were verified by doctor:bundle.
+
+          This is a fork-specific GitHub release, NOT an npm publication. No assertion of full upstream parity or a reproducible transitive dependency tree is made.
+          EOF
+      - name: Publish only after all checks pass
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GH_REPO="$GITHUB_REPOSITORY"
+          (cd release-assets && sha256sum -c SHA256SUMS)
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "::error::Release already exists"; exit 1
+          fi
+          gh release create "v$VERSION" \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "Envelope v$VERSION" --notes-file release-assets/RELEASE_NOTES.md \
+            "release-assets/pi-envelope-$VERSION.tgz" \
+            release-assets/BUILD_MANIFEST.json \
+            release-assets/SHA256SUMS
+          gh release view "v$VERSION" --json url,isDraft,assets --jq '{url,isDraft,assetCount:(.assets|length)}'
