@@ -108,3 +108,12 @@ test('LSP navigation reports UNVERIFIED for missing servers, unsupported methods
  const result=body(await foreign.call('envelope_code_definition',{path:'src/a.ts',line:1,column:17}));
  assert.equal(result.verdict,'UNVERIFIED');assert.deepEqual(result.locations,[]);
 });
+
+
+test('navigation never labels stale returned files as current indexed evidence',async t=>{
+ const h=fixture(t,{mode:'nav-stale'});
+ const result=body(await h.call('envelope_code_references',{path:'src/a.ts',line:1,column:17}));
+ assert.equal(result.verdict,'UNVERIFIED');
+ assert.deepEqual(result.locations,[]);
+ assert.match(result.reason,/changed|stale|hash|source/i);
+});
