@@ -161,7 +161,7 @@ export function registerManagedJobs(pi,{home,project,allowStarts=()=>false,allow
       try{
         if(!allowAgentRuns())throw new Error('Background agent sessions are disabled; enable /envelope jobs agent on');
         const sessionId='envelope-'+randomUUID();
-        const argv=['--print','--session-id',sessionId,'--tools','read,grep,find,ls','--name',p.name||'Envelope background review','--',p.prompt];
+        const argv=['--print','--no-mcp','--no-extensions','--session-id',sessionId,'--tools','read,grep,find,ls','--name',p.name||'Envelope background review','--',p.prompt];
         const started=await jobs.start({project:project(ctx),command:'pi',args:argv,kind:'agent',sessionId});
         return respond({...started,resumeCommand:'pi --session-id '+sessionId,readOnly:true});
       }catch(error){return respond('Envelope agent: '+error.message,true);}
@@ -177,11 +177,12 @@ async function runWorker(dir){
   const cancelFile=join(dir,'cancel');
   if(existsSync(cancelFile)){write({status:'cancelled'});return;}
   const fd=openSync(join(dir,'output.log'),'a');
-  let written=0;
+  let written=0,outputTruncated=false;
   const emit=buf=>{
     const block=Buffer.isBuffer(buf)?buf:Buffer.from(buf);
     const remaining=state.maxLogBytes-written;
-    if(remaining>0){const n=Math.min(remaining,block.length);writeSync(fd,block,0,n);written+=n;}
+    if(remaining>0){const n=Math.min(remaining,block.length);writeSync(fd,block,0,n);written+=n;if(n<block.length)outputTruncated=true;}
+    else if(block.length>0)outputTruncated=true;
   };
   let child;
   try{
@@ -206,7 +207,7 @@ async function runWorker(dir){
       child.once('close',(code,signal)=>resolve({code,signal}));
     });
     clearInterval(heartbeat);clearInterval(cancelCheck);if(emergency)clearTimeout(emergency);
-    write({status:existsSync(cancelFile)?'cancelled':result.code===0?'completed':'failed',exitCode:result.code,signal:result.signal??null,error:result.error??null,outputTruncated:written>=state.maxLogBytes,finishedAt:Date.now()});
+    write({status:existsSync(cancelFile)?'cancelled':result.code===0?'completed':'failed',exitCode:result.code,signal:result.signal??null,error:result.error??null,outputTruncated,finishedAt:Date.now()});
   }catch(error){write({status:existsSync(cancelFile)?'cancelled':'failed',error:error.message,finishedAt:Date.now()});}
   finally{closeSync(fd);}
 }
