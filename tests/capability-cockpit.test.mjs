@@ -48,3 +48,17 @@ test('existing extension exposes cockpit without registering extra hooks or modi
  assert.equal(JSON.parse(response.content[0].text).capabilities.memory,'disabled');
  assert.equal(hooks.get('tool_result').length,1);
 });
+
+
+test('managed jobs and single-agent execution are separately discoverable and never auto-enabled',()=>{
+ const off=inspectCapabilityCockpit(DEFAULT_CONFIG,{intent:'jobs',pathEnv:''});
+ assert.equal(off.capabilities.jobs,'disabled');
+ assert.equal(off.capabilities.backgroundAgent,'disabled');
+ assert.deepEqual(off.plan.map(x=>x.tool),['envelope_job','envelope_agent_start']);
+ assert.deepEqual(off.plan.map(x=>x.state),['blocked','blocked']);
+ assert.equal(off.toolExecution,false);
+ const jobOnly=inspectCapabilityCockpit({...DEFAULT_CONFIG,jobs:{enabled:true,agentEnabled:false}},{intent:'jobs',pathEnv:''});
+ assert.deepEqual(jobOnly.plan.map(x=>x.state),['suggested','blocked']);
+ const both=inspectCapabilityCockpit({...DEFAULT_CONFIG,jobs:{enabled:true,agentEnabled:true}},{intent:'jobs',pathEnv:''});
+ assert.deepEqual(both.plan.map(x=>x.state),['suggested','suggested']);
+});
