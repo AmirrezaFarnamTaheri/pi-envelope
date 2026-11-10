@@ -443,3 +443,14 @@ test('changing the configured encoder or turning code intelligence off revokes a
  await call('code off');
  assert.equal(watch.status(f.root).active,false);
 });
+
+
+test('already-aborted incremental deletion-only sync leaves prior embeddings untouched',async t=>{
+ const f=fixture(t),runtime=new LocalEmbeddingRuntime();
+ await runtime.build(f.index,{executable:f.encoder});
+ const saved=readFileSync(f.manifest,'utf8');
+ unlinkSync(join(f.root,'src','second.ts'));f.index.refresh();
+ const ctrl=new AbortController();ctrl.abort();
+ await assert.rejects(runtime.sync(f.index,{executable:f.encoder,signal:ctrl.signal}),/cancel|abort/i);
+ assert.equal(readFileSync(f.manifest,'utf8'),saved,'cancellation must forbid deletion-only manifest publication');
+});

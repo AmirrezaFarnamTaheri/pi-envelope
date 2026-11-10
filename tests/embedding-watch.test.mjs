@@ -101,3 +101,20 @@ test('stop waits for pending worker abort before acknowledging revoked consent',
  assert.equal(f.coordinator.status(f.root).active,false);
  assert.ok(f.handles.every(h=>h.closed));
 });
+
+
+test('ambiguous file event aborts an already running automatic encoder update',async t=>{
+ const f=setup(t);let workerSignal,release;
+ await f.coordinator.start(f.root,{refresh:f.refresh,preflight:f.preflight,
+  update:async(_,signal)=>{workerSignal=signal;return new Promise(resolve=>release=resolve);},
+  checkEnabled:f.checkEnabled,debounceMs:250});
+ f.emit('entry.ts');
+ const current=f.coordinator.flush(f.root);
+ for(let i=0;i<30&&!workerSignal;i++)await Promise.resolve();
+ assert.ok(workerSignal,'the automatic worker must have started');
+ f.emit('untracked-config.yaml');
+ assert.equal(f.coordinator.status(f.root).manualRebuildRequired,true);
+ assert.equal(workerSignal.aborted,true,'source-universe uncertainty must cancel the running job');
+ release();await current;
+ await f.coordinator.stopAndWait(f.root);
+});
