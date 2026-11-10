@@ -2,7 +2,7 @@
 
 **Initial audit:** 2026-11-08. **Pinned-source refresh:** 2026-11-10. Three source heads were repinned after checking their reference paths: AxiomCodeGraph, TeaRAGs-MCP, and repo-harness (the last is now hosted at `aimpact-inc/repo-harness`). This updates provenance only, not functional parity.
 
-**Original audit date:** 2026-11-08. **Baseline:** Envelope v0.16.0 commit `0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64`. **Candidate:** v0.21.0 on the unmerged review stack.
+**Original audit date:** 2026-11-08. **Baseline:** Envelope v0.16.0 commit `0ae309be24ca2ba3ceb73f80fe52ad4a8d27dc64`. **Candidate:** v0.22.0 follow-up under review in PR #26 (not merged into main).
 
 The user supplied an assumption that licensing clearance will be resolved separately. It is not a legal opinion. This implementation uses independently written graph code; retain upstream attribution if later copying actual source.
 
