@@ -16,6 +16,7 @@ One project-scoped **`CodeIndex`** serves source maps, symbol lookup, syntactic 
 | `envelope_code_tree_query` | S-expression syntax matches with named captures from real installed Tree-sitter grammars | Disabled by default; hard query/source/output limits; no fabricated fallback |
 | `envelope_code_tree_capture` | Bounded group presets for imports, functions, classes/types, calls and identifiers | Grammar-dependent; no semantic call graph |
 | `envelope_code_lsp_verify` | Explicitly configured external language-server diagnostics | UNVERIFIED on timeout/absent/unreliable responses |
+| `envelope_code_definition` / `envelope_code_references` | Indexed, project-scoped LSP definition and reference locations, 1-based UTF-16 inputs | No whole-program completeness claim; missing server, foreign paths and invalid results are UNVERIFIED |
 | `envelope_code_rename` | Preview-first, hash-checked LSP rename with ordinary-error rollback | **JS/TS-only**, manual apply opt-in, not crash-atomic across files |
 
 Commands: `/envelope code on|off|status`, `/envelope code languages on|off`, `/envelope code tree on|off|status`, `/envelope code guard on|off`, `/envelope code rename on|off`, `/envelope code lsp status`.
