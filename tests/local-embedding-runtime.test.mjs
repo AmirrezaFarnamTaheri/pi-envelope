@@ -6,6 +6,7 @@ import {join} from 'node:path';
 import ts from 'typescript';
 import {CodeIndex} from '../extensions/envelope/code-index.mjs';
 import {LocalEmbeddingRuntime} from '../extensions/envelope/local-embedding-runtime.mjs';
+import {EmbeddingWatchCoordinator} from '../extensions/envelope/local-embedding-watch.mjs';
 import {searchLocalVectors} from '../extensions/envelope/local-vectors.mjs';
 import registerEnvelope from '../extensions/envelope/index.mjs';
 
@@ -354,3 +355,91 @@ test('cancelling an embedding encoder terminates children that inherited stdout'
  assert.ok(Date.now()-start<1250,'all inherited pipes must close promptly after cancellation');
 });
 function lstatMaybe(path){try{lstatSync(path);return true;}catch{return false;}}
+
+
+test('read-only watch preflight validates manifest completeness without invoking a new encoder',async t=>{
+ const f=fixture(t),runtime=new LocalEmbeddingRuntime();
+ await assert.throws(()=>runtime.inspect(f.index,{executable:f.encoder}),/manifest|build explicitly/i);
+ await runtime.build(f.index,{executable:f.encoder});
+ const before=readFileSync(f.manifest,'utf8');
+ const status=runtime.inspect(f.index,{executable:f.encoder});
+ assert.equal(status.ready,true);
+ assert.equal(status.files,2);
+ assert.equal(status.model,'trusted-local-fixture-encoder');
+ assert.equal(readFileSync(f.manifest,'utf8'),before,'inspection must not rewrite the manifest');
+ f.put('first.ts','export function changed(){ return "new auth query"; }');
+ f.index.refresh();
+ assert.throws(()=>runtime.inspect(f.index,{executable:f.encoder}),/manual|current verified|sync/i);
+ assert.equal(readFileSync(f.manifest,'utf8'),before);
+});
+
+test('Pi vectors watch explicitly synchronizes changed source and refuses unknown-event stale reads',async t=>{
+ const f=fixture(t),tools=new Map(),commands=new Map(),hooks=new Map(),notices=[],handles=[];
+ const watchFactory=(dir,options,callback)=>{
+  assert.equal(options.persistent,false);
+  const h={dir,callback,closed:false,close(){this.closed=true;}};handles.push(h);return h;
+ };
+ const embeddingWatcher=new EmbeddingWatchCoordinator({watchFactory});
+ const pi={cwd:f.root,registerTool:x=>tools.set(x.name,x),registerCommand:(name,x)=>commands.set(name,x),
+  on:(name,x)=>hooks.set(name,[...(hooks.get(name)||[]),x]),logger:{warn(){}}};
+ registerEnvelope(pi,{home:f.home,loadCompiler:()=>ts,embeddingWatcher});
+ const ctx={cwd:f.root,ui:{notify:x=>notices.push(String(x))},sessionManager:{getSessionId:()=> 'embedding-watch-pi'}};
+ const call=async text=>commands.get('envelope').handler(text,ctx);
+ const last=()=>notices.at(-1)||'';
+ await call('code vectors encoder '+f.encoder);
+ await call('code vectors on');
+ await call('code vectors watch on 250');
+ assert.match(last(),/watch not enabled|manifest|build explicitly/i,'watch must not bootstrap model execution');
+ assert.equal(embeddingWatcher.status(f.root).active,false);
+ await call('code vectors build');
+ const baseline=readFileSync(f.manifest,'utf8');
+ await call('code vectors watch on 250');
+ assert.equal(embeddingWatcher.status(f.root).active,true,last());
+ assert.equal(readFileSync(f.manifest,'utf8'),baseline,'watch startup cannot re-embed or rewrite');
+ const sourceWatcher=handles.find(h=>!h.closed&&h.dir===join(f.root,'src'));
+ assert.ok(sourceWatcher);
+ f.put('first.ts','export function documentOne(){ return "changed auth retry"; }');
+ sourceWatcher.callback('change','first.ts');
+ await embeddingWatcher.flush(f.root);
+ const changed=JSON.parse(readFileSync(f.manifest,'utf8'));
+ assert.notEqual(JSON.stringify(changed),baseline);
+ assert.equal(changed.entries[0].sha256, (await import('node:crypto')).createHash('sha256').update('export function documentOne(){ return "changed auth retry"; }').digest('hex'));
+ assert.equal(embeddingWatcher.status(f.root).batches,1);
+ sourceWatcher.callback('rename',null);
+ assert.equal(embeddingWatcher.status(f.root).manualRebuildRequired,true);
+ const vector=tools.get('envelope_code_vector');
+ const denied=await vector.execute('watch-test',{action:'search',queryVector:[1,0,0,0,0,0,0,0]},undefined,undefined,ctx);
+ assert.equal(denied.isError,true,'agent tool must not bypass manual watcher recovery state');
+ await call('code vectors find auth retry');
+ assert.match(last(),/manual sync|watcher requires/i);
+ await call('code vectors sync');
+ assert.equal(embeddingWatcher.status(f.root).active,false,'human sync revokes prior watch consent');
+ await call('code vectors watch on 250');
+ assert.equal(embeddingWatcher.status(f.root).active,true,last());
+ await call('code vectors watch off');
+ assert.equal(embeddingWatcher.status(f.root).active,false);
+ assert.ok(handles.every(h=>h.closed));
+ assert.equal(hooks.get('session_shutdown').length,1,'watch must not register an additional Pi hook');
+ hooks.get('session_shutdown')[0]();
+});
+
+test('changing the configured encoder or turning code intelligence off revokes automatic watch consent',async t=>{
+ const f=fixture(t),commands=new Map(),handles=[];
+ const watch=new EmbeddingWatchCoordinator({watchFactory:(dir,opts,callback)=>{
+  const h={dir,callback,close(){this.closed=true;},closed:false};handles.push(h);return h;
+ }});
+ const pi={cwd:f.root,registerTool:()=>{},registerCommand:(name,x)=>commands.set(name,x),on:()=>{},logger:{warn(){}}};
+ registerEnvelope(pi,{home:f.home,loadCompiler:()=>ts,embeddingWatcher:watch});
+ const notices=[],ctx={cwd:f.root,ui:{notify:x=>notices.push(String(x))},sessionManager:{getSessionId:()=> 'watch-revoke'}};
+ const call=async v=>commands.get('envelope').handler(v,ctx);
+ await call('code vectors encoder '+f.encoder);await call('code vectors on');await call('code vectors build');
+ await call('code vectors watch on');
+ assert.equal(watch.status(f.root).active,true);
+ await call('code vectors encoder none');
+ assert.equal(watch.status(f.root).active,false);
+ assert.ok(handles.every(h=>h.closed));
+ await call('code vectors encoder '+f.encoder);await call('code vectors watch on');
+ assert.equal(watch.status(f.root).active,true);
+ await call('code off');
+ assert.equal(watch.status(f.root).active,false);
+});
