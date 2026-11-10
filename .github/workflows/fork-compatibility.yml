@@ -41,11 +41,12 @@ jobs:
           path: envelope
           persist-credentials: false
 
-      - name: Checkout fork main (no write token)
+      - name: Checkout fork for compatibility (no write token)
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: AmirrezaFarnamTaheri/pi
-          ref: main
+          # Test both in-flight PRs together; all other PRs and dispatches use main.
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref == 'feat/managed-jobs-and-agent-sessions' && 'feat/background-shell-runs' || 'main' }}
           path: pi
           persist-credentials: false
 
